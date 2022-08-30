@@ -36,6 +36,7 @@ pub use frame_support::{
 	StorageValue,
 };
 pub use frame_system::Call as SystemCall;
+pub use frame_support::traits::EqualPrivilegeOnly;
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::CurrencyAdapter;
@@ -142,6 +143,8 @@ parameter_types! {
 	pub BlockLength: frame_system::limits::BlockLength = frame_system::limits::BlockLength
 		::max_with_normal_ratio(5 * 1024 * 1024, NORMAL_DISPATCH_RATIO);
 	pub const SS58Prefix: u8 = 42;
+	pub MaximumSchedulerWeight: Weight = 10_000_000;
+ 	pub const MaxScheduledPerBlock: u32 = 50;
 }
 
 // Configure FRAME pallets to include in runtime.
@@ -290,10 +293,27 @@ impl pallet_sudo::Config for Runtime {
 	type Call = Call;
 }
 
+// TODO - Update settings
+impl pallet_scheduler::Config for Runtime {
+	type Event = Event;
+	type Origin = Origin;
+	type PalletsOrigin = OriginCaller;
+	type Call = Call;
+	type MaximumWeight = MaximumSchedulerWeight;
+	type ScheduleOrigin = frame_system::EnsureRoot<AccountId>;
+	type MaxScheduledPerBlock = MaxScheduledPerBlock;
+	type WeightInfo = ();
+	type OriginPrivilegeCmp = EqualPrivilegeOnly;
+	type PreimageProvider = ();
+	type NoPreimagePostponement = ();
+}
+
 /// Configure the pallet-template in pallets/template.
 impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
+
+
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -312,6 +332,7 @@ construct_runtime!(
 		Nicks: pallet_nicks,
 		TransactionPayment: pallet_transaction_payment,
 		Sudo: pallet_sudo,
+		Scheduler: pallet_scheduler,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
 	}
