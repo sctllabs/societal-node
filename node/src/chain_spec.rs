@@ -2,7 +2,7 @@ use node_template_runtime::{
 	opaque::Block, wasm_binary_unwrap, AccountId, AuraConfig, AuthorityDiscoveryConfig, BabeConfig,
 	Balance, BalancesConfig, CouncilConfig, GenesisConfig, GrandpaConfig, ImOnlineConfig,
 	MaxNominations, NominationPoolsConfig, SessionConfig, SessionKeys, Signature, StakerStatus,
-	StakingConfig, SudoConfig, SystemConfig, DOLLARS,
+	StakingConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, DOLLARS,
 };
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sc_chain_spec::ChainSpecExtension;
@@ -161,6 +161,9 @@ pub fn testnet_genesis(
 			get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
 		]
 	});
+
+	let num_endowed_accounts = endowed_accounts.len();
+
 	// endow all authorities and nominators.
 	initial_authorities
 		.iter()
@@ -243,6 +246,15 @@ pub fn testnet_genesis(
 			min_create_bond: 10 * DOLLARS,
 			min_join_bond: 1 * DOLLARS,
 			..Default::default()
+		},
+		technical_membership: Default::default(),
+		technical_committee: TechnicalCommitteeConfig {
+			members: endowed_accounts
+				.iter()
+				.take((num_endowed_accounts + 1) / 2)
+				.cloned()
+				.collect(),
+			phantom: Default::default(),
 		},
 		transaction_payment: Default::default(),
 	}
