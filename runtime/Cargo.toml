@@ -50,7 +50,6 @@ pallet-babe = { version = "4.0.0-dev", default-features = false, git = "https://
 pallet-bags-list = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-balances = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-bounties = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
-pallet-grandpa = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-child-bounties = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-collective = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-contracts = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
@@ -59,11 +58,12 @@ pallet-contracts-rpc-runtime-api = { version = "4.0.0-dev", default-features = f
 pallet-conviction-voting = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-democracy = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-election-provider-multi-phase = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
+pallet-grandpa = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-im-online = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
+pallet-membership = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-nicks = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-nomination-pools = { version = "1.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-nomination-pools-runtime-api = { version = "1.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
-pallet-membership = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-offences = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-randomness-collective-flip = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-referenda = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
@@ -118,21 +118,21 @@ std = [
 	"pallet-election-provider-multi-phase/std",
 	"pallet-grandpa/std",
 	"pallet-im-online/std",
+	"pallet-membership/std",
+	"pallet-nicks/std",
 	"pallet-nomination-pools/std",
 	"pallet-nomination-pools-runtime-api/std",
-	"pallet-membership/std",
+	"pallet-offences/std",
 	"pallet-randomness-collective-flip/std",
+	"pallet-referenda/std",
+	"pallet-scheduler/std",
+	"pallet-session/std",
+	"pallet-staking/std",
 	"pallet-sudo/std",
 	"pallet-template/std",
 	"pallet-timestamp/std",
 	"pallet-transaction-payment-rpc-runtime-api/std",
 	"pallet-transaction-payment/std",
-	"pallet-nicks/std",
-	"pallet-offences/std",
-	"pallet-referenda/std",
-	"pallet-scheduler/std",
-	"pallet-session/std",
-	"pallet-staking/std",
 	"pallet-treasury/std",
 	"scale-info/std",
 	"sp-api/std",
@@ -163,32 +163,32 @@ runtime-benchmarks = [
 ]
 try-runtime = [
 	"frame-executive/try-runtime",
-	"frame-try-runtime",
 	"frame-system/try-runtime",
+	"frame-try-runtime",
 	"pallet-assets/try-runtime",
 	"pallet-aura/try-runtime",
-	"pallet-balances/try-runtime",
-	"pallet-democracy/try-runtime",
-	"pallet-grandpa/try-runtime",
-	"pallet-randomness-collective-flip/try-runtime",
-	"pallet-sudo/try-runtime",
-	"pallet-template/try-runtime",
-	"pallet-timestamp/try-runtime",
-	"pallet-transaction-payment/try-runtime",
 	"pallet-authority-discovery/try-runtime",
 	"pallet-authorship/try-runtime",
 	"pallet-babe/try-runtime",
 	"pallet-bags-list/try-runtime",
+	"pallet-balances/try-runtime",
 	"pallet-bounties/try-runtime",
 	"pallet-child-bounties/try-runtime",
 	"pallet-collective/try-runtime",
 	"pallet-conviction-voting/try-runtime",
+	"pallet-democracy/try-runtime",
 	"pallet-election-provider-multi-phase/try-runtime",
+	"pallet-grandpa/try-runtime",
 	"pallet-im-online/try-runtime",
 	"pallet-membership/try-runtime",
 	"pallet-offences/try-runtime",
+	"pallet-randomness-collective-flip/try-runtime",
 	"pallet-referenda/try-runtime",
 	"pallet-session/try-runtime",
 	"pallet-staking/try-runtime",
+	"pallet-sudo/try-runtime",
+	"pallet-template/try-runtime",
+	"pallet-timestamp/try-runtime",
+	"pallet-transaction-payment/try-runtime",
 	"pallet-treasury/try-runtime",
 ]
