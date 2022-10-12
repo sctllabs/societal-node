@@ -26,6 +26,7 @@ use frame_support::{
 	PalletId,
 };
 use frame_system::EnsureSigned;
+use node_primitives::AccountIndex;
 pub use node_primitives::{AccountId, Balance, BlockNumber, Hash, Index, Moment, Signature};
 use pallet_contracts::{DefaultAddressGenerator, DefaultContractAccessWeight};
 use pallet_grandpa::{
@@ -1062,6 +1063,19 @@ impl pallet_democracy::Config for Runtime {
 	type MaxProposals = MaxProposals;
 }
 
+parameter_types! {
+	pub const IndexDeposit: Balance = 1 * DOLLARS;
+}
+
+// TODO - Update settings
+impl pallet_indices::Config for Runtime {
+	type AccountIndex = AccountIndex;
+	type Currency = Balances;
+	type Deposit = IndexDeposit;
+	type Event = Event;
+	type WeightInfo = pallet_indices::weights::SubstrateWeight<Runtime>;
+}
+
 impl pallet_sudo::Config for Runtime {
 	type Event = Event;
 	type Call = Call;
@@ -1130,6 +1144,7 @@ construct_runtime!(
 		Assets: pallet_assets,
 		AssetTxPayment: pallet_asset_tx_payment,
 		Democracy: pallet_democracy,
+		Indices: pallet_indices,
 	}
 );
 

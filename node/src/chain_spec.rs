@@ -1,8 +1,9 @@
 use node_template_runtime::{
 	opaque::Block, wasm_binary_unwrap, AccountId, AuraConfig, AuthorityDiscoveryConfig, BabeConfig,
 	Balance, BalancesConfig, CouncilConfig, DemocracyConfig, GenesisConfig, GrandpaConfig,
-	ImOnlineConfig, MaxNominations, NominationPoolsConfig, SessionConfig, SessionKeys, Signature,
-	StakerStatus, StakingConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, DOLLARS,
+	ImOnlineConfig, IndicesConfig, MaxNominations, NominationPoolsConfig, SessionConfig,
+	SessionKeys, Signature, StakerStatus, StakingConfig, SudoConfig, SystemConfig,
+	TechnicalCommitteeConfig, DOLLARS,
 };
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sc_chain_spec::ChainSpecExtension;
@@ -258,6 +259,7 @@ pub fn testnet_genesis(
 		},
 		assets: Default::default(),
 		democracy: DemocracyConfig::default(),
+		indices: IndicesConfig { indices: vec![] },
 		transaction_payment: Default::default(),
 	}
 }

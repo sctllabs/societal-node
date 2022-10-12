@@ -3867,6 +3867,7 @@ dependencies = [
  "pallet-election-provider-multi-phase",
  "pallet-grandpa",
  "pallet-im-online",
+ "pallet-indices",
  "pallet-membership",
  "pallet-nicks",
  "pallet-nomination-pools",
@@ -4428,6 +4429,22 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-staking",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-indices"
+version = "4.0.0-dev"
+source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.28#ce10b9f29353e89fc3e59d447041bb29622def3f"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-keyring",
+ "sp-runtime",
  "sp-std",
 ]
 
