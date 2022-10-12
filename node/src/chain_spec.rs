@@ -256,6 +256,7 @@ pub fn testnet_genesis(
 				.collect(),
 			phantom: Default::default(),
 		},
+		assets: Default::default(),
 		transaction_payment: Default::default(),
 	}
 }

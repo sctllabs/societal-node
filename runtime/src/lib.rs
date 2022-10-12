@@ -38,7 +38,7 @@ use sp_runtime::{
 	create_runtime_str,
 	curve::PiecewiseLinear,
 	generic, impl_opaque_keys,
-	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, NumberFor, OpaqueKeys},
+	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, ConvertInto, NumberFor, OpaqueKeys},
 	transaction_validity::{TransactionPriority, TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult, FixedU128, Percent,
 };
@@ -74,6 +74,10 @@ use pallet_transaction_payment::CurrencyAdapter;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
+
+/// Implementations of some helper traits passed into runtime modules as associated types.
+pub mod impls;
+use impls::CreditToBlockAuthor;
 
 use pallet_election_provider_multi_phase::SolutionAccuracyOf;
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
@@ -955,6 +959,42 @@ impl pallet_referenda::Config for Runtime {
 	type Tracks = TracksInfo;
 }
 
+parameter_types! {
+	pub const AssetDeposit: Balance = 100 * DOLLARS;
+	pub const ApprovalDeposit: Balance = 1 * DOLLARS;
+	pub const StringLimit: u32 = 50;
+	pub const MetadataDepositBase: Balance = 10 * DOLLARS;
+	pub const MetadataDepositPerByte: Balance = 1 * DOLLARS;
+}
+
+// TODO - Update settings
+impl pallet_assets::Config for Runtime {
+	type Event = Event;
+	type Balance = u128;
+	type AssetId = u32;
+	type Currency = Balances;
+	type ForceOrigin = EnsureRoot<AccountId>;
+	type AssetDeposit = AssetDeposit;
+	type AssetAccountDeposit = ConstU128<DOLLARS>;
+	type MetadataDepositBase = MetadataDepositBase;
+	type MetadataDepositPerByte = MetadataDepositPerByte;
+	type ApprovalDeposit = ApprovalDeposit;
+	type StringLimit = StringLimit;
+	type Freezer = ();
+	type Extra = ();
+	type WeightInfo = pallet_assets::weights::SubstrateWeight<Runtime>;
+}
+
+// TODO - Update settings
+impl pallet_asset_tx_payment::Config for Runtime {
+	type Event = Event;
+	type Fungibles = Assets;
+	type OnChargeAssetTransaction = pallet_asset_tx_payment::FungiblesAdapter<
+		pallet_assets::BalanceToAssetBalance<Balances, Runtime, ConvertInto>,
+		CreditToBlockAuthor,
+	>;
+}
+
 impl pallet_sudo::Config for Runtime {
 	type Event = Event;
 	type Call = Call;
@@ -1020,6 +1060,8 @@ construct_runtime!(
 		TechnicalMembership: pallet_membership::<Instance1>,
 		Referenda: pallet_referenda,
 		ConvictionVoting: pallet_conviction_voting,
+		Assets: pallet_assets,
+		AssetTxPayment: pallet_asset_tx_payment,
 	}
 );
 
@@ -1039,6 +1081,7 @@ pub type SignedExtra = (
 	frame_system::CheckNonce<Runtime>,
 	frame_system::CheckWeight<Runtime>,
 	pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+	pallet_asset_tx_payment::ChargeAssetTxPayment<Runtime>,
 );
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, SignedExtra>;
