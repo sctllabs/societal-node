@@ -3865,6 +3865,7 @@ dependencies = [
  "pallet-conviction-voting",
  "pallet-democracy",
  "pallet-election-provider-multi-phase",
+ "pallet-elections-phragmen",
  "pallet-grandpa",
  "pallet-im-online",
  "pallet-indices",
@@ -3901,6 +3902,7 @@ dependencies = [
  "sp-std",
  "sp-transaction-pool",
  "sp-version",
+ "static_assertions",
  "substrate-wasm-builder",
 ]
 
@@ -4388,6 +4390,23 @@ dependencies = [
  "sp-std",
  "static_assertions",
  "strum",
+]
+
+[[package]]
+name = "pallet-elections-phragmen"
+version = "5.0.0-dev"
+source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.28#ce10b9f29353e89fc3e59d447041bb29622def3f"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-npos-elections",
+ "sp-runtime",
+ "sp-std",
 ]
 
 [[package]]

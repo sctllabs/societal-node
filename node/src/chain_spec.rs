@@ -1,8 +1,8 @@
 use node_template_runtime::{
 	opaque::Block, wasm_binary_unwrap, AccountId, AuraConfig, AuthorityDiscoveryConfig, BabeConfig,
-	Balance, BalancesConfig, CouncilConfig, DemocracyConfig, GenesisConfig, GrandpaConfig,
-	ImOnlineConfig, IndicesConfig, MaxNominations, NominationPoolsConfig, SessionConfig,
-	SessionKeys, Signature, StakerStatus, StakingConfig, SudoConfig, SystemConfig,
+	Balance, BalancesConfig, CouncilConfig, DemocracyConfig, ElectionsConfig, GenesisConfig,
+	GrandpaConfig, ImOnlineConfig, IndicesConfig, MaxNominations, NominationPoolsConfig,
+	SessionConfig, SessionKeys, Signature, StakerStatus, StakingConfig, SudoConfig, SystemConfig,
 	TechnicalCommitteeConfig, DOLLARS,
 };
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
@@ -260,6 +260,14 @@ pub fn testnet_genesis(
 		assets: Default::default(),
 		democracy: DemocracyConfig::default(),
 		indices: IndicesConfig { indices: vec![] },
+		elections: ElectionsConfig {
+			members: endowed_accounts
+				.iter()
+				.take((num_endowed_accounts + 1) / 2)
+				.cloned()
+				.map(|member| (member, STASH))
+				.collect(),
+		},
 		transaction_payment: Default::default(),
 	}
 }
