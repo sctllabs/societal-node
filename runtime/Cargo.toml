@@ -59,6 +59,7 @@ pallet-im-online = { version = "4.0.0-dev", default-features = false, git = "htt
 pallet-nicks = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-nomination-pools = { version = "1.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-nomination-pools-runtime-api = { version = "1.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
+pallet-membership = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-offences = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-randomness-collective-flip = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 pallet-scheduler = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
@@ -111,6 +112,7 @@ std = [
 	"pallet-im-online/std",
 	"pallet-nomination-pools/std",
 	"pallet-nomination-pools-runtime-api/std",
+	"pallet-membership/std",
 	"pallet-randomness-collective-flip/std",
 	"pallet-sudo/std",
 	"pallet-template/std",
@@ -171,6 +173,7 @@ try-runtime = [
 	"pallet-collective/try-runtime",
 	"pallet-election-provider-multi-phase/try-runtime",
 	"pallet-im-online/try-runtime",
+	"pallet-membership/try-runtime",
 	"pallet-offences/try-runtime",
 	"pallet-session/try-runtime",
 	"pallet-staking/try-runtime",
