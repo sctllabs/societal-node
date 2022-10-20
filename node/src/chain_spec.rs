@@ -4,9 +4,10 @@ use sc_service::ChainType;
 use serde::{Deserialize, Serialize};
 use societal_node_runtime::{
 	opaque::Block, wasm_binary_unwrap, AccountId, AuraConfig, AuthorityDiscoveryConfig, BabeConfig,
-	Balance, BalancesConfig, CouncilConfig, GenesisConfig, GrandpaConfig, ImOnlineConfig,
-	MaxNominations, NominationPoolsConfig, SessionConfig, SessionKeys, Signature, StakerStatus,
-	StakingConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, DOLLARS,
+	Balance, BalancesConfig, CouncilConfig, DemocracyConfig, ElectionsConfig, GenesisConfig,
+	GrandpaConfig, ImOnlineConfig, IndicesConfig, MaxNominations, NominationPoolsConfig,
+	SessionConfig, SessionKeys, Signature, SocietyConfig, StakerStatus, StakingConfig, SudoConfig,
+	SystemConfig, TechnicalCommitteeConfig, DOLLARS,
 };
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_consensus_babe::AuthorityId as BabeId;
@@ -256,6 +257,27 @@ pub fn testnet_genesis(
 				.collect(),
 			phantom: Default::default(),
 		},
+		assets: Default::default(),
+		democracy: DemocracyConfig::default(),
+		indices: IndicesConfig { indices: vec![] },
+		elections: ElectionsConfig {
+			members: endowed_accounts
+				.iter()
+				.take((num_endowed_accounts + 1) / 2)
+				.cloned()
+				.map(|member| (member, STASH))
+				.collect(),
+		},
+		society: SocietyConfig {
+			members: endowed_accounts
+				.iter()
+				.take((num_endowed_accounts + 1) / 2)
+				.cloned()
+				.collect(),
+			pot: 0,
+			max_members: 999,
+		},
+		vesting: Default::default(),
 		transaction_payment: Default::default(),
 	}
 }
