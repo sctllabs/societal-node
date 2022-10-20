@@ -7,8 +7,11 @@ use crate::{
 use frame_benchmarking_cli::{BenchmarkCmd, ExtrinsicFactory, SUBSTRATE_REFERENCE_HARDWARE};
 use sc_cli::{ChainSpec, RuntimeVersion, SubstrateCli};
 use sc_service::PartialComponents;
+use societal_node::service::{new_partial, ExecutorDispatch, FullClient};
 use societal_node_runtime::{Block, EXISTENTIAL_DEPOSIT};
 use sp_keyring::Sr25519Keyring;
+
+use std::sync::Arc;
 
 impl SubstrateCli for Cli {
 	fn impl_name() -> String {
@@ -49,7 +52,7 @@ impl SubstrateCli for Cli {
 	}
 }
 
-/// Parse and run command line arguments
+/// Parse command line arguments into service configuration.
 pub fn run() -> sc_cli::Result<()> {
 	let cli = Cli::from_args();
 
@@ -96,9 +99,9 @@ pub fn run() -> sc_cli::Result<()> {
 		Some(Subcommand::Revert(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
-				let PartialComponents { client, task_manager, backend, .. } =
-					service::new_partial(&config)?;
-				let aux_revert = Box::new(|client, _, blocks| {
+				let PartialComponents { client, task_manager, backend, .. } = new_partial(&config)?;
+				let aux_revert = Box::new(|client: Arc<FullClient>, backend, blocks| {
+					sc_consensus_babe::revert(client.clone(), backend, blocks)?;
 					sc_finality_grandpa::revert(client, blocks)?;
 					Ok(())
 				});
@@ -121,7 +124,7 @@ pub fn run() -> sc_cli::Result<()> {
 							)
 						}
 
-						cmd.run::<Block, service::ExecutorDispatch>(config)
+						cmd.run::<Block, ExecutorDispatch>(config)
 					},
 					BenchmarkCmd::Block(cmd) => {
 						let PartialComponents { client, .. } = service::new_partial(&config)?;
@@ -170,7 +173,8 @@ pub fn run() -> sc_cli::Result<()> {
 				let task_manager =
 					sc_service::TaskManager::new(config.tokio_handle.clone(), registry)
 						.map_err(|e| sc_cli::Error::Service(sc_service::Error::Prometheus(e)))?;
-				Ok((cmd.run::<Block, service::ExecutorDispatch>(config), task_manager))
+
+				Ok((cmd.run::<Block, ExecutorDispatch>(config), task_manager))
 			})
 		},
 		#[cfg(not(feature = "try-runtime"))]
@@ -184,7 +188,8 @@ pub fn run() -> sc_cli::Result<()> {
 		None => {
 			let runner = cli.create_runner(&cli.run)?;
 			runner.run_node_until_exit(|config| async move {
-				service::new_full(config).map_err(sc_cli::Error::Service)
+				service::new_full(config, cli.no_hardware_benchmarks)
+					.map_err(sc_cli::Error::Service)
 			})
 		},
 	}

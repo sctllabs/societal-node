@@ -33,7 +33,7 @@ use pallet_grandpa::{
 	fg_primitives, AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList,
 };
 use sp_api::impl_runtime_apis;
-use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::{
 	create_runtime_str,
@@ -77,16 +77,12 @@ use pallet_transaction_payment::CurrencyAdapter;
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
-/// Implementations of some helper traits passed into runtime modules as associated types.
-pub mod impls;
-use impls::CreditToBlockAuthor;
-
 use pallet_election_provider_multi_phase::SolutionAccuracyOf;
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use pallet_session::historical as pallet_session_historical;
 
 /// Import the template pallet.
-pub use pallet_template;
+pub use pallet_dao;
 
 /// Generated voter bag information.
 mod voter_bags;
@@ -115,20 +111,13 @@ pub mod opaque {
 	pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 	/// Opaque block identifier type.
 	pub type BlockId = generic::BlockId<Block>;
-
-	impl_opaque_keys! {
-		pub struct SessionKeys {
-			pub aura: Aura,
-			pub grandpa: Grandpa,
-		}
-	}
 }
 
 // To learn more about runtime versioning, see:
 // https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-	spec_name: create_runtime_str!("societal-node"),
+	spec_name: create_runtime_str!("node"),
 	impl_name: create_runtime_str!("societal-node"),
 	authoring_version: 1,
 	// The version of the runtime specification. A full node will not attempt to use its native
@@ -260,12 +249,6 @@ impl frame_system::Config for Runtime {
 
 impl pallet_randomness_collective_flip::Config for Runtime {}
 
-impl pallet_aura::Config for Runtime {
-	type AuthorityId = AuraId;
-	type DisabledValidators = ();
-	type MaxAuthorities = ConstU32<32>;
-}
-
 impl pallet_grandpa::Config for Runtime {
 	type Event = Event;
 	type Call = Call;
@@ -286,12 +269,15 @@ impl pallet_grandpa::Config for Runtime {
 	type MaxAuthorities = ConstU32<32>;
 }
 
+parameter_types! {
+	pub const MinimumPeriod: Moment = SLOT_DURATION / 2;
+}
+
 impl pallet_timestamp::Config for Runtime {
-	/// A timestamp: milliseconds since the unix epoch.
-	type Moment = u64;
-	type OnTimestampSet = Aura;
-	type MinimumPeriod = ConstU64<{ SLOT_DURATION / 2 }>;
-	type WeightInfo = ();
+	type Moment = Moment;
+	type OnTimestampSet = Babe;
+	type MinimumPeriod = MinimumPeriod;
+	type WeightInfo = pallet_timestamp::weights::SubstrateWeight<Runtime>;
 }
 
 /// Existential deposit.
@@ -987,16 +973,6 @@ impl pallet_assets::Config for Runtime {
 	type WeightInfo = pallet_assets::weights::SubstrateWeight<Runtime>;
 }
 
-// TODO - Update settings
-impl pallet_asset_tx_payment::Config for Runtime {
-	type Event = Event;
-	type Fungibles = Assets;
-	type OnChargeAssetTransaction = pallet_asset_tx_payment::FungiblesAdapter<
-		pallet_assets::BalanceToAssetBalance<Balances, Runtime, ConvertInto>,
-		CreditToBlockAuthor,
-	>;
-}
-
 parameter_types! {
 	// One cent: $10,000 / MB
 	pub const PreimageByteDeposit: Balance = 1 * CENTS;
@@ -1312,7 +1288,6 @@ construct_runtime!(
 		System: frame_system,
 		RandomnessCollectiveFlip: pallet_randomness_collective_flip,
 		Timestamp: pallet_timestamp,
-		Aura: pallet_aura,
 		Grandpa: pallet_grandpa,
 		Balances: pallet_balances,
 		Nicks: pallet_nicks,
@@ -1342,7 +1317,6 @@ construct_runtime!(
 		Referenda: pallet_referenda,
 		ConvictionVoting: pallet_conviction_voting,
 		Assets: pallet_assets,
-		AssetTxPayment: pallet_asset_tx_payment,
 		Democracy: pallet_democracy,
 		Indices: pallet_indices,
 		Elections: pallet_elections_phragmen,
@@ -1369,7 +1343,6 @@ pub type SignedExtra = (
 	frame_system::CheckNonce<Runtime>,
 	frame_system::CheckWeight<Runtime>,
 	pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
-	pallet_asset_tx_payment::ChargeAssetTxPayment<Runtime>,
 );
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, SignedExtra>;
@@ -1457,25 +1430,80 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl sp_consensus_aura::AuraApi<Block, AuraId> for Runtime {
-		fn slot_duration() -> sp_consensus_aura::SlotDuration {
-			sp_consensus_aura::SlotDuration::from_millis(Aura::slot_duration())
+	impl pallet_nomination_pools_runtime_api::NominationPoolsApi<Block, AccountId, Balance> for Runtime {
+		fn pending_rewards(member_account: AccountId) -> Balance {
+			NominationPools::pending_rewards(member_account)
+		}
+	}
+
+	impl sp_consensus_babe::BabeApi<Block> for Runtime {
+		fn configuration() -> sp_consensus_babe::BabeGenesisConfiguration {
+			// The choice of `c` parameter (where `1 - c` represents the
+			// probability of a slot being empty), is done in accordance to the
+			// slot duration and expected target block time, for safely
+			// resisting network delays of maximum two seconds.
+			// <https://research.web3.foundation/en/latest/polkadot/BABE/Babe/#6-practical-results>
+			sp_consensus_babe::BabeGenesisConfiguration {
+				slot_duration: Babe::slot_duration(),
+				epoch_length: EpochDuration::get(),
+				c: BABE_GENESIS_EPOCH_CONFIG.c,
+				genesis_authorities: Babe::authorities().to_vec(),
+				randomness: Babe::randomness(),
+				allowed_slots: BABE_GENESIS_EPOCH_CONFIG.allowed_slots,
+			}
 		}
 
-		fn authorities() -> Vec<AuraId> {
-			Aura::authorities().into_inner()
+		fn current_epoch_start() -> sp_consensus_babe::Slot {
+			Babe::current_epoch_start()
+		}
+
+		fn current_epoch() -> sp_consensus_babe::Epoch {
+			Babe::current_epoch()
+		}
+
+		fn next_epoch() -> sp_consensus_babe::Epoch {
+			Babe::next_epoch()
+		}
+
+		fn generate_key_ownership_proof(
+			_slot: sp_consensus_babe::Slot,
+			authority_id: sp_consensus_babe::AuthorityId,
+		) -> Option<sp_consensus_babe::OpaqueKeyOwnershipProof> {
+			use codec::Encode;
+
+			Historical::prove((sp_consensus_babe::KEY_TYPE, authority_id))
+				.map(|p| p.encode())
+				.map(sp_consensus_babe::OpaqueKeyOwnershipProof::new)
+		}
+
+		fn submit_report_equivocation_unsigned_extrinsic(
+			equivocation_proof: sp_consensus_babe::EquivocationProof<<Block as BlockT>::Header>,
+			key_owner_proof: sp_consensus_babe::OpaqueKeyOwnershipProof,
+		) -> Option<()> {
+			let key_owner_proof = key_owner_proof.decode()?;
+
+			Babe::submit_unsigned_equivocation_report(
+				equivocation_proof,
+				key_owner_proof,
+			)
+		}
+	}
+
+	impl sp_authority_discovery::AuthorityDiscoveryApi<Block> for Runtime {
+		fn authorities() -> Vec<AuthorityDiscoveryId> {
+			AuthorityDiscovery::authorities()
 		}
 	}
 
 	impl sp_session::SessionKeys<Block> for Runtime {
 		fn generate_session_keys(seed: Option<Vec<u8>>) -> Vec<u8> {
-			opaque::SessionKeys::generate(seed)
+			SessionKeys::generate(seed)
 		}
 
 		fn decode_session_keys(
 			encoded: Vec<u8>,
 		) -> Option<Vec<(Vec<u8>, KeyTypeId)>> {
-			opaque::SessionKeys::decode_into_raw_public_keys(&encoded)
+			SessionKeys::decode_into_raw_public_keys(&encoded)
 		}
 	}
 

@@ -22,6 +22,7 @@ static_assertions = "1.1.0"
 # primitives
 node-primitives = { version = "2.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 sp-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
+sp-authority-discovery = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 sp-block-builder = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 sp-consensus-aura = { version = "0.10.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 sp-consensus-babe = { version = "0.10.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
@@ -149,6 +150,7 @@ std = [
 	"pallet-vesting/std",
 	"scale-info/std",
 	"sp-api/std",
+	"sp-authority-discovery/std",
 	"sp-block-builder/std",
 	"sp-consensus-aura/std",
 	"sp-consensus-babe/std",
