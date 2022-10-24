@@ -3,11 +3,11 @@ use sc_chain_spec::ChainSpecExtension;
 use sc_service::ChainType;
 use serde::{Deserialize, Serialize};
 use societal_node_runtime::{
-	opaque::Block, wasm_binary_unwrap, AccountId, AuraConfig, AuthorityDiscoveryConfig, BabeConfig,
-	Balance, BalancesConfig, CouncilConfig, DemocracyConfig, ElectionsConfig, GenesisConfig,
-	GrandpaConfig, ImOnlineConfig, IndicesConfig, MaxNominations, NominationPoolsConfig,
-	SessionConfig, SessionKeys, Signature, SocietyConfig, StakerStatus, StakingConfig, SudoConfig,
-	SystemConfig, TechnicalCommitteeConfig, DOLLARS,
+	opaque::Block, wasm_binary_unwrap, AccountId, AuthorityDiscoveryConfig, BabeConfig, Balance,
+	BalancesConfig, CouncilConfig, DemocracyConfig, ElectionsConfig, GenesisConfig, GrandpaConfig,
+	ImOnlineConfig, IndicesConfig, MaxNominations, NominationPoolsConfig, SessionConfig,
+	SessionKeys, Signature, SocietyConfig, StakerStatus, StakingConfig, SudoConfig, SystemConfig,
+	TechnicalCommitteeConfig, DOLLARS,
 };
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_consensus_babe::AuthorityId as BabeId;
@@ -201,16 +201,7 @@ pub fn testnet_genesis(
 			// Configure endowed accounts with initial balance of 1 << 60.
 			balances: endowed_accounts.iter().cloned().map(|k| (k, 1 << 60)).collect(),
 		},
-		// TODO: revise
-		aura: AuraConfig {
-			authorities: vec![], /* authorities: initial_authorities.iter().map(|x|
-			                      * (x.0.clone())).collect(), */
-		},
-		// TODO: revise
-		grandpa: GrandpaConfig {
-			authorities: vec![], /* authorities: initial_authorities.iter().map(|x| (x.1.clone(),
-			                      * 1)).collect(), */
-		},
+		grandpa: GrandpaConfig { authorities: vec![] },
 		sudo: SudoConfig {
 			// Assign network admin rights.
 			key: Some(root_key),
