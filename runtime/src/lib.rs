@@ -1289,9 +1289,19 @@ impl pallet_scheduler::Config for Runtime {
 	type NoPreimagePostponement = ();
 }
 
-/// Configure the pallet-template in pallets/template.
-impl pallet_template::Config for Runtime {
+parameter_types! {
+	pub const TemplatePalletId: PalletId = PalletId(*b"py/tmplt");
+	pub const TaxInPercent: u32 = 0;
+}
+
+impl pallet_dao::Config for Runtime {
 	type Event = Event;
+	type Call = Call;
+	type Currency = Balances;
+	type PalletId = TemplatePalletId;
+	type TaxInPercent = TaxInPercent;
+	type SupervisorOrigin = EnsureRoot<AccountId>;
+	type TimeProvider = pallet_timestamp::Pallet<Runtime>;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -1311,8 +1321,7 @@ construct_runtime!(
 		TransactionPayment: pallet_transaction_payment,
 		Sudo: pallet_sudo,
 		Scheduler: pallet_scheduler,
-		// Include the custom logic from the pallet-template in the runtime.
-		TemplateModule: pallet_template,
+		Dao: pallet_dao,
 		Contracts: pallet_contracts,
 		AuthorityDiscovery: pallet_authority_discovery,
 		Authorship: pallet_authorship,
@@ -1386,7 +1395,7 @@ mod benches {
 		[frame_system, SystemBench::<Runtime>]
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
-		[pallet_template, TemplateModule]
+		[pallet_dao, Dao]
 	);
 }
 
