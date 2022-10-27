@@ -1291,7 +1291,8 @@ impl pallet_scheduler::Config for Runtime {
 
 parameter_types! {
 	pub const TemplatePalletId: PalletId = PalletId(*b"py/tmplt");
-	pub const TaxInPercent: u32 = 0;
+	pub const DaoStringLimit: u32 = 50;
+	pub const DaoMetadataLimit: u32 = 500;
 }
 
 impl pallet_dao::Config for Runtime {
@@ -1299,9 +1300,12 @@ impl pallet_dao::Config for Runtime {
 	type Call = Call;
 	type Currency = Balances;
 	type PalletId = TemplatePalletId;
-	type TaxInPercent = TaxInPercent;
 	type SupervisorOrigin = EnsureRoot<AccountId>;
 	type TimeProvider = pallet_timestamp::Pallet<Runtime>;
+	type DaoStringLimit = DaoStringLimit;
+	type DaoMetadataLimit = DaoMetadataLimit;
+	type AssetId = u32;
+	type Balance = u128;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

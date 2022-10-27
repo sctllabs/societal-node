@@ -3,15 +3,19 @@
 use codec::MaxEncodedLen;
 use frame_support::{
 	codec::{Decode, Encode},
-	traits::{Currency, Get, ReservableCurrency, UnfilteredDispatchable},
+	dispatch::DispatchResult,
+	traits::{
+		tokens::fungibles::{Inspect, Mutate},
+		Currency,
+		ExistenceRequirement::KeepAlive,
+		Get, ReservableCurrency, UnfilteredDispatchable, UnixTime,
+	},
 	weights::GetDispatchInfo,
 	BoundedVec, PalletId,
 };
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// <https://docs.substrate.io/reference/frame-pallets/>
 pub use pallet::*;
 use scale_info::TypeInfo;
+use serde::{self, Deserialize, Serialize};
 use sp_runtime::{traits::AccountIdConversion, RuntimeDebug};
 use sp_std::prelude::*;
 
@@ -24,39 +28,108 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+// TODO
 type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+
+type OrganizationOf<T> = Organization<
+	<T as frame_system::Config>::AccountId,
+	<T as pallet_assets::Config>::AssetId,
+	BoundedVec<u8, <T as Config>::DaoStringLimit>,
+	BoundedVec<u8, <T as Config>::DaoStringLimit>,
+>;
+type ProposalOf<T> = Proposal<<T as frame_system::Config>::AccountId>;
+
+type AssetId<T> = <T as Config>::AssetId;
+type Balance<T> = <T as Config>::Balance;
 
 #[frame_support::pallet]
 pub mod pallet {
 	pub use super::*;
-	use frame_support::{pallet_prelude::*, traits::UnixTime};
+	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
+	use serde::Deserializer;
 
 	/// The current storage version.
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
-	const MAX_DESCRIPTION_LENGTH: u32 = 300;
 
-	type DescriptionLength = ConstU32<MAX_DESCRIPTION_LENGTH>;
+	#[derive(
+		Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	)]
+	pub struct DaoTokenMetadata {
+		#[serde(deserialize_with = "de_string_to_bytes")]
+		name: Vec<u8>,
+		#[serde(deserialize_with = "de_string_to_bytes")]
+		symbol: Vec<u8>,
+		decimals: u8,
+	}
 
-	#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
-	pub struct OrgConfig {
-		/// Name of the DAO.
-		pub name: BoundedVec<u8, ConstU32<15>>,
-		/// Purpose of this DAO.
-		pub purpose: BoundedVec<u8, ConstU32<150>>,
-		//TODO: Generic metadata.
+	#[derive(
+		Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	)]
+	pub struct DaoGovernanceToken {
+		token_id: u32,
+		metadata: DaoTokenMetadata,
+		#[serde(deserialize_with = "de_string_to_u128")]
+		min_balance: u128,
+	}
+
+	#[derive(
+		Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	)]
+	pub struct DaoPolicy {
+		pub proposal_bond: u128,
+		pub proposal_period: u64,
+	}
+
+	#[derive(
+		Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	)]
+	pub struct OrganizationPayload {
+		#[serde(deserialize_with = "de_string_to_bytes")]
+		name: Vec<u8>,
+		#[serde(deserialize_with = "de_string_to_bytes")]
+		purpose: Vec<u8>,
+		#[serde(deserialize_with = "de_string_to_bytes")]
+		metadata: Vec<u8>,
+		token: Option<DaoGovernanceToken>,
+		token_id: Option<u32>,
+		policy: DaoPolicy,
+	}
+
+	pub fn de_string_to_bytes<'de, D>(de: D) -> Result<Vec<u8>, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		let s: &str = Deserialize::deserialize(de)?;
+		Ok(s.as_bytes().to_vec())
+	}
+
+	pub fn de_string_to_u128<'de, D>(de: D) -> Result<u128, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		let s: &str = Deserialize::deserialize(de)?;
+		Ok(s.parse::<u128>().unwrap())
 	}
 
 	#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
-	pub struct Organization<AccountId> {
+	pub struct OrganizationConfig<BoundedString, BoundedMetadata> {
+		/// Name of the DAO.
+		pub name: BoundedString,
+		/// Purpose of this DAO.
+		pub purpose: BoundedString,
+		/// Generic metadata. Can be used to store additional data.
+		pub metadata: BoundedMetadata,
+	}
+
+	#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+	pub struct Organization<AccountId, TokenId, BoundedString, BoundedMetadata> {
 		pub founder: AccountId,
-		// Treasury
 		pub account_id: AccountId,
-		pub org_type: u32,
-		pub description: BoundedVec<u8, ConstU32<MAX_DESCRIPTION_LENGTH>>,
+		pub token_id: TokenId,
 		pub next_proposal_id: u32,
-		pub config: OrgConfig,
+		pub config: OrganizationConfig<BoundedString, BoundedMetadata>,
 	}
 
 	#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
@@ -98,37 +171,43 @@ pub mod pallet {
 		pub status: ProposalStatus,
 	}
 
-	type OrganizationOf<T> = Organization<<T as frame_system::Config>::AccountId>;
-	type ProposalOf<T> = Proposal<<T as frame_system::Config>::AccountId>;
-
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
 	#[pallet::storage_version(STORAGE_VERSION)]
-	// #[pallet::without_storage_info]
 	pub struct Pallet<T>(_);
 
-	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
-		/// Because this pallet emits events, it depends on the runtime's definition of an event.
+	pub trait Config: frame_system::Config + pallet_assets::Config {
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 		type Call: Parameter + UnfilteredDispatchable<Origin = Self::Origin> + GetDispatchInfo;
 		type Currency: ReservableCurrency<Self::AccountId>;
+		type SupervisorOrigin: EnsureOrigin<Self::Origin>;
+		type TimeProvider: UnixTime;
+
+		type AssetId: IsType<<Self as pallet_assets::Config>::AssetId>
+			+ Parameter
+			+ From<u32>
+			+ Ord
+			+ Copy;
+
+		type Balance: IsType<<Self as pallet_assets::Config>::Balance>
+			+ Parameter
+			+ From<u128>
+			+ Ord
+			+ Copy;
+
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
-		type TaxInPercent: Get<u32>;
-		type SupervisorOrigin: EnsureOrigin<Self::Origin>;
-		// type MaxMembers: Get<u32>;
-		type TimeProvider: UnixTime;
-		// type DescLimit: Get<u32>;
+
+		#[pallet::constant]
+		type DaoStringLimit: Get<u32>;
+
+		#[pallet::constant]
+		type DaoMetadataLimit: Get<u32>;
 	}
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/main-docs/build/runtime-storage/
 	#[pallet::storage]
 	#[pallet::getter(fn next_org_id)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/main-docs/build/runtime-storage/#declaring-storage-items
 	pub(super) type NextOrgId<T> = StorageValue<_, u32, ValueQuery>;
 
 	#[pallet::storage]
@@ -148,16 +227,9 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
-	// #[pallet::storage]
-	// #[pallet::getter(fn organizations)]
-	// pub(super) type Organizations<T: Config> =
-	// 	StorageDoubleMap<_, Blake2_128Concat, u32, OrganizationOf<T>, OptionQuery>;
-
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
-	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/main-docs/build/events-errors/
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -168,71 +240,179 @@ pub mod pallet {
 		ProposalAdded(u32, T::AccountId),
 	}
 
-	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Error names should be descriptive.
 		NoneValue,
-		/// Errors should have helpful documentation associated with them.
 		OrganizationNotExist,
-		DescriptionTooLong,
+		NameTooLong,
+		PurposeTooLong,
+		MetadataTooLong,
+		TokenNotProvided,
+		TokenAlreadyExists,
+		TokenNotExists,
+		TokenCreateFailed,
+		InvalidInput,
 	}
 
-	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-	// These functions materialize as "extrinsics", which are often compared to transactions.
-	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn create_organization(
-			origin: OriginFor<T>,
-			name: Vec<u8>,
-			description: Vec<u8>,
-			purpose: Vec<u8>,
-		) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/main-docs/build/origins/
-			let who = ensure_signed(origin)?;
+		// TODO: calculate dynamic weight
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(4))]
+		pub fn create_organization(origin: OriginFor<T>, data: Vec<u8>) -> DispatchResult {
+			let who = ensure_signed(origin.clone())?;
 
-			let mut org_description = Default::default();
-			match BoundedVec::<u8, ConstU32<MAX_DESCRIPTION_LENGTH>>::try_from(description.clone())
-			{
-				Ok(description) => {
-					org_description = description;
+			let payload = serde_json::from_slice::<OrganizationPayload>(&data);
+			if payload.is_err() {
+				log::info!("err: {:?}", payload);
+
+				return Err(Error::<T>::InvalidInput.into())
+			}
+
+			let organization = payload.unwrap();
+
+			let org_id = <NextOrgId<T>>::get();
+			let org_account_id = Self::account_id(org_id);
+
+			let mut org_name = Default::default();
+			match BoundedVec::<u8, T::DaoStringLimit>::try_from(organization.name.clone()) {
+				Ok(name) => {
+					org_name = name;
 				},
 				Err(_) => return Err(Error::<T>::OrganizationNotExist.into()),
 			}
 
-			// TODO: check name length
-			// TODO: check purpose length
+			let mut org_purpose = Default::default();
+			match BoundedVec::<u8, T::DaoStringLimit>::try_from(organization.purpose.clone()) {
+				Ok(purpose) => {
+					org_purpose = purpose;
+				},
+				Err(_) => return Err(Error::<T>::OrganizationNotExist.into()),
+			}
 
-			let org_id = <NextOrgId<T>>::get();
-			<NextOrgId<T>>::put(org_id.checked_add(1).unwrap());
+			let mut org_metadata = Default::default();
+			match BoundedVec::<u8, T::DaoStringLimit>::try_from(organization.metadata.clone()) {
+				Ok(metadata) => {
+					org_metadata = metadata;
+				},
+				Err(_) => return Err(Error::<T>::OrganizationNotExist.into()),
+			}
+
+			// TODO: revise this - need some minimal balance to mint tokens to
+			let _transfer_res = <T as Config>::Currency::transfer(
+				&who,
+				&org_account_id,
+				Self::u128_to_balance_of(100000000),
+				KeepAlive,
+			);
+
+			let mut has_token_id: Option<AssetId<T>> = None;
+
+			if let Some(token) = organization.token {
+				let token_id = Self::u32_to_asset_id(token.token_id);
+				has_token_id = Some(token_id);
+
+				let metadata = token.metadata;
+				let min_balance = Self::u128_to_balance(token.min_balance).into();
+
+				// considering organization as the governance token admin
+				let token_admin = <T::Lookup as sp_runtime::traits::StaticLookup>::unlookup(
+					org_account_id.clone(),
+				);
+
+				let issuance = pallet_assets::Pallet::<T>::total_issuance(token_id.into())
+					.try_into()
+					.unwrap_or(0u128);
+
+				if issuance > 0 {
+					return Err(Error::<T>::TokenAlreadyExists.into())
+				} else {
+					log::info!("issuing token: {:?}", token_id);
+					let create_result = pallet_assets::Pallet::<T>::create(
+						origin.clone(),
+						token_id.into(),
+						token_admin,
+						min_balance,
+					);
+					match create_result {
+						Ok(_) => {},
+						Err(e) => {
+							log::info!("error occurred while issuing token: {:?}", e);
+
+							return Err(Error::<T>::TokenCreateFailed.into())
+						},
+					}
+
+					log::info!("setting metadata for token: {:?}", token_id);
+					let metadata_result = pallet_assets::Pallet::<T>::set_metadata(
+						origin.clone(),
+						token_id.into(),
+						metadata.name,
+						metadata.symbol,
+						metadata.decimals,
+					);
+					match metadata_result {
+						Ok(_) => {},
+						Err(e) => {
+							log::info!("error occurred while setting metadata for token: {:?}", e);
+
+							return Err(Error::<T>::TokenCreateFailed.into())
+						},
+					}
+
+					log::info!("minting token: {:?}", token_id);
+					let mint_result = pallet_assets::Pallet::<T>::mint_into(
+						token_id.into(),
+						&org_account_id,
+						min_balance,
+					);
+					match mint_result {
+						Ok(_) => {},
+						Err(e) => {
+							log::info!("error occurred while minting token: {:?}", e);
+
+							return Err(Error::<T>::TokenCreateFailed.into())
+						},
+					}
+				}
+			}
+
+			if has_token_id.is_none() {
+				if let Some(id) = organization.token_id {
+					let token_id = Self::u32_to_asset_id(id);
+					has_token_id = Some(token_id);
+
+					let issuance = pallet_assets::Pallet::<T>::total_issuance(token_id.into())
+						.try_into()
+						.unwrap_or(0u128);
+
+					if issuance == 0 {
+						return Err(Error::<T>::TokenNotExists.into())
+					}
+				}
+			}
+
+			if has_token_id.is_none() {
+				return Err(Error::<T>::TokenNotProvided.into())
+			}
 
 			let org = Organization {
 				founder: who.clone(),
-				account_id: Self::account_id(org_id),
-				org_type: 1,
-				description: org_description,
+				account_id: org_account_id,
+				token_id: has_token_id.unwrap().into(),
 				next_proposal_id: 0,
-				config: OrgConfig {
-					name: BoundedVec::<u8, ConstU32<15>>::try_from(name.clone()).ok().unwrap(),
-					purpose: BoundedVec::<u8, ConstU32<150>>::try_from(purpose.clone())
-						.ok()
-						.unwrap(),
+				config: OrganizationConfig {
+					name: org_name,
+					purpose: org_purpose,
+					metadata: org_metadata,
 				},
 			};
 
 			Organizations::<T>::insert(org_id, org);
+			<NextOrgId<T>>::put(org_id.checked_add(1).unwrap());
 
-			// Emit an event.
 			Self::deposit_event(Event::OrgRegistered(org_id, who));
 
-			// Return a successful DispatchResultWithPostInfo
-			Ok(().into())
+			Ok(())
 		}
 
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
@@ -252,7 +432,7 @@ pub mod pallet {
 
 					Proposals::<T>::insert(org_id, proposal_id, proposal);
 
-					org.next_proposal_id = org.next_proposal_id.checked_add(1).unwrap();
+					org.next_proposal_id = proposal_id.checked_add(1).unwrap();
 					Organizations::<T>::insert(org_id, org);
 				},
 				None => return Err(Error::<T>::OrganizationNotExist.into()),
@@ -260,7 +440,7 @@ pub mod pallet {
 
 			Self::deposit_event(Event::ProposalAdded(org_id, who));
 
-			Ok(().into())
+			Ok(())
 		}
 
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
@@ -286,61 +466,26 @@ pub mod pallet {
 
 			Proposals::<T>::insert(org_id, proposal_id, proposal);
 
-			Ok(().into())
+			Ok(())
 		}
-
-		// An example dispatchable that may throw a custom error.
-		// #[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
-		// pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-		// 	let _who = ensure_signed(origin)?;
-
-		// 	// Read a value from storage.
-		// 	match <Something<T>>::get() {
-		// 		// Return an error if the value has not been set.
-		// 		None => return Err(Error::<T>::NoneValue.into()),
-		// 		Some(old) => {
-		// 			// Increment the value read from storage; will error in the event of overflow.
-		// 			let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-		// 			// Update the value in storage with the incremented result.
-		// 			<Something<T>>::put(new);
-		// 			Ok(())
-		// 		},
-		// 	}
-		// }
 	}
 
 	impl<T: Config> Pallet<T> {
 		fn account_id(app_id: u32) -> T::AccountId {
-			if app_id == 0 {
-				T::PalletId::get().into_account_truncating()
-			} else {
-				T::PalletId::get().into_sub_account_truncating(app_id)
-			}
+			T::PalletId::get().into_sub_account_truncating(app_id)
 		}
 
-		fn u128_to_balance(cost: u128) -> BalanceOf<T> {
+		fn u32_to_asset_id(asset_id: u32) -> AssetId<T> {
+			asset_id.try_into().ok().unwrap()
+		}
+
+		fn u128_to_balance(cost: u128) -> Balance<T> {
+			TryInto::<Balance<T>>::try_into(cost).ok().unwrap()
+		}
+
+		// TODO: rework
+		fn u128_to_balance_of(cost: u128) -> BalanceOf<T> {
 			TryInto::<BalanceOf<T>>::try_into(cost).ok().unwrap()
-		}
-
-		fn balance_to_u128(balance: BalanceOf<T>) -> u128 {
-			TryInto::<u128>::try_into(balance).ok().unwrap()
-		}
-
-		/// refer https://github.com/paritytech/substrate/blob/743accbe3256de2fc615adcaa3ab03ebdbbb4dbd/frame/treasury/src/lib.rs#L351
-		///
-		/// This actually does computation. If you need to keep using it, then make sure you cache
-		/// the value and only call this once.
-		pub fn validate_member(account_id: T::AccountId, ord_id: u32) -> bool {
-			if !Organizations::<T>::contains_key(ord_id) {
-				false
-			} else {
-				true
-				// let members = Organizations::<T>::get(ord_id).unwrap().members;
-				// match members.binary_search(&account_id) {
-				// 	Ok(_) => true,
-				// 	Err(_) => false,
-				// }
-			}
 		}
 	}
 }
