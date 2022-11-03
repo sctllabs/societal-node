@@ -92,7 +92,7 @@ pub mod pallet {
 		type ExpectedBlockTime: Get<u64>;
 
 		// TODO: rework providers
-		type CouncilProvider: CouncilProvider<u32, Self::AccountId>;
+		type CouncilProvider: InitializeDaoMembers<u32, Self::AccountId>;
 	}
 
 	#[pallet::storage]
@@ -286,6 +286,11 @@ pub mod pallet {
 				prime_account: who.clone(),
 				approve_origin: (3, 5),
 				reject_origin: (1, 2),
+				add_origin: (1, 2),
+				remove_origin: (1, 2),
+				swap_origin: (1, 2),
+				reset_origin: (1, 2),
+				prime_origin: (1, 2),
 			};
 			Policies::<T>::insert(dao_id, policy);
 
@@ -302,7 +307,7 @@ pub mod pallet {
 			for member in council {
 				council_members.push(T::Lookup::lookup(member)?);
 			}
-			T::CouncilProvider::initialize_members(dao_id, council_members.as_slice());
+			T::CouncilProvider::initialize_members(dao_id, council_members)?;
 
 			<NextDaoId<T>>::put(dao_id.checked_add(1).unwrap());
 

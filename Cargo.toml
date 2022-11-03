@@ -4,6 +4,9 @@ members = [
     "pallets/dao",
     "pallets/dao-collective",
     "pallets/dao-treasury",
+    "pallets/membership",
+    "pallets/dao-primitives",
+    "pallets/treasury",
     "runtime",
 ]
 [profile.release]

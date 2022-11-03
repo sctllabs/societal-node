@@ -557,7 +557,7 @@ impl pallet_collective::Config<TechnicalCollective> for Runtime {
 }
 
 // TODO - Update settings
-type DaoCouncilCollective = pallet_dao_collective::Instance3;
+type DaoCouncilCollective = pallet_dao_collective::Instance1;
 impl pallet_dao_collective::Config<DaoCouncilCollective> for Runtime {
 	type Origin = Origin;
 	type Proposal = Call;
@@ -849,6 +849,31 @@ impl pallet_membership::Config<pallet_membership::Instance1> for Runtime {
 	type MembershipChanged = TechnicalCommittee;
 	type MaxMembers = TechnicalMaxMembers;
 	type WeightInfo = pallet_membership::weights::SubstrateWeight<Runtime>;
+}
+
+// TODO - Update settings
+type DaoCouncilMembership = pallet_dao_membership::Instance1;
+impl pallet_dao_membership::Config<DaoCouncilMembership> for Runtime {
+	type Event = Event;
+
+	// TODO: dynamic properties - move to dao-primitives for generic types
+	type AddOrigin =
+		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
+	type RemoveOrigin =
+		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
+	type SwapOrigin =
+		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
+	type ResetOrigin =
+		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
+	type PrimeOrigin =
+		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
+
+	type MembershipInitialized = DaoCouncil;
+	type MembershipChanged = DaoCouncil;
+	type MaxMembers = TechnicalMaxMembers;
+	type WeightInfo = pallet_dao_membership::weights::SubstrateWeight<Runtime>;
+
+	type DaoProvider = Dao;
 }
 
 parameter_types! {
@@ -1342,7 +1367,7 @@ impl pallet_dao::Config for Runtime {
 	type AssetId = u32;
 	type Balance = Balance;
 	type ExpectedBlockTime = ExpectedBlockTime;
-	type CouncilProvider = DaoCouncil;
+	type CouncilProvider = DaoCouncilMemberships;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -1393,7 +1418,8 @@ construct_runtime!(
 		Uniques: pallet_uniques,
 		Society: pallet_society,
 		Multisig: pallet_multisig,
-		DaoCouncil: pallet_dao_collective::<Instance3>
+		DaoCouncil: pallet_dao_collective::<Instance1>,
+		DaoCouncilMemberships: pallet_dao_membership::<Instance1> //TODO: rename
 	}
 );
 

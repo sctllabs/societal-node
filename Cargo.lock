@@ -4412,6 +4412,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-dao-membership"
+version = "4.0.0-dev"
+dependencies = [
+ "dao-primitives",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-dao-treasury"
 version = "4.0.0-dev"
 dependencies = [
@@ -7402,6 +7419,7 @@ dependencies = [
  "pallet-conviction-voting",
  "pallet-dao",
  "pallet-dao-collective",
+ "pallet-dao-membership",
  "pallet-dao-treasury",
  "pallet-democracy",
  "pallet-election-provider-multi-phase",
