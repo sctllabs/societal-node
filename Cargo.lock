@@ -1195,6 +1195,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "dao-primitives"
+version = "4.0.0-dev"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "log",
+ "node-primitives",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "serde_json",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "data-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4359,15 +4377,55 @@ dependencies = [
 name = "pallet-dao"
 version = "4.0.0-dev"
 dependencies = [
+ "dao-primitives",
  "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
  "pallet-assets",
+ "pallet-dao-treasury",
  "parity-scale-codec",
  "scale-info",
  "serde",
  "serde_json",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-dao-collective"
+version = "4.0.0-dev"
+dependencies = [
+ "dao-primitives",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-dao-treasury"
+version = "4.0.0-dev"
+dependencies = [
+ "dao-primitives",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "impl-trait-for-tuples",
+ "log",
+ "pallet-balances",
+ "pallet-dao-collective",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
  "sp-core",
  "sp-io",
  "sp-runtime",
@@ -7343,6 +7401,8 @@ dependencies = [
  "pallet-contracts-rpc-runtime-api",
  "pallet-conviction-voting",
  "pallet-dao",
+ "pallet-dao-collective",
+ "pallet-dao-treasury",
  "pallet-democracy",
  "pallet-election-provider-multi-phase",
  "pallet-elections-phragmen",

@@ -1,7 +1,7 @@
 [package]
-name = "pallet-dao"
+name = "dao-primitives"
 version = "4.0.0-dev"
-description = "Societal DAO Pallet"
+description = "Societal DAO Primitives"
 authors = ["Societal <https://github.com/sctllabs/societal-node"]
 homepage = "https://www.sctl.xyz"
 edition = "2021"
@@ -22,12 +22,9 @@ serde_json = { version = "1.0.79", features = ["alloc"], default-features = fals
 codec = { package = "parity-scale-codec", version = "3.0.0", default-features = false, features = [
 	"derive",
 ] }
-frame-benchmarking = { version = "4.0.0-dev", default-features = false, optional = true, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 frame-support = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 frame-system = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
-dao-primitives = { version = "4.0.0-dev", default-features = false, path = "../dao-primitives" }
-pallet-assets = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
-pallet-dao-treasury = { version = "4.0.0-dev", default-features = false, path = "../treasury" }
+node-primitives = { version = "2.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 scale-info = { version = "2.1.1", default-features = false, features = ["derive"] }
 sp-runtime = { version = "6.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 sp-std = { version = "4.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
@@ -41,11 +38,8 @@ sp-runtime = { version = "6.0.0", default-features = false, git = "https://githu
 default = ["std"]
 std = [
 	"codec/std",
-	"frame-benchmarking/std",
 	"frame-support/std",
 	"frame-system/std",
-	"pallet-assets/std",
 	"scale-info/std",
 ]
-runtime-benchmarks = ["frame-benchmarking/runtime-benchmarks"]
 try-runtime = ["frame-support/try-runtime"]

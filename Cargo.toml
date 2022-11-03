@@ -1,7 +1,9 @@
 [workspace]
 members = [
     "node",
+    "pallets/collective",
     "pallets/dao",
+    "pallets/treasury",
     "runtime",
 ]
 [profile.release]
