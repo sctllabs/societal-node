@@ -49,7 +49,6 @@ std = [
 	"frame-benchmarking/std",
 	"frame-support/std",
 	"frame-system/std",
-	"pallet-assets/std",
 	"scale-info/std",
 ]
 runtime-benchmarks = ["frame-benchmarking/runtime-benchmarks"]
