@@ -857,17 +857,8 @@ impl pallet_dao_membership::Config<DaoCouncilMembership> for Runtime {
 	type Event = Event;
 
 	// TODO: dynamic properties - move to dao-primitives for generic types
-	type AddOrigin =
+	type ApproveOrigin =
 		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
-	type RemoveOrigin =
-		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
-	type SwapOrigin =
-		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
-	type ResetOrigin =
-		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
-	type PrimeOrigin =
-		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
-
 	type MembershipInitialized = DaoCouncil;
 	type MembershipChanged = DaoCouncil;
 	type MaxMembers = TechnicalMaxMembers;
