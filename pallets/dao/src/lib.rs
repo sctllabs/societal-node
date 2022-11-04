@@ -1,17 +1,21 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use codec::HasCompact;
 use frame_support::{
 	dispatch::DispatchResult,
 	traits::{
-		tokens::fungibles::{Inspect, Mutate},
-		Currency, Get, ReservableCurrency, UnfilteredDispatchable, UnixTime,
+		tokens::fungibles::{metadata::Mutate as MetadataMutate, Create, Inspect, Mutate},
+		Currency,
+		ExistenceRequirement::KeepAlive,
+		Get, ReservableCurrency, UnfilteredDispatchable, UnixTime,
 	},
 	weights::GetDispatchInfo,
 	BoundedVec, PalletId,
 };
 pub use pallet::*;
+use scale_info::TypeInfo;
 use serde::{self};
-use sp_runtime::traits::{AccountIdConversion, StaticLookup};
+use sp_runtime::traits::{AccountIdConversion, AtLeast32BitUnsigned, StaticLookup};
 use sp_std::prelude::*;
 
 use dao_primitives::*;
@@ -31,7 +35,7 @@ type BalanceOf<T> =
 
 type DaoOf<T> = Dao<
 	<T as frame_system::Config>::AccountId,
-	<T as pallet_assets::Config>::AssetId,
+	<T as Config>::AssetId,
 	BoundedVec<u8, <T as Config>::DaoStringLimit>,
 	BoundedVec<u8, <T as Config>::DaoStringLimit>,
 >;
@@ -60,24 +64,34 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_assets::Config {
+	pub trait Config: frame_system::Config {
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 		type Call: Parameter + UnfilteredDispatchable<Origin = Self::Origin> + GetDispatchInfo;
 		type Currency: ReservableCurrency<Self::AccountId>;
 		type SupervisorOrigin: EnsureOrigin<Self::Origin>;
 		type TimeProvider: UnixTime;
 
-		type AssetId: IsType<<Self as pallet_assets::Config>::AssetId>
+		type AssetId: Member
 			+ Parameter
+			+ Default
+			+ Copy
+			+ HasCompact
+			+ MaybeSerializeDeserialize
+			+ MaxEncodedLen
+			+ TypeInfo
 			+ From<u32>
-			+ Ord
-			+ Copy;
+			+ Ord;
 
-		type Balance: IsType<<Self as pallet_assets::Config>::Balance>
+		type Balance: Member
 			+ Parameter
+			+ AtLeast32BitUnsigned
+			+ Default
+			+ Copy
+			+ MaybeSerializeDeserialize
+			+ MaxEncodedLen
+			+ TypeInfo
 			+ From<u128>
-			+ Ord
-			+ Copy;
+			+ Ord;
 
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
@@ -93,6 +107,24 @@ pub mod pallet {
 
 		// TODO: rework providers
 		type CouncilProvider: InitializeDaoMembers<u32, Self::AccountId>;
+
+		type AssetProvider: Inspect<
+				Self::AccountId,
+				AssetId = <Self as pallet::Config>::AssetId,
+				Balance = <Self as pallet::Config>::Balance,
+			> + Create<
+				Self::AccountId,
+				AssetId = <Self as pallet::Config>::AssetId,
+				Balance = <Self as pallet::Config>::Balance,
+			> + MetadataMutate<
+				Self::AccountId,
+				AssetId = <Self as pallet::Config>::AssetId,
+				Balance = <Self as pallet::Config>::Balance,
+			> + Mutate<
+				Self::AccountId,
+				AssetId = <Self as pallet::Config>::AssetId,
+				Balance = <Self as pallet::Config>::Balance,
+			>;
 	}
 
 	#[pallet::storage]
@@ -186,6 +218,14 @@ pub mod pallet {
 			let min = <T as Config>::Currency::minimum_balance();
 			let _ = <T as Config>::Currency::make_free_balance_be(&dao_account_id, min);
 
+			// reserving some deposit for token metadata storage
+			let _ = <T as Config>::Currency::transfer(
+				&who,
+				&dao_account_id,
+				Self::u128_to_balance_of(2_000_000_000_000_000), //TODO: should be dynamic
+				KeepAlive,
+			);
+
 			let mut has_token_id: Option<AssetId<T>> = None;
 
 			if let Some(token) = dao.token {
@@ -195,23 +235,18 @@ pub mod pallet {
 				let metadata = token.metadata;
 				let min_balance = Self::u128_to_balance(token.min_balance).into();
 
-				// considering dao as the governance token admin
-				let token_admin = <T::Lookup as sp_runtime::traits::StaticLookup>::unlookup(
-					dao_account_id.clone(),
-				);
-
-				let issuance = pallet_assets::Pallet::<T>::total_issuance(token_id.into())
-					.try_into()
-					.unwrap_or(0u128);
+				let issuance =
+					T::AssetProvider::total_issuance(token_id).try_into().unwrap_or(0u128);
 
 				if issuance > 0 {
 					return Err(Error::<T>::TokenAlreadyExists.into())
 				} else {
 					log::info!("issuing token: {:?}", token_id);
-					let create_result = pallet_assets::Pallet::<T>::create(
-						origin.clone(),
-						token_id.into(),
-						token_admin,
+
+					let create_result = T::AssetProvider::create(
+						token_id,
+						dao_account_id.clone(),
+						false,
 						min_balance,
 					);
 					match create_result {
@@ -224,9 +259,9 @@ pub mod pallet {
 					}
 
 					log::info!("setting metadata for token: {:?}", token_id);
-					let metadata_result = pallet_assets::Pallet::<T>::set_metadata(
-						origin.clone(),
-						token_id.into(),
+					let metadata_result = T::AssetProvider::set(
+						token_id,
+						&dao_account_id.clone(),
 						metadata.name,
 						metadata.symbol,
 						metadata.decimals,
@@ -241,11 +276,8 @@ pub mod pallet {
 					}
 
 					log::info!("minting token: {:?}", token_id);
-					let mint_result = pallet_assets::Pallet::<T>::mint_into(
-						token_id.into(),
-						&dao_account_id,
-						min_balance,
-					);
+					let mint_result =
+						T::AssetProvider::mint_into(token_id, &dao_account_id, min_balance);
 					match mint_result {
 						Ok(_) => {},
 						Err(e) => {
@@ -262,9 +294,8 @@ pub mod pallet {
 					let token_id = Self::u32_to_asset_id(id);
 					has_token_id = Some(token_id);
 
-					let issuance = pallet_assets::Pallet::<T>::total_issuance(token_id.into())
-						.try_into()
-						.unwrap_or(0u128);
+					let issuance =
+						T::AssetProvider::total_issuance(token_id).try_into().unwrap_or(0u128);
 
 					if issuance == 0 {
 						return Err(Error::<T>::TokenNotExists.into())

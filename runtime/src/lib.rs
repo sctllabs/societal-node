@@ -1002,7 +1002,7 @@ parameter_types! {
 	pub const AssetDeposit: Balance = 100 * DOLLARS;
 	pub const ApprovalDeposit: Balance = 1 * DOLLARS;
 	pub const StringLimit: u32 = 50;
-	pub const MetadataDepositBase: Balance = 10 * DOLLARS;
+	pub const MetadataDepositBase: Balance = 1 * DOLLARS;
 	pub const MetadataDepositPerByte: Balance = 1 * DOLLARS;
 }
 
@@ -1359,6 +1359,7 @@ impl pallet_dao::Config for Runtime {
 	type Balance = Balance;
 	type ExpectedBlockTime = ExpectedBlockTime;
 	type CouncilProvider = DaoCouncilMemberships;
+	type AssetProvider = Assets;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
