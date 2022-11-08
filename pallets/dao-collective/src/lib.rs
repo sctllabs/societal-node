@@ -47,15 +47,13 @@ use sp_io::storage;
 use sp_runtime::{traits::Hash, RuntimeDebug};
 use sp_std::{marker::PhantomData, prelude::*, result};
 
-use dao_primitives::{CouncilProvider, DaoPolicy, DaoProvider};
+use dao_primitives::{ChangeDaoMembers, DaoPolicy, DaoProvider, InitializeDaoMembers};
 
 use frame_support::{
 	codec::{Decode, Encode, MaxEncodedLen},
 	dispatch::{DispatchError, DispatchResultWithPostInfo, Dispatchable, PostDispatchInfo},
 	ensure,
-	traits::{
-		Backing, ChangeMembers, EnsureOrigin, EnsureOriginWithArg, Get, GetBacking, StorageVersion,
-	},
+	traits::{Backing, EnsureOrigin, EnsureOriginWithArg, Get, GetBacking, StorageVersion},
 	weights::{GetDispatchInfo, Pays, Weight},
 };
 
@@ -406,12 +404,11 @@ pub mod pallet {
 			}
 			let mut new_members = new_members;
 			new_members.sort();
-			// ignoring since we're not enforcing any roots
-			// <Self as ChangeMembers<T::AccountId>>::set_members_sorted(
-			// 	dao_id,
-			// 	&new_members,
-			// 	&old,
-			// );
+			<Self as ChangeDaoMembers<DaoId, T::AccountId>>::set_members_sorted(
+				dao_id,
+				&new_members,
+				&old,
+			);
 			Prime::<T, I>::set(dao_id, prime);
 
 			// TODO: revise weights across all functions
@@ -1007,7 +1004,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 }
 
 // TODO re-work pallet-membership for Dao members management
-impl<T: Config<I>, I: 'static> ChangeMembers<T::AccountId> for Pallet<T, I> {
+impl<T: Config<I>, I: 'static> ChangeDaoMembers<DaoId, T::AccountId> for Pallet<T, I> {
 	/// Update the members of the collective. Votes are updated and the prime is reset.
 	///
 	/// NOTE: Does not enforce the expected `MaxMembers` limit on the amount of members, but
@@ -1026,49 +1023,49 @@ impl<T: Config<I>, I: 'static> ChangeMembers<T::AccountId> for Pallet<T, I> {
 	///   - 1 storage write (codec `O(1)`) for deleting the old prime
 	/// # </weight>
 	fn change_members_sorted(
+		dao_id: DaoId,
 		_incoming: &[T::AccountId],
 		outgoing: &[T::AccountId],
 		new: &[T::AccountId],
 	) {
-		// if new.len() > T::MaxMembers::get() as usize {
-		// 	log::error!(
-		// 		target: "runtime::collective",
-		// 		"New members count ({}) exceeds maximum amount of members expected ({}).",
-		// 		new.len(),
-		// 		T::MaxMembers::get(),
-		// 	);
-		// }
-		// // remove accounts from all current voting in motions.
-		// let mut outgoing = outgoing.to_vec();
-		// outgoing.sort();
-		// for h in Self::proposals(dao_id).into_iter() {
-		// 	<Voting<T, I>>::mutate(dao_id, h, |v| {
-		// 		if let Some(mut votes) = v.take() {
-		// 			votes.ayes = votes
-		// 				.ayes
-		// 				.into_iter()
-		// 				.filter(|i| outgoing.binary_search(i).is_err())
-		// 				.collect();
-		// 			votes.nays = votes
-		// 				.nays
-		// 				.into_iter()
-		// 				.filter(|i| outgoing.binary_search(i).is_err())
-		// 				.collect();
-		// 			*v = Some(votes);
-		// 		}
-		// 	});
-		// }
-		// Members::<T, I>::insert(dao_id, new);
-		// Prime::<T, I>::remove(dao_id);
+		if new.len() > T::MaxMembers::get() as usize {
+			log::error!(
+				target: "runtime::collective",
+				"New members count ({}) exceeds maximum amount of members expected ({}).",
+				new.len(),
+				T::MaxMembers::get(),
+			);
+		}
+		// remove accounts from all current voting in motions.
+		let mut outgoing = outgoing.to_vec();
+		outgoing.sort();
+		for h in Self::proposals(dao_id).into_iter() {
+			<Voting<T, I>>::mutate(dao_id, h, |v| {
+				if let Some(mut votes) = v.take() {
+					votes.ayes = votes
+						.ayes
+						.into_iter()
+						.filter(|i| outgoing.binary_search(i).is_err())
+						.collect();
+					votes.nays = votes
+						.nays
+						.into_iter()
+						.filter(|i| outgoing.binary_search(i).is_err())
+						.collect();
+					*v = Some(votes);
+				}
+			});
+		}
+		Members::<T, I>::insert(dao_id, new);
+		Prime::<T, I>::remove(dao_id);
 	}
 
-	fn set_prime(prime: Option<T::AccountId>) {
-		// Prime::<T, I>::set(dao_id, prime);
+	fn set_prime(dao_id: DaoId, prime: Option<T::AccountId>) {
+		Prime::<T, I>::set(dao_id, prime);
 	}
 
-	fn get_prime() -> Option<T::AccountId> {
-		None
-		// Prime::<T, I>::get(dao_id)
+	fn get_prime(dao_id: DaoId) -> Option<T::AccountId> {
+		Prime::<T, I>::get(dao_id)
 	}
 }
 
@@ -1222,11 +1219,12 @@ impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>
 	}
 }
 
-impl<T: Config<I>, I: 'static> CouncilProvider<DaoId, T::AccountId> for Pallet<T, I> {
-	fn initialize_members(dao_id: DaoId, members: &[T::AccountId]) {
-		if !members.is_empty() {
-			assert!(<Members<T, I>>::get(dao_id).is_empty(), "Members are already initialized!");
-			<Members<T, I>>::insert(dao_id, members);
-		}
+// TODO: make abstraction to frame InitializeMembers
+impl<T: Config<I>, I: 'static> InitializeDaoMembers<DaoId, T::AccountId> for Pallet<T, I> {
+	fn initialize_members(dao_id: DaoId, members: Vec<T::AccountId>) -> Result<(), DispatchError> {
+		// considering we've checked everything in membership pallet
+		<Members<T, I>>::insert(dao_id, members);
+
+		Ok(())
 	}
 }

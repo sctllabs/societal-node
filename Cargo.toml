@@ -3,6 +3,8 @@ members = [
     "node",
     "pallets/dao",
     "pallets/dao-collective",
+    "pallets/dao-membership",
+    "pallets/dao-primitives",
     "pallets/dao-treasury",
     "runtime",
 ]

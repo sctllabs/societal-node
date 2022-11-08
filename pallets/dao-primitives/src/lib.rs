@@ -1,7 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use codec::MaxEncodedLen;
-use frame_support::codec::{Decode, Encode};
+use frame_support::{
+	codec::{Decode, Encode},
+	dispatch::DispatchError,
+};
 pub use node_primitives::Balance;
 
 use scale_info::TypeInfo;
@@ -91,6 +94,11 @@ pub struct DaoPolicy<AccountId> {
 	// TODO: use max members for account length
 	pub approve_origin: (u32, u32),
 	pub reject_origin: (u32, u32),
+	pub add_origin: (u32, u32),
+	pub remove_origin: (u32, u32),
+	pub swap_origin: (u32, u32),
+	pub reset_origin: (u32, u32),
+	pub prime_origin: (u32, u32),
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
@@ -112,8 +120,100 @@ pub trait DaoProvider {
 	fn count() -> u32;
 }
 
-pub trait CouncilProvider<DaoId, AccountId> {
-	fn initialize_members(dao_id: DaoId, members: &[AccountId]);
+// TODO: rename to InitializeMembers?
+pub trait InitializeDaoMembers<DaoId, AccountId> {
+	fn initialize_members(dao_id: DaoId, members: Vec<AccountId>) -> Result<(), DispatchError>;
+}
+
+/// Trait for type that can handle incremental changes to a set of account IDs.
+pub trait ChangeDaoMembers<DaoId, AccountId: Clone + Ord> {
+	/// A number of members `incoming` just joined the set and replaced some `outgoing` ones. The
+	/// new set is given by `new`, and need not be sorted.
+	///
+	/// This resets any previous value of prime.
+	fn change_members(
+		dao_id: DaoId,
+		incoming: &[AccountId],
+		outgoing: &[AccountId],
+		mut new: Vec<AccountId>,
+	) {
+		new.sort();
+		Self::change_members_sorted(dao_id, incoming, outgoing, &new[..]);
+	}
+
+	/// A number of members `_incoming` just joined the set and replaced some `_outgoing` ones. The
+	/// new set is thus given by `sorted_new` and **must be sorted**.
+	///
+	/// NOTE: This is the only function that needs to be implemented in `ChangeMembers`.
+	///
+	/// This resets any previous value of prime.
+	fn change_members_sorted(
+		dao_id: DaoId,
+		incoming: &[AccountId],
+		outgoing: &[AccountId],
+		sorted_new: &[AccountId],
+	);
+
+	/// Set the new members; they **must already be sorted**. This will compute the diff and use it
+	/// to call `change_members_sorted`.
+	///
+	/// This resets any previous value of prime.
+	fn set_members_sorted(dao_id: DaoId, new_members: &[AccountId], old_members: &[AccountId]) {
+		let (incoming, outgoing) = Self::compute_members_diff_sorted(new_members, old_members);
+		Self::change_members_sorted(dao_id, &incoming[..], &outgoing[..], new_members);
+	}
+
+	/// Compute diff between new and old members; they **must already be sorted**.
+	///
+	/// Returns incoming and outgoing members.
+	fn compute_members_diff_sorted(
+		new_members: &[AccountId],
+		old_members: &[AccountId],
+	) -> (Vec<AccountId>, Vec<AccountId>) {
+		let mut old_iter = old_members.iter();
+		let mut new_iter = new_members.iter();
+		let mut incoming = Vec::new();
+		let mut outgoing = Vec::new();
+		let mut old_i = old_iter.next();
+		let mut new_i = new_iter.next();
+		loop {
+			match (old_i, new_i) {
+				(None, None) => break,
+				(Some(old), Some(new)) if old == new => {
+					old_i = old_iter.next();
+					new_i = new_iter.next();
+				},
+				(Some(old), Some(new)) if old < new => {
+					outgoing.push(old.clone());
+					old_i = old_iter.next();
+				},
+				(Some(old), None) => {
+					outgoing.push(old.clone());
+					old_i = old_iter.next();
+				},
+				(_, Some(new)) => {
+					incoming.push(new.clone());
+					new_i = new_iter.next();
+				},
+			}
+		}
+		(incoming, outgoing)
+	}
+
+	/// Set the prime member.
+	fn set_prime(_dao_id: DaoId, _prime: Option<AccountId>) {}
+
+	/// Get the current prime.
+	fn get_prime(_dao_id: DaoId) -> Option<AccountId> {
+		None
+	}
+}
+
+impl<D, T: Clone + Ord> ChangeDaoMembers<D, T> for () {
+	fn change_members(_: D, _: &[T], _: &[T], _: Vec<T>) {}
+	fn change_members_sorted(_: D, _: &[T], _: &[T], _: &[T]) {}
+	fn set_members_sorted(_: D, _: &[T], _: &[T]) {}
+	fn set_prime(_: D, _: Option<T>) {}
 }
 
 pub fn de_string_to_bytes<'de, D>(de: D) -> Result<Vec<u8>, D::Error>
