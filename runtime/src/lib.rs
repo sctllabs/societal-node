@@ -83,6 +83,7 @@ use pallet_session::historical as pallet_session_historical;
 
 /// Import the template pallet.
 pub use pallet_dao;
+pub use pallet_dao_treasury;
 
 /// Generated voter bag information.
 mod voter_bags;
@@ -555,6 +556,19 @@ impl pallet_collective::Config<TechnicalCollective> for Runtime {
 	type WeightInfo = pallet_collective::weights::SubstrateWeight<Runtime>;
 }
 
+// TODO - Update settings
+type DaoCouncilCollective = pallet_dao_collective::Instance3;
+impl pallet_dao_collective::Config<DaoCouncilCollective> for Runtime {
+	type Origin = Origin;
+	type Proposal = Call;
+	type Event = Event;
+	type MaxProposals = CouncilMaxProposals;
+	type MaxMembers = CouncilMaxMembers;
+	type DefaultVote = pallet_dao_collective::PrimeDefaultVote;
+	type WeightInfo = pallet_dao_collective::weights::SubstrateWeight<Runtime>;
+	type DaoProvider = Dao;
+}
+
 parameter_types! {
 	pub const ImOnlineUnsignedPriority: TransactionPriority = TransactionPriority::max_value();
 	/// We prioritize im-online heartbeats over election solution submission.
@@ -590,13 +604,14 @@ impl pallet_im_online::Config for Runtime {
 parameter_types! {
 	pub const ProposalBond: Permill = Permill::from_percent(5);
 	pub const ProposalBondMinimum: Balance = 1 * DOLLARS;
-	pub const SpendPeriod: BlockNumber = 1 * DAYS;
+	pub const SpendPeriod: BlockNumber = 1 * MINUTES;
 	pub const Burn: Permill = Permill::from_percent(50);
 	pub const TipCountdown: BlockNumber = 1 * DAYS;
 	pub const TipFindersFee: Percent = Percent::from_percent(20);
 	pub const TipReportDepositBase: Balance = 1 * DOLLARS;
 	pub const DataDepositPerByte: Balance = 1 * CENTS;
 	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
+	pub const DaoTreasuryPalletId: PalletId = PalletId(*b"py/dtrsr");
 	pub const MaximumReasonLength: u32 = 300;
 	pub const MaxApprovals: u32 = 100;
 }
@@ -625,6 +640,25 @@ impl pallet_treasury::Config for Runtime {
 	type WeightInfo = pallet_treasury::weights::SubstrateWeight<Runtime>;
 	type MaxApprovals = MaxApprovals;
 	type SpendOrigin = frame_support::traits::NeverEnsureOrigin<u128>;
+}
+
+impl pallet_dao_treasury::Config for Runtime {
+	type PalletId = DaoTreasuryPalletId;
+	type Currency = Balances;
+	type ApproveOrigin =
+		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
+	type RejectOrigin =
+		pallet_dao_collective::EnsureProportionMoreThanWithArg<AccountId, DaoCouncilCollective>;
+	type Event = Event;
+	type OnSlash = ();
+	type SpendPeriod = SpendPeriod;
+	type Burn = Burn;
+	type BurnDestination = ();
+	type SpendFunds = ();
+	type WeightInfo = pallet_dao_treasury::weights::SubstrateWeight<Runtime>;
+	type MaxApprovals = MaxApprovals;
+	type SpendOrigin = frame_support::traits::NeverEnsureOrigin<u128>;
+	type DaoProvider = Dao;
 }
 
 parameter_types! {
@@ -791,6 +825,7 @@ impl pallet_election_provider_multi_phase::BenchmarkingConfig for ElectionProvid
 	const MAXIMUM_TARGETS: u32 = 300;
 }
 
+// TODO: default voting policy?
 type EnsureRootOrHalfCouncil = EitherOfDiverse<
 	EnsureRoot<AccountId>,
 	pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
@@ -958,7 +993,7 @@ parameter_types! {
 // TODO - Update settings
 impl pallet_assets::Config for Runtime {
 	type Event = Event;
-	type Balance = u128;
+	type Balance = Balance;
 	type AssetId = u32;
 	type Currency = Balances;
 	type ForceOrigin = EnsureRoot<AccountId>;
@@ -1290,7 +1325,7 @@ impl pallet_scheduler::Config for Runtime {
 }
 
 parameter_types! {
-	pub const TemplatePalletId: PalletId = PalletId(*b"py/tmplt");
+	pub const DaoPalletId: PalletId = PalletId(*b"py/sctld");
 	pub const DaoStringLimit: u32 = 50;
 	pub const DaoMetadataLimit: u32 = 500;
 }
@@ -1299,13 +1334,15 @@ impl pallet_dao::Config for Runtime {
 	type Event = Event;
 	type Call = Call;
 	type Currency = Balances;
-	type PalletId = TemplatePalletId;
+	type PalletId = DaoPalletId;
 	type SupervisorOrigin = EnsureRoot<AccountId>;
 	type TimeProvider = pallet_timestamp::Pallet<Runtime>;
 	type DaoStringLimit = DaoStringLimit;
 	type DaoMetadataLimit = DaoMetadataLimit;
 	type AssetId = u32;
-	type Balance = u128;
+	type Balance = Balance;
+	type ExpectedBlockTime = ExpectedBlockTime;
+	type CouncilProvider = DaoCouncil;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -1337,6 +1374,7 @@ construct_runtime!(
 		TechnicalCommittee: pallet_collective::<Instance2>,
 		ImOnline: pallet_im_online,
 		Treasury: pallet_treasury,
+		DaoTreasury: pallet_dao_treasury,
 		BagsList: pallet_bags_list,
 		Offences: pallet_offences,
 		NominationPools: pallet_nomination_pools,
@@ -1355,6 +1393,7 @@ construct_runtime!(
 		Uniques: pallet_uniques,
 		Society: pallet_society,
 		Multisig: pallet_multisig,
+		DaoCouncil: pallet_dao_collective::<Instance3>
 	}
 );
 

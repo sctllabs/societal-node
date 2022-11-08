@@ -2,6 +2,8 @@
 members = [
     "node",
     "pallets/dao",
+    "pallets/dao-collective",
+    "pallets/dao-treasury",
     "runtime",
 ]
 [profile.release]
