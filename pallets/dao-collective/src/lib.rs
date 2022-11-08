@@ -1169,7 +1169,7 @@ impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin() -> Result<O, ()> {
+	fn try_successful_origin(arg: &(u32, u32)) -> Result<O, ()> {
 		Ok(O::from(RawOrigin::Members(1u32, 0u32)))
 	}
 }
@@ -1214,8 +1214,8 @@ impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin() -> Result<O, ()> {
-		Ok(O::from(FrameRawOrigin::Members(0u32, 0u32)))
+	fn try_successful_origin(arg: &(u32, u32)) -> Result<O, ()> {
+		Ok(O::from(RawOrigin::Members(0u32, 0u32)))
 	}
 }
 

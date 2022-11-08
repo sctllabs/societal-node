@@ -422,14 +422,14 @@ mod benchmark {
 	const SEED: u32 = 0;
 
 	fn set_members<T: Config<I>, I: 'static>(members: Vec<T::AccountId>, prime: Option<usize>) {
-		let reset_origin = T::ResetOrigin::successful_origin();
-		let prime_origin = T::PrimeOrigin::successful_origin();
+		let approve_origin = T::ApproveOrigin::successful_origin(&(1, 1));
+		// let prime_origin = T::PrimeOrigin::successful_origin();
 
-		assert_ok!(<Membership<T, I>>::reset_members(reset_origin, members.clone()));
+		assert_ok!(<Membership<T, I>>::reset_members(approve_origin.clone(), 0, members.clone()));
 		if let Some(prime) = prime.map(|i| members[i].clone()) {
-			assert_ok!(<Membership<T, I>>::set_prime(prime_origin, prime));
+			assert_ok!(<Membership<T, I>>::set_prime(approve_origin.clone(), 0, prime));
 		} else {
-			assert_ok!(<Membership<T, I>>::clear_prime(prime_origin));
+			assert_ok!(<Membership<T, I>>::clear_prime(approve_origin, 0));
 		}
 	}
 
@@ -441,10 +441,10 @@ mod benchmark {
 			set_members::<T, I>(members, None);
 			let new_member = account::<T::AccountId>("add", m, SEED);
 		}: {
-			assert_ok!(<Membership<T, I>>::add_member(T::AddOrigin::successful_origin(), new_member.clone()));
+			assert_ok!(<Membership<T, I>>::add_member(T::ApproveOrigin::successful_origin(&(1, 1)), 0, new_member.clone()));
 		}
 		verify {
-			assert!(<Members<T, I>>::get().contains(&new_member));
+			assert!(<Members<T, I>>::get(0).contains(&new_member));
 			#[cfg(test)] crate::tests::clean();
 		}
 
@@ -458,11 +458,11 @@ mod benchmark {
 
 			let to_remove = members.first().cloned().unwrap();
 		}: {
-			assert_ok!(<Membership<T, I>>::remove_member(T::RemoveOrigin::successful_origin(), to_remove.clone()));
+			assert_ok!(<Membership<T, I>>::remove_member(T::ApproveOrigin::successful_origin(&(1, 1)), 0, to_remove.clone()));
 		} verify {
-			assert!(!<Members<T, I>>::get().contains(&to_remove));
+			assert!(!<Members<T, I>>::get(0).contains(&to_remove));
 			// prime is rejigged
-			assert!(<Prime<T, I>>::get().is_some() && T::MembershipChanged::get_prime().is_some());
+			assert!(<Prime<T, I>>::get(0).is_some() && T::MembershipChanged::get_prime(0).is_some());
 			#[cfg(test)] crate::tests::clean();
 		}
 
@@ -476,15 +476,16 @@ mod benchmark {
 			let remove = members.first().cloned().unwrap();
 		}: {
 			assert_ok!(<Membership<T, I>>::swap_member(
-				T::SwapOrigin::successful_origin(),
+				T::ApproveOrigin::successful_origin(&(1, 1)),
+				0,
 				remove.clone(),
 				add.clone(),
 			));
 		} verify {
-			assert!(!<Members<T, I>>::get().contains(&remove));
-			assert!(<Members<T, I>>::get().contains(&add));
+			assert!(!<Members<T, I>>::get(0).contains(&remove));
+			assert!(<Members<T, I>>::get(0).contains(&add));
 			// prime is rejigged
-			assert!(<Prime<T, I>>::get().is_some() && T::MembershipChanged::get_prime().is_some());
+			assert!(<Prime<T, I>>::get(0).is_some() && T::MembershipChanged::get_prime(0).is_some());
 			#[cfg(test)] crate::tests::clean();
 		}
 
@@ -496,12 +497,12 @@ mod benchmark {
 			set_members::<T, I>(members.clone(), Some(members.len() - 1));
 			let mut new_members = (m..2*m).map(|i| account("member", i, SEED)).collect::<Vec<T::AccountId>>();
 		}: {
-			assert_ok!(<Membership<T, I>>::reset_members(T::ResetOrigin::successful_origin(), new_members.clone()));
+			assert_ok!(<Membership<T, I>>::reset_members(T::ApproveOrigin::successful_origin(&(1, 1)), 0, new_members.clone()));
 		} verify {
 			new_members.sort();
-			assert_eq!(<Members<T, I>>::get(), new_members);
+			assert_eq!(<Members<T, I>>::get(0), new_members);
 			// prime is rejigged
-			assert!(<Prime<T, I>>::get().is_some() && T::MembershipChanged::get_prime().is_some());
+			assert!(<Prime<T, I>>::get(0).is_some() && T::MembershipChanged::get_prime(0).is_some());
 			#[cfg(test)] crate::tests::clean();
 		}
 
@@ -516,12 +517,12 @@ mod benchmark {
 			let add = account::<T::AccountId>("member", m, SEED);
 			whitelist!(prime);
 		}: {
-			assert_ok!(<Membership<T, I>>::change_key(RawOrigin::Signed(prime.clone()).into(), add.clone()));
+			assert_ok!(<Membership<T, I>>::change_key(RawOrigin::Signed(prime.clone()).into(), 0, add.clone()));
 		} verify {
-			assert!(!<Members<T, I>>::get().contains(&prime));
-			assert!(<Members<T, I>>::get().contains(&add));
+			assert!(!<Members<T, I>>::get(0).contains(&prime));
+			assert!(<Members<T, I>>::get(0).contains(&add));
 			// prime is rejigged
-			assert_eq!(<Prime<T, I>>::get().unwrap(), add);
+			assert_eq!(<Prime<T, I>>::get(0).unwrap(), add);
 			#[cfg(test)] crate::tests::clean();
 		}
 
@@ -531,10 +532,10 @@ mod benchmark {
 			let prime = members.last().cloned().unwrap();
 			set_members::<T, I>(members, None);
 		}: {
-			assert_ok!(<Membership<T, I>>::set_prime(T::PrimeOrigin::successful_origin(), prime));
+			assert_ok!(<Membership<T, I>>::set_prime(T::ApproveOrigin::successful_origin(&(1, 1)), 0, prime));
 		} verify {
-			assert!(<Prime<T, I>>::get().is_some());
-			assert!(<T::MembershipChanged>::get_prime().is_some());
+			assert!(<Prime<T, I>>::get(0).is_some());
+			assert!(<T::MembershipChanged>::get_prime(0).is_some());
 			#[cfg(test)] crate::tests::clean();
 		}
 
@@ -544,10 +545,10 @@ mod benchmark {
 			let prime = members.last().cloned().unwrap();
 			set_members::<T, I>(members, None);
 		}: {
-			assert_ok!(<Membership<T, I>>::clear_prime(T::PrimeOrigin::successful_origin()));
+			assert_ok!(<Membership<T, I>>::clear_prime(T::ApproveOrigin::successful_origin(&(1, 1)), 0));
 		} verify {
-			assert!(<Prime<T, I>>::get().is_none());
-			assert!(<T::MembershipChanged>::get_prime().is_none());
+			assert!(<Prime<T, I>>::get(0).is_none());
+			assert!(<T::MembershipChanged>::get_prime(0).is_none());
 			#[cfg(test)] crate::tests::clean();
 		}
 
@@ -787,14 +788,14 @@ mod tests {
 		new_test_ext().execute_with(|| {
 			assert_ok!(Membership::set_prime(Origin::signed(5), 10));
 			assert_noop!(
-				Membership::change_key(Origin::signed(3), 25),
+				Membership::change_key(Origin::signed(3), 0, 25),
 				Error::<Test, _>::NotMember
 			);
 			assert_noop!(
-				Membership::change_key(Origin::signed(10), 20),
+				Membership::change_key(Origin::signed(10), 0, 20),
 				Error::<Test, _>::AlreadyMember
 			);
-			assert_ok!(Membership::change_key(Origin::signed(10), 40));
+			assert_ok!(Membership::change_key(Origin::signed(10), 0, 40));
 			assert_eq!(Membership::members(), vec![20, 30, 40]);
 			assert_eq!(MEMBERS.with(|m| m.borrow().clone()), Membership::members().to_vec());
 			assert_eq!(Membership::prime(), Some(40));
@@ -805,7 +806,7 @@ mod tests {
 	#[test]
 	fn change_key_works_that_does_not_change_order() {
 		new_test_ext().execute_with(|| {
-			assert_ok!(Membership::change_key(Origin::signed(10), 5));
+			assert_ok!(Membership::change_key(Origin::signed(10), 0, 5));
 			assert_eq!(Membership::members(), vec![5, 20, 30]);
 			assert_eq!(MEMBERS.with(|m| m.borrow().clone()), Membership::members().to_vec());
 		});

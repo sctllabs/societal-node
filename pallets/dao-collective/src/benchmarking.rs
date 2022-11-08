@@ -50,8 +50,10 @@ benchmarks_instance_pallet! {
 		}
 		let old_members_count = old_members.len() as u32;
 
+		// TODO: use proper dao_id
 		Collective::<T, I>::set_members(
 			SystemOrigin::Root.into(),
+			0,
 			old_members.clone(),
 			Some(last_old_member.clone()),
 			T::MaxMembers::get(),
@@ -68,6 +70,7 @@ benchmarks_instance_pallet! {
 			}.into();
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(last_old_member.clone()).into(),
+				0,
 				threshold,
 				Box::new(proposal.clone()),
 				MAX_BYTES,
@@ -81,6 +84,7 @@ benchmarks_instance_pallet! {
 				let approve = true;
 				Collective::<T, I>::vote(
 					SystemOrigin::Signed(voter.clone()).into(),
+					0,
 					hash,
 					i,
 					approve,
@@ -97,10 +101,10 @@ benchmarks_instance_pallet! {
 			new_members.push(last_member.clone());
 		}
 
-	}: _(SystemOrigin::Root, new_members.clone(), Some(last_member), T::MaxMembers::get())
+	}: _(SystemOrigin::Root, 0, new_members.clone(), Some(last_member), T::MaxMembers::get())
 	verify {
 		new_members.sort();
-		assert_eq!(Collective::<T, I>::members(), new_members);
+		assert_eq!(Collective::<T, I>::members(0), new_members);
 	}
 
 	execute {
@@ -119,16 +123,16 @@ benchmarks_instance_pallet! {
 		let caller: T::AccountId = whitelisted_caller();
 		members.push(caller.clone());
 
-		Collective::<T, I>::set_members(SystemOrigin::Root.into(), members, None, T::MaxMembers::get())?;
+		Collective::<T, I>::set_members(SystemOrigin::Root.into(), 0, members, None, T::MaxMembers::get())?;
 
 		let proposal: T::Proposal = SystemCall::<T>::remark { remark: vec![1; b as usize] }.into();
 
-	}: _(SystemOrigin::Signed(caller), Box::new(proposal.clone()), bytes_in_storage)
+	}: _(SystemOrigin::Signed(caller), 0, Box::new(proposal.clone()), bytes_in_storage)
 	verify {
 		let proposal_hash = T::Hashing::hash_of(&proposal);
 		// Note that execution fails due to mis-matched origin
 		assert_last_event::<T, I>(
-			Event::MemberExecuted { proposal_hash, result: Err(DispatchError::BadOrigin) }.into()
+			Event::MemberExecuted { dao_id: 0, proposal_hash, result: Err(DispatchError::BadOrigin) }.into()
 		);
 	}
 
@@ -149,17 +153,17 @@ benchmarks_instance_pallet! {
 		let caller: T::AccountId = whitelisted_caller();
 		members.push(caller.clone());
 
-		Collective::<T, I>::set_members(SystemOrigin::Root.into(), members, None, T::MaxMembers::get())?;
+		Collective::<T, I>::set_members(SystemOrigin::Root.into(), 0, members, None, T::MaxMembers::get())?;
 
-		let proposal: T::Proposal = SystemCall::<T>::remark { remark: vec![1; b as usize] }.into();
+		let proposal: T::Proposal = SystemCall::<T>::remark {  remark: vec![1; b as usize] }.into();
 		let threshold = 1;
 
-	}: propose(SystemOrigin::Signed(caller), threshold, Box::new(proposal.clone()), bytes_in_storage)
+	}: propose(SystemOrigin::Signed(caller), 0, threshold, Box::new(proposal.clone()), bytes_in_storage)
 	verify {
 		let proposal_hash = T::Hashing::hash_of(&proposal);
 		// Note that execution fails due to mis-matched origin
 		assert_last_event::<T, I>(
-			Event::Executed { proposal_hash, result: Err(DispatchError::BadOrigin) }.into()
+			Event::Executed { dao_id: 0, proposal_hash, result: Err(DispatchError::BadOrigin) }.into()
 		);
 	}
 
@@ -179,7 +183,7 @@ benchmarks_instance_pallet! {
 		}
 		let caller: T::AccountId = whitelisted_caller();
 		members.push(caller.clone());
-		Collective::<T, I>::set_members(SystemOrigin::Root.into(), members, None, T::MaxMembers::get())?;
+		Collective::<T, I>::set_members(SystemOrigin::Root.into(), 0, members, None, T::MaxMembers::get())?;
 
 		let threshold = m;
 		// Add previous proposals.
@@ -188,22 +192,23 @@ benchmarks_instance_pallet! {
 			let proposal: T::Proposal = SystemCall::<T>::remark { remark: vec![i as u8; b as usize] }.into();
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(caller.clone()).into(),
+				0,
 				threshold,
 				Box::new(proposal),
 				bytes_in_storage,
 			)?;
 		}
 
-		assert_eq!(Collective::<T, I>::proposals().len(), (p - 1) as usize);
+		assert_eq!(Collective::<T, I>::proposals(0).len(), (p - 1) as usize);
 
 		let proposal: T::Proposal = SystemCall::<T>::remark { remark: vec![p as u8; b as usize] }.into();
 
-	}: propose(SystemOrigin::Signed(caller.clone()), threshold, Box::new(proposal.clone()), bytes_in_storage)
+	}: propose(SystemOrigin::Signed(caller.clone()), 0, threshold, Box::new(proposal.clone()), bytes_in_storage)
 	verify {
 		// New proposal is recorded
-		assert_eq!(Collective::<T, I>::proposals().len(), p as usize);
+		assert_eq!(Collective::<T, I>::proposals(0).len(), p as usize);
 		let proposal_hash = T::Hashing::hash_of(&proposal);
-		assert_last_event::<T, I>(Event::Proposed { account: caller, proposal_index: p - 1, proposal_hash, threshold }.into());
+		assert_last_event::<T, I>(Event::Proposed { dao_id: 0, account: caller, proposal_index: p - 1, proposal_hash, threshold }.into());
 	}
 
 	vote {
@@ -224,7 +229,7 @@ benchmarks_instance_pallet! {
 		}
 		let voter: T::AccountId = account::<T::AccountId>("voter", 0, SEED);
 		members.push(voter.clone());
-		Collective::<T, I>::set_members(SystemOrigin::Root.into(), members.clone(), None, T::MaxMembers::get())?;
+		Collective::<T, I>::set_members(SystemOrigin::Root.into(), 0, members.clone(), None, T::MaxMembers::get())?;
 
 		// Threshold is 1 less than the number of members so that one person can vote nay
 		let threshold = m - 1;
@@ -236,6 +241,7 @@ benchmarks_instance_pallet! {
 			let proposal: T::Proposal = SystemCall::<T>::remark { remark: vec![i as u8; b as usize] }.into();
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(proposer.clone()).into(),
+				0,
 				threshold,
 				Box::new(proposal.clone()),
 				bytes_in_storage,
@@ -250,6 +256,7 @@ benchmarks_instance_pallet! {
 			let approve = true;
 			Collective::<T, I>::vote(
 				SystemOrigin::Signed(voter.clone()).into(),
+				0,
 				last_hash,
 				index,
 				approve,
@@ -259,12 +266,13 @@ benchmarks_instance_pallet! {
 		let approve = true;
 		Collective::<T, I>::vote(
 			SystemOrigin::Signed(voter.clone()).into(),
+			0,
 			last_hash,
 			index,
 			approve,
 		)?;
 
-		assert_eq!(Collective::<T, I>::proposals().len(), p as usize);
+		assert_eq!(Collective::<T, I>::proposals(0).len(), p as usize);
 
 		// Voter switches vote to nay, but does not kill the vote, just updates + inserts
 		let approve = false;
@@ -272,11 +280,11 @@ benchmarks_instance_pallet! {
 		// Whitelist voter account from further DB operations.
 		let voter_key = frame_system::Account::<T>::hashed_key_for(&voter);
 		frame_benchmarking::benchmarking::add_to_whitelist(voter_key.into());
-	}: _(SystemOrigin::Signed(voter), last_hash, index, approve)
+	}: _(SystemOrigin::Signed(voter), 0, last_hash, index, approve)
 	verify {
 		// All proposals exist and the last proposal has just been updated.
-		assert_eq!(Collective::<T, I>::proposals().len(), p as usize);
-		let voting = Collective::<T, I>::voting(&last_hash).ok_or("Proposal Missing")?;
+		assert_eq!(Collective::<T, I>::proposals(0).len(), p as usize);
+		let voting = Collective::<T, I>::voting(0, &last_hash).ok_or("Proposal Missing")?;
 		assert_eq!(voting.ayes.len(), (m - 3) as usize);
 		assert_eq!(voting.nays.len(), 1);
 	}
@@ -299,7 +307,7 @@ benchmarks_instance_pallet! {
 		}
 		let voter = account::<T::AccountId>("voter", 0, SEED);
 		members.push(voter.clone());
-		Collective::<T, I>::set_members(SystemOrigin::Root.into(), members.clone(), None, T::MaxMembers::get())?;
+		Collective::<T, I>::set_members(SystemOrigin::Root.into(), 0, members.clone(), None, T::MaxMembers::get())?;
 
 		// Threshold is total members so that one nay will disapprove the vote
 		let threshold = m;
@@ -309,10 +317,12 @@ benchmarks_instance_pallet! {
 		for i in 0 .. p {
 			// Proposals should be different so that different proposal hashes are generated
 			let proposal: T::Proposal = SystemCall::<T>::remark {
+
 				remark: vec![i as u8; bytes as usize]
 			}.into();
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(proposer.clone()).into(),
+				0,
 				threshold,
 				Box::new(proposal.clone()),
 				bytes_in_storage,
@@ -327,6 +337,7 @@ benchmarks_instance_pallet! {
 			let approve = true;
 			Collective::<T, I>::vote(
 				SystemOrigin::Signed(voter.clone()).into(),
+				0,
 				last_hash,
 				index,
 				approve,
@@ -336,17 +347,19 @@ benchmarks_instance_pallet! {
 		let approve = true;
 		Collective::<T, I>::vote(
 			SystemOrigin::Signed(voter.clone()).into(),
+			0,
 			last_hash,
 			index,
 			approve,
 		)?;
 
-		assert_eq!(Collective::<T, I>::proposals().len(), p as usize);
+		assert_eq!(Collective::<T, I>::proposals(0).len(), p as usize);
 
 		// Voter switches vote to nay, which kills the vote
 		let approve = false;
 		Collective::<T, I>::vote(
 			SystemOrigin::Signed(voter.clone()).into(),
+			0,
 			last_hash,
 			index,
 			approve,
@@ -355,11 +368,11 @@ benchmarks_instance_pallet! {
 		// Whitelist voter account from further DB operations.
 		let voter_key = frame_system::Account::<T>::hashed_key_for(&voter);
 		frame_benchmarking::benchmarking::add_to_whitelist(voter_key.into());
-	}: close(SystemOrigin::Signed(voter), last_hash, index, Weight::max_value(), bytes_in_storage)
+	}: close(SystemOrigin::Signed(voter), 0, last_hash, index, Weight::max_value(), bytes_in_storage)
 	verify {
 		// The last proposal is removed.
-		assert_eq!(Collective::<T, I>::proposals().len(), (p - 1) as usize);
-		assert_last_event::<T, I>(Event::Disapproved { proposal_hash: last_hash }.into());
+		assert_eq!(Collective::<T, I>::proposals(0).len(), (p - 1) as usize);
+		assert_last_event::<T, I>(Event::Disapproved { dao_id: 0, proposal_hash: last_hash }.into());
 	}
 
 	close_early_approved {
@@ -378,7 +391,7 @@ benchmarks_instance_pallet! {
 		}
 		let caller: T::AccountId = whitelisted_caller();
 		members.push(caller.clone());
-		Collective::<T, I>::set_members(SystemOrigin::Root.into(), members.clone(), None, T::MaxMembers::get())?;
+		Collective::<T, I>::set_members(SystemOrigin::Root.into(), 0, members.clone(), None, T::MaxMembers::get())?;
 
 		// Threshold is 2 so any two ayes will approve the vote
 		let threshold = 2;
@@ -390,6 +403,7 @@ benchmarks_instance_pallet! {
 			let proposal: T::Proposal = SystemCall::<T>::remark { remark: vec![i as u8; b as usize] }.into();
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(caller.clone()).into(),
+				0,
 				threshold,
 				Box::new(proposal.clone()),
 				bytes_in_storage,
@@ -400,6 +414,7 @@ benchmarks_instance_pallet! {
 		// Caller switches vote to nay on their own proposal, allowing them to be the deciding approval vote
 		Collective::<T, I>::vote(
 			SystemOrigin::Signed(caller.clone()).into(),
+			0,
 			last_hash,
 			p - 1,
 			false,
@@ -411,6 +426,7 @@ benchmarks_instance_pallet! {
 			let approve = false;
 			Collective::<T, I>::vote(
 				SystemOrigin::Signed(voter.clone()).into(),
+				0,
 				last_hash,
 				p - 1,
 				approve,
@@ -420,27 +436,29 @@ benchmarks_instance_pallet! {
 		// Member zero is the first aye
 		Collective::<T, I>::vote(
 			SystemOrigin::Signed(members[0].clone()).into(),
+			0,
 			last_hash,
 			p - 1,
 			true,
 		)?;
 
-		assert_eq!(Collective::<T, I>::proposals().len(), p as usize);
+		assert_eq!(Collective::<T, I>::proposals(0).len(), p as usize);
 
 		// Caller switches vote to aye, which passes the vote
 		let index = p - 1;
 		let approve = true;
 		Collective::<T, I>::vote(
 			SystemOrigin::Signed(caller.clone()).into(),
+			0,
 			last_hash,
 			index, approve,
 		)?;
 
-	}: close(SystemOrigin::Signed(caller), last_hash, index, Weight::max_value(), bytes_in_storage)
+	}: close(SystemOrigin::Signed(caller), 0, last_hash, index, Weight::max_value(), bytes_in_storage)
 	verify {
 		// The last proposal is removed.
-		assert_eq!(Collective::<T, I>::proposals().len(), (p - 1) as usize);
-		assert_last_event::<T, I>(Event::Executed { proposal_hash: last_hash, result: Err(DispatchError::BadOrigin) }.into());
+		assert_eq!(Collective::<T, I>::proposals(0).len(), (p - 1) as usize);
+		assert_last_event::<T, I>(Event::Executed { dao_id: 0, proposal_hash: last_hash, result: Err(DispatchError::BadOrigin) }.into());
 	}
 
 	close_disapproved {
@@ -461,6 +479,7 @@ benchmarks_instance_pallet! {
 		members.push(caller.clone());
 		Collective::<T, I>::set_members(
 			SystemOrigin::Root.into(),
+			0,
 			members.clone(),
 			Some(caller.clone()),
 			T::MaxMembers::get(),
@@ -474,10 +493,12 @@ benchmarks_instance_pallet! {
 		for i in 0 .. p {
 			// Proposals should be different so that different proposal hashes are generated
 			let proposal: T::Proposal = SystemCall::<T>::remark {
+
 				remark: vec![i as u8; bytes as usize]
 			}.into();
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(caller.clone()).into(),
+				0,
 				threshold,
 				Box::new(proposal.clone()),
 				bytes_in_storage,
@@ -493,6 +514,7 @@ benchmarks_instance_pallet! {
 			let approve = true;
 			Collective::<T, I>::vote(
 				SystemOrigin::Signed(voter.clone()).into(),
+				0,
 				last_hash,
 				index,
 				approve,
@@ -502,19 +524,20 @@ benchmarks_instance_pallet! {
 		// caller is prime, prime votes nay
 		Collective::<T, I>::vote(
 			SystemOrigin::Signed(caller.clone()).into(),
+			0,
 			last_hash,
 			index,
 			false,
 		)?;
 
 		System::<T>::set_block_number(T::BlockNumber::max_value());
-		assert_eq!(Collective::<T, I>::proposals().len(), p as usize);
+		assert_eq!(Collective::<T, I>::proposals(0).len(), p as usize);
 
 		// Prime nay will close it as disapproved
-	}: close(SystemOrigin::Signed(caller), last_hash, index, Weight::max_value(), bytes_in_storage)
+	}: close(SystemOrigin::Signed(caller), 0, last_hash, index, Weight::max_value(), bytes_in_storage)
 	verify {
-		assert_eq!(Collective::<T, I>::proposals().len(), (p - 1) as usize);
-		assert_last_event::<T, I>(Event::Disapproved { proposal_hash: last_hash }.into());
+		assert_eq!(Collective::<T, I>::proposals(0).len(), (p - 1) as usize);
+		assert_last_event::<T, I>(Event::Disapproved { dao_id: 0, proposal_hash: last_hash }.into());
 	}
 
 	close_approved {
@@ -535,6 +558,7 @@ benchmarks_instance_pallet! {
 		members.push(caller.clone());
 		Collective::<T, I>::set_members(
 			SystemOrigin::Root.into(),
+			0,
 			members.clone(),
 			Some(caller.clone()),
 			T::MaxMembers::get(),
@@ -550,6 +574,7 @@ benchmarks_instance_pallet! {
 			let proposal: T::Proposal = SystemCall::<T>::remark { remark: vec![i as u8; b as usize] }.into();
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(caller.clone()).into(),
+				0,
 				threshold,
 				Box::new(proposal.clone()),
 				bytes_in_storage,
@@ -560,6 +585,7 @@ benchmarks_instance_pallet! {
 		// The prime member votes aye, so abstentions default to aye.
 		Collective::<T, _>::vote(
 			SystemOrigin::Signed(caller.clone()).into(),
+			0,
 			last_hash,
 			p - 1,
 			true // Vote aye.
@@ -572,6 +598,7 @@ benchmarks_instance_pallet! {
 			let approve = false;
 			Collective::<T, I>::vote(
 				SystemOrigin::Signed(voter.clone()).into(),
+				0,
 				last_hash,
 				p - 1,
 				approve
@@ -580,13 +607,13 @@ benchmarks_instance_pallet! {
 
 		// caller is prime, prime already votes aye by creating the proposal
 		System::<T>::set_block_number(T::BlockNumber::max_value());
-		assert_eq!(Collective::<T, I>::proposals().len(), p as usize);
+		assert_eq!(Collective::<T, I>::proposals(0).len(), p as usize);
 
 		// Prime aye will close it as approved
-	}: close(SystemOrigin::Signed(caller), last_hash, p - 1, Weight::max_value(), bytes_in_storage)
+	}: close(SystemOrigin::Signed(caller), 0, last_hash, p - 1, Weight::max_value(), bytes_in_storage)
 	verify {
-		assert_eq!(Collective::<T, I>::proposals().len(), (p - 1) as usize);
-		assert_last_event::<T, I>(Event::Executed { proposal_hash: last_hash, result: Err(DispatchError::BadOrigin) }.into());
+		assert_eq!(Collective::<T, I>::proposals(0).len(), (p - 1) as usize);
+		assert_last_event::<T, I>(Event::Executed { dao_id: 0, proposal_hash: last_hash, result: Err(DispatchError::BadOrigin) }.into());
 	}
 
 	disapprove_proposal {
@@ -606,6 +633,7 @@ benchmarks_instance_pallet! {
 		members.push(caller.clone());
 		Collective::<T, I>::set_members(
 			SystemOrigin::Root.into(),
+			0,
 			members.clone(),
 			Some(caller.clone()),
 			T::MaxMembers::get(),
@@ -621,6 +649,7 @@ benchmarks_instance_pallet! {
 			let proposal: T::Proposal = SystemCall::<T>::remark { remark: vec![i as u8; b as usize] }.into();
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(caller.clone()).into(),
+				0,
 				threshold,
 				Box::new(proposal.clone()),
 				bytes_in_storage,
@@ -629,12 +658,12 @@ benchmarks_instance_pallet! {
 		}
 
 		System::<T>::set_block_number(T::BlockNumber::max_value());
-		assert_eq!(Collective::<T, I>::proposals().len(), p as usize);
+		assert_eq!(Collective::<T, I>::proposals(0).len(), p as usize);
 
-	}: _(SystemOrigin::Root, last_hash)
+	}: _(SystemOrigin::Root, 0, last_hash)
 	verify {
-		assert_eq!(Collective::<T, I>::proposals().len(), (p - 1) as usize);
-		assert_last_event::<T, I>(Event::Disapproved { proposal_hash: last_hash }.into());
+		assert_eq!(Collective::<T, I>::proposals(0).len(), (p - 1) as usize);
+		assert_last_event::<T, I>(Event::Disapproved { dao_id: 0,proposal_hash: last_hash }.into());
 	}
 
 	impl_benchmark_test_suite!(Collective, crate::tests::new_test_ext(), crate::tests::Test);
