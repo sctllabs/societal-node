@@ -96,8 +96,8 @@ hex-literal = { version = "0.3.4", optional = true }
 
 # Local Dependencies
 pallet-dao = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao" }
-pallet-dao-treasury = { version = "4.0.0-dev", default-features = false, path = "../pallets/treasury" }
-pallet-dao-collective = { version = "4.0.0-dev", default-features = false, path = "../pallets/collective" }
+pallet-dao-collective = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-collective" }
+pallet-dao-treasury = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-treasury" }
 
 [build-dependencies]
 substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
