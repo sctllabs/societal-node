@@ -279,9 +279,6 @@ pub mod pallet {
 		InsufficientPermission,
 		/// Proposal has not been approved.
 		ProposalNotApproved,
-		///
-		DaoNotExist,
-		PolicyNotExist,
 	}
 
 	// TODO: beware of huge DAO count - use chunk spend instead
@@ -332,14 +329,7 @@ pub mod pallet {
 			let proposer = ensure_signed(origin.clone())?;
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
 
-			ensure!(T::DaoProvider::exists(dao_id), Error::<T, I>::DaoNotExist);
-
-			let policy = T::DaoProvider::policy(dao_id);
-			if policy.is_none() {
-				return Err(Error::<T, I>::PolicyNotExist.into())
-			}
-
-			let bond = Self::calculate_bond(policy.unwrap(), value);
+			let bond = Self::calculate_bond(T::DaoProvider::policy(dao_id)?, value);
 			T::Currency::reserve(&proposer, bond)
 				.map_err(|_| Error::<T, I>::InsufficientProposersBalance)?;
 
@@ -370,14 +360,7 @@ pub mod pallet {
 			#[pallet::compact] dao_id: DaoId,
 			#[pallet::compact] proposal_id: ProposalIndex,
 		) -> DispatchResult {
-			ensure!(T::DaoProvider::exists(dao_id), Error::<T, I>::DaoNotExist);
-
-			let policy = T::DaoProvider::policy(dao_id);
-			if policy.is_none() {
-				return Err(Error::<T, I>::PolicyNotExist.into())
-			}
-
-			T::RejectOrigin::ensure_origin(origin, &policy.unwrap().reject_origin)?;
+			T::RejectOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.reject_origin)?;
 
 			let proposal = <Proposals<T, I>>::take(&dao_id, &proposal_id)
 				.ok_or(Error::<T, I>::InvalidIndex)?;
@@ -409,14 +392,10 @@ pub mod pallet {
 			#[pallet::compact] dao_id: DaoId,
 			#[pallet::compact] proposal_id: ProposalIndex,
 		) -> DispatchResult {
-			ensure!(T::DaoProvider::exists(dao_id), Error::<T, I>::DaoNotExist);
-
-			let policy = T::DaoProvider::policy(dao_id);
-			if policy.is_none() {
-				return Err(Error::<T, I>::PolicyNotExist.into())
-			}
-
-			T::ApproveOrigin::ensure_origin(origin, &policy.unwrap().approve_origin)?;
+			T::ApproveOrigin::ensure_origin(
+				origin,
+				&T::DaoProvider::policy(dao_id)?.approve_origin,
+			)?;
 
 			ensure!(
 				<Proposals<T, I>>::contains_key(dao_id, proposal_id),
@@ -446,7 +425,7 @@ pub mod pallet {
 			let max_amount = T::SpendOrigin::ensure_origin(origin)?;
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
 
-			ensure!(T::DaoProvider::exists(dao_id), Error::<T, I>::DaoNotExist);
+			T::DaoProvider::exists(dao_id)?;
 
 			ensure!(amount <= max_amount, Error::<T, I>::InsufficientPermission);
 			let proposal_index = Self::proposal_count(dao_id);
@@ -492,14 +471,7 @@ pub mod pallet {
 			#[pallet::compact] dao_id: DaoId,
 			#[pallet::compact] proposal_id: ProposalIndex,
 		) -> DispatchResult {
-			ensure!(T::DaoProvider::exists(dao_id), Error::<T, I>::DaoNotExist);
-
-			let policy = T::DaoProvider::policy(dao_id);
-			if policy.is_none() {
-				return Err(Error::<T, I>::PolicyNotExist.into())
-			}
-
-			T::RejectOrigin::ensure_origin(origin, &policy.unwrap().reject_origin)?;
+			T::RejectOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.reject_origin)?;
 
 			Approvals::<T, I>::try_mutate(dao_id, |v| -> DispatchResult {
 				if let Some(index) = v.iter().position(|x| x == &proposal_id) {

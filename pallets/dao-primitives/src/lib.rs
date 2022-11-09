@@ -114,9 +114,9 @@ pub trait DaoProvider {
 	type AccountId;
 	type Policy;
 
-	fn exists(id: Self::Id) -> bool;
+	fn exists(id: Self::Id) -> Result<(), DispatchError>;
 	fn dao_account_id(id: Self::Id) -> Self::AccountId;
-	fn policy(id: Self::Id) -> Option<Self::Policy>;
+	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError>;
 	fn count() -> u32;
 }
 

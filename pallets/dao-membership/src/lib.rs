@@ -125,7 +125,6 @@ pub mod pallet {
 		NotMember,
 		/// Too many members.
 		TooManyMembers,
-		PolicyNotExist,
 	}
 
 	#[pallet::call]
@@ -139,12 +138,7 @@ pub mod pallet {
 			dao_id: DaoId,
 			who: T::AccountId,
 		) -> DispatchResult {
-			let policy = T::DaoProvider::policy(dao_id);
-			if policy.is_none() {
-				return Err(Error::<T, I>::PolicyNotExist.into())
-			}
-
-			T::ApproveOrigin::ensure_origin(origin, &policy.unwrap().add_origin)?;
+			T::ApproveOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.add_origin)?;
 
 			let mut members = <Members<T, I>>::get(dao_id);
 			let location = members.binary_search(&who).err().ok_or(Error::<T, I>::AlreadyMember)?;
@@ -169,12 +163,10 @@ pub mod pallet {
 			dao_id: DaoId,
 			who: T::AccountId,
 		) -> DispatchResult {
-			let policy = T::DaoProvider::policy(dao_id);
-			if policy.is_none() {
-				return Err(Error::<T, I>::PolicyNotExist.into())
-			}
-
-			T::ApproveOrigin::ensure_origin(origin, &policy.unwrap().remove_origin)?;
+			T::ApproveOrigin::ensure_origin(
+				origin,
+				&T::DaoProvider::policy(dao_id)?.remove_origin,
+			)?;
 
 			let mut members = <Members<T, I>>::get(dao_id);
 			let location = members.binary_search(&who).ok().ok_or(Error::<T, I>::NotMember)?;
@@ -201,12 +193,7 @@ pub mod pallet {
 			remove: T::AccountId,
 			add: T::AccountId,
 		) -> DispatchResult {
-			let policy = T::DaoProvider::policy(dao_id);
-			if policy.is_none() {
-				return Err(Error::<T, I>::PolicyNotExist.into())
-			}
-
-			T::ApproveOrigin::ensure_origin(origin, &policy.unwrap().swap_origin)?;
+			T::ApproveOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.swap_origin)?;
 
 			if remove == add {
 				return Ok(())
@@ -237,12 +224,7 @@ pub mod pallet {
 			dao_id: DaoId,
 			members: Vec<T::AccountId>,
 		) -> DispatchResult {
-			let policy = T::DaoProvider::policy(dao_id);
-			if policy.is_none() {
-				return Err(Error::<T, I>::PolicyNotExist.into())
-			}
-
-			T::ApproveOrigin::ensure_origin(origin, &policy.unwrap().reset_origin)?;
+			T::ApproveOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.reset_origin)?;
 
 			let mut members: BoundedVec<T::AccountId, T::MaxMembers> =
 				BoundedVec::try_from(members).map_err(|_| Error::<T, I>::TooManyMembers)?;
@@ -303,12 +285,7 @@ pub mod pallet {
 		/// May only be called from `T::PrimeOrigin`.
 		#[pallet::weight(50_000_000)]
 		pub fn set_prime(origin: OriginFor<T>, dao_id: DaoId, who: T::AccountId) -> DispatchResult {
-			let policy = T::DaoProvider::policy(dao_id);
-			if policy.is_none() {
-				return Err(Error::<T, I>::PolicyNotExist.into())
-			}
-
-			T::ApproveOrigin::ensure_origin(origin, &policy.unwrap().prime_origin)?;
+			T::ApproveOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.prime_origin)?;
 
 			Self::members(dao_id).binary_search(&who).ok().ok_or(Error::<T, I>::NotMember)?;
 			Prime::<T, I>::insert(dao_id, &who);
@@ -322,12 +299,7 @@ pub mod pallet {
 		/// May only be called from `T::PrimeOrigin`.
 		#[pallet::weight(50_000_000)]
 		pub fn clear_prime(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
-			let policy = T::DaoProvider::policy(dao_id);
-			if policy.is_none() {
-				return Err(Error::<T, I>::PolicyNotExist.into())
-			}
-
-			T::ApproveOrigin::ensure_origin(origin, &policy.unwrap().prime_origin)?;
+			T::ApproveOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.prime_origin)?;
 
 			Prime::<T, I>::remove(dao_id);
 

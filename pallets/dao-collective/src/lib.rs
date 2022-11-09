@@ -329,8 +329,6 @@ pub mod pallet {
 		WrongProposalWeight,
 		/// The given length bound for the proposal was too low.
 		WrongProposalLength,
-		DaoNotExist,
-		PolicyNotExist,
 	}
 
 	// Note that councillor operations are assigned to the operational class.
@@ -733,10 +731,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			Error::<T, I>::DuplicateProposal
 		);
 
-		let policy = T::DaoProvider::policy(dao_id);
-		if policy.is_none() {
-			return Err(Error::<T, I>::PolicyNotExist.into())
-		}
+		let policy = T::DaoProvider::policy(dao_id)?;
 
 		let active_proposals =
 			<Proposals<T, I>>::try_mutate(dao_id, |proposals| -> Result<usize, DispatchError> {
@@ -748,8 +743,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		<ProposalCount<T, I>>::mutate(dao_id, |i| *i += 1);
 		<ProposalOf<T, I>>::insert(dao_id, proposal_hash, proposal);
 		let votes = {
-			let end =
-				frame_system::Pallet::<T>::block_number() + policy.unwrap().proposal_period.into();
+			let end = frame_system::Pallet::<T>::block_number() + policy.proposal_period.into();
 			Votes { index, threshold, ayes: vec![], nays: vec![], end }
 		};
 		<Voting<T, I>>::insert(dao_id, proposal_hash, votes);
@@ -1161,9 +1155,9 @@ impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>
 {
 	type Success = ();
 	fn try_origin(o: O, arg: &(u32, u32)) -> Result<Self::Success, O> {
-		let (N, D) = arg;
+		let (min, limit) = arg;
 		o.into().and_then(|o| match o {
-			RawOrigin::Members(n, m) if n * D > N * m => Ok(()),
+			RawOrigin::Members(n, m) if n * limit > min * m => Ok(()),
 			r => Err(O::from(r)),
 		})
 	}
@@ -1205,10 +1199,10 @@ impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>
 {
 	type Success = ();
 	fn try_origin(o: O, arg: &(u32, u32)) -> Result<Self::Success, O> {
-		let (N, D) = arg;
+		let (min, limit) = arg;
 
 		o.into().and_then(|o| match o {
-			RawOrigin::Members(n, m) if n * D >= N * m => Ok(()),
+			RawOrigin::Members(n, m) if n * limit >= min * m => Ok(()),
 			r => Err(O::from(r)),
 		})
 	}
