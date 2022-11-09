@@ -169,12 +169,6 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(4))]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			let who = ensure_signed(origin)?;
-			Ok(())
-		}
-
 		// TODO: calculate dynamic weight
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(4))]
 		pub fn create_dao(
