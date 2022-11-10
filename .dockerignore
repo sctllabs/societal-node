@@ -1,0 +1,8 @@
+.devcontainer
+.github
+.vscode
+scripts
+.history
+target
+.cargo
+.local
