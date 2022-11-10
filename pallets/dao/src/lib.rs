@@ -2,7 +2,7 @@
 
 use codec::HasCompact;
 use frame_support::{
-	dispatch::DispatchResult,
+	dispatch::{DispatchError, DispatchResult},
 	traits::{
 		tokens::fungibles::{metadata::Mutate as MetadataMutate, Create, Inspect, Mutate},
 		Currency,
@@ -55,8 +55,6 @@ pub mod pallet {
 
 	/// The current storage version.
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
-
-	// const MAX_ACCOUNT_LIMIT: u32 = 10;
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
@@ -165,6 +163,7 @@ pub mod pallet {
 		TokenNotExists,
 		TokenCreateFailed,
 		InvalidInput,
+		PolicyNotExist,
 	}
 
 	#[pallet::call]
@@ -173,7 +172,6 @@ pub mod pallet {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(4))]
 		pub fn create_dao(
 			origin: OriginFor<T>,
-			// additional council member - should be multi-account lookup or something
 			council: Vec<<T::Lookup as StaticLookup>::Source>,
 			data: Vec<u8>,
 		) -> DispatchResult {
@@ -191,29 +189,14 @@ pub mod pallet {
 			let dao_id = <NextDaoId<T>>::get();
 			let dao_account_id = Self::account_id(dao_id);
 
-			let mut dao_name = Default::default();
-			match BoundedVec::<u8, T::DaoStringLimit>::try_from(dao.name.clone()) {
-				Ok(name) => {
-					dao_name = name;
-				},
-				Err(_) => return Err(Error::<T>::DaoNotExist.into()),
-			}
+			let dao_name = BoundedVec::<u8, T::DaoStringLimit>::try_from(dao.name.clone())
+				.map_err(|_| Error::<T>::NameTooLong)?;
 
-			let mut dao_purpose = Default::default();
-			match BoundedVec::<u8, T::DaoStringLimit>::try_from(dao.purpose.clone()) {
-				Ok(purpose) => {
-					dao_purpose = purpose;
-				},
-				Err(_) => return Err(Error::<T>::DaoNotExist.into()),
-			}
+			let dao_purpose = BoundedVec::<u8, T::DaoStringLimit>::try_from(dao.purpose.clone())
+				.map_err(|_| Error::<T>::PurposeTooLong)?;
 
-			let mut dao_metadata = Default::default();
-			match BoundedVec::<u8, T::DaoStringLimit>::try_from(dao.metadata.clone()) {
-				Ok(metadata) => {
-					dao_metadata = metadata;
-				},
-				Err(_) => return Err(Error::<T>::DaoNotExist.into()),
-			}
+			let dao_metadata = BoundedVec::<u8, T::DaoStringLimit>::try_from(dao.metadata.clone())
+				.map_err(|_| Error::<T>::MetadataTooLong)?;
 
 			let min = <T as Config>::Currency::minimum_balance();
 			let _ = <T as Config>::Currency::make_free_balance_be(&dao_account_id, min);
@@ -233,7 +216,7 @@ pub mod pallet {
 				has_token_id = Some(token_id);
 
 				let metadata = token.metadata;
-				let min_balance = Self::u128_to_balance(token.min_balance).into();
+				let min_balance = Self::u128_to_balance(token.min_balance);
 
 				let issuance =
 					T::AssetProvider::total_issuance(token_id).try_into().unwrap_or(0u128);
@@ -261,7 +244,7 @@ pub mod pallet {
 					log::info!("setting metadata for token: {:?}", token_id);
 					let metadata_result = T::AssetProvider::set(
 						token_id,
-						&dao_account_id.clone(),
+						&dao_account_id,
 						metadata.name,
 						metadata.symbol,
 						metadata.decimals,
@@ -328,7 +311,7 @@ pub mod pallet {
 			let dao = Dao {
 				founder: who.clone(),
 				account_id: dao_account_id,
-				token_id: has_token_id.unwrap().into(),
+				token_id: has_token_id.unwrap(),
 				config: DaoConfig { name: dao_name, purpose: dao_purpose, metadata: dao_metadata },
 			};
 			Daos::<T>::insert(dao_id, dao);
@@ -373,16 +356,23 @@ impl<T: Config> DaoProvider for Pallet<T> {
 	type AccountId = T::AccountId;
 	type Policy = PolicyOf<T>;
 
-	fn exists(id: Self::Id) -> bool {
-		Daos::<T>::contains_key(&id)
+	fn exists(id: Self::Id) -> Result<(), DispatchError> {
+		if !Daos::<T>::contains_key(&id) {
+			return Err(Error::<T>::DaoNotExist.into())
+		}
+
+		Ok(())
 	}
 
 	fn count() -> u32 {
 		NextDaoId::<T>::get()
 	}
 
-	fn policy(id: Self::Id) -> Option<Self::Policy> {
-		Policies::<T>::get(&id)
+	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError> {
+		match Policies::<T>::get(&id) {
+			Some(policy) => Ok(policy),
+			None => Err(Error::<T>::PolicyNotExist.into()),
+		}
 	}
 
 	fn dao_account_id(id: Self::Id) -> Self::AccountId {

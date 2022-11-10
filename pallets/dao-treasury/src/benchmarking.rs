@@ -36,7 +36,8 @@ fn setup_proposal<T: Config<I>, I: 'static>(
 	u: u32,
 ) -> (T::AccountId, BalanceOf<T, I>, <T::Lookup as StaticLookup>::Source) {
 	let caller = account("caller", u, SEED);
-	let value: BalanceOf<T, I> = T::ProposalBondMinimum::get().saturating_mul(100u32.into());
+	let value: BalanceOf<T, I> = 100u32.into(); // T::ProposalBondMinimum::get().saturating_mul(100u32.into());
+											// let value: BalanceOf<T, I> = T::ProposalBondMinimum::get().saturating_mul(100u32.into());
 	let _ = T::Currency::make_free_balance_be(&caller, value);
 	let beneficiary = account("beneficiary", u, SEED);
 	let beneficiary_lookup = T::Lookup::unlookup(beneficiary);
@@ -47,11 +48,11 @@ fn setup_proposal<T: Config<I>, I: 'static>(
 fn create_approved_proposals<T: Config<I>, I: 'static>(n: u32) -> Result<(), &'static str> {
 	for i in 0..n {
 		let (caller, value, lookup) = setup_proposal::<T, I>(i);
-		Treasury::<T, I>::propose_spend(RawOrigin::Signed(caller).into(), value, lookup)?;
-		let proposal_id = <ProposalCount<T, I>>::get() - 1;
-		Treasury::<T, I>::approve_proposal(RawOrigin::Root.into(), proposal_id)?;
+		Treasury::<T, I>::propose_spend(RawOrigin::Signed(caller).into(), 0, value, lookup)?;
+		let proposal_id = <ProposalCount<T, I>>::get(0) - 1;
+		Treasury::<T, I>::approve_proposal(RawOrigin::Root.into(), 0, proposal_id)?;
 	}
-	ensure!(<Approvals<T, I>>::get().len() == n as usize, "Not all approved");
+	ensure!(<Approvals<T, I>>::get(0).len() == n as usize, "Not all approved");
 	Ok(())
 }
 
@@ -72,7 +73,7 @@ benchmarks_instance_pallet! {
 		let (_, value, beneficiary_lookup) = setup_proposal::<T, _>(SEED);
 		let origin = T::SpendOrigin::try_successful_origin();
 		let beneficiary = T::Lookup::lookup(beneficiary_lookup.clone()).unwrap();
-		let call = Call::<T, I>::spend { amount: value, beneficiary: beneficiary_lookup };
+		let call = Call::<T, I>::spend { dao_id: 0, amount: value, beneficiary: beneficiary_lookup };
 	}: {
 		if let Ok(origin) = origin.clone() {
 			call.dispatch_bypass_filter(origin)?;
@@ -80,7 +81,7 @@ benchmarks_instance_pallet! {
 	}
 	verify {
 		if origin.is_ok() {
-			assert_last_event::<T, I>(Event::SpendApproved { proposal_index: 0, amount: value, beneficiary }.into())
+			assert_last_event::<T, I>(Event::SpendApproved { dao_id: 0, proposal_index: 0, amount: value, beneficiary }.into())
 		}
 	}
 
@@ -89,17 +90,18 @@ benchmarks_instance_pallet! {
 		// Whitelist caller account from further DB operations.
 		let caller_key = frame_system::Account::<T>::hashed_key_for(&caller);
 		frame_benchmarking::benchmarking::add_to_whitelist(caller_key.into());
-	}: _(RawOrigin::Signed(caller), value, beneficiary_lookup)
+	}: _(RawOrigin::Signed(caller), 0, value, beneficiary_lookup)
 
 	reject_proposal {
 		let (caller, value, beneficiary_lookup) = setup_proposal::<T, _>(SEED);
 		Treasury::<T, _>::propose_spend(
 			RawOrigin::Signed(caller).into(),
+			0,
 			value,
 			beneficiary_lookup
 		)?;
-		let proposal_id = Treasury::<T, _>::proposal_count() - 1;
-	}: _(RawOrigin::Root, proposal_id)
+		let proposal_id = Treasury::<T, _>::proposal_count(0) - 1;
+	}: _(RawOrigin::Root, 0, proposal_id)
 
 	approve_proposal {
 		let p in 0 .. T::MaxApprovals::get() - 1;
@@ -107,22 +109,24 @@ benchmarks_instance_pallet! {
 		let (caller, value, beneficiary_lookup) = setup_proposal::<T, _>(SEED);
 		Treasury::<T, _>::propose_spend(
 			RawOrigin::Signed(caller).into(),
+			0,
 			value,
 			beneficiary_lookup
 		)?;
-		let proposal_id = Treasury::<T, _>::proposal_count() - 1;
-	}: _(RawOrigin::Root, proposal_id)
+		let proposal_id = Treasury::<T, _>::proposal_count(0) - 1;
+	}: _(RawOrigin::Root, 0, proposal_id)
 
 	remove_approval {
 		let (caller, value, beneficiary_lookup) = setup_proposal::<T, _>(SEED);
 		Treasury::<T, _>::propose_spend(
 			RawOrigin::Signed(caller).into(),
+			0,
 			value,
 			beneficiary_lookup
 		)?;
-		let proposal_id = Treasury::<T, _>::proposal_count() - 1;
-		Treasury::<T, I>::approve_proposal(RawOrigin::Root.into(), proposal_id)?;
-	}: _(RawOrigin::Root, proposal_id)
+		let proposal_id = Treasury::<T, _>::proposal_count(0) - 1;
+		Treasury::<T, I>::approve_proposal(RawOrigin::Root.into(), 0, proposal_id)?;
+	}: _(RawOrigin::Root, 0, proposal_id)
 
 	on_initialize_proposals {
 		let p in 0 .. T::MaxApprovals::get();
