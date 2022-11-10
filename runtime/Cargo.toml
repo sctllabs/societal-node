@@ -96,6 +96,9 @@ hex-literal = { version = "0.3.4", optional = true }
 
 # Local Dependencies
 pallet-dao = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao" }
+pallet-dao-collective = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-collective" }
+pallet-dao-membership = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-membership" }
+pallet-dao-treasury = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-treasury" }
 
 [build-dependencies]
 substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
@@ -124,6 +127,10 @@ std = [
 	"pallet-contracts-rpc-runtime-api/std",
 	"pallet-conviction-voting/std",
 	"pallet-democracy/std",
+	"pallet-dao/std",
+	"pallet-dao-collective/std",
+	"pallet-dao-membership/std",
+	"pallet-dao-treasury/std",
 	"pallet-elections-phragmen/std",
 	"pallet-election-provider-multi-phase/std",
 	"pallet-grandpa/std",
@@ -143,7 +150,6 @@ std = [
 	"pallet-society/std",
 	"pallet-staking/std",
 	"pallet-sudo/std",
-	"pallet-dao/std",
 	"pallet-timestamp/std",
 	"pallet-transaction-payment-rpc-runtime-api/std",
 	"pallet-transaction-payment/std",
@@ -172,10 +178,34 @@ runtime-benchmarks = [
 	"frame-system-benchmarking",
 	"frame-system/runtime-benchmarks",
 	"hex-literal",
+	"pallet-assets/runtime-benchmarks",
+	"pallet-babe/runtime-benchmarks",
 	"pallet-balances/runtime-benchmarks",
-	"pallet-grandpa/runtime-benchmarks",
+	"pallet-bags-list/runtime-benchmarks",
+	"pallet-balances/runtime-benchmarks",
+	"pallet-bounties/runtime-benchmarks",
+	"pallet-child-bounties/runtime-benchmarks",
+	"pallet-collective/runtime-benchmarks",
+	"pallet-contracts/runtime-benchmarks",
+	"pallet-conviction-voting/runtime-benchmarks",
+	"pallet-democracy/runtime-benchmarks",
 	"pallet-dao/runtime-benchmarks",
+	"pallet-dao-collective/runtime-benchmarks",
+	"pallet-dao-membership/runtime-benchmarks",
+	"pallet-dao-treasury/runtime-benchmarks",
+	"pallet-election-provider-multi-phase/runtime-benchmarks",
+	"pallet-elections-phragmen/runtime-benchmarks",
+	"pallet-grandpa/runtime-benchmarks",
+	"pallet-im-online/runtime-benchmarks",
+	"pallet-indices/runtime-benchmarks",
+	"pallet-membership/runtime-benchmarks",
+	"pallet-referenda/runtime-benchmarks",
+	"pallet-society/runtime-benchmarks",
+	"pallet-staking/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
+	"pallet-treasury/runtime-benchmarks",
+	"pallet-uniques/runtime-benchmarks",
+	"pallet-vesting/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks"
 ]
 try-runtime = [
@@ -189,6 +219,9 @@ try-runtime = [
 	"pallet-randomness-collective-flip/try-runtime",
 	"pallet-sudo/try-runtime",
 	"pallet-dao/try-runtime",
+	"pallet-dao-collective/try-runtime",
+	"pallet-dao-membership/try-runtime",
+	"pallet-dao-treasury/try-runtime",
 	"pallet-timestamp/try-runtime",
 	"pallet-transaction-payment/try-runtime",
 	"pallet-authority-discovery/try-runtime",

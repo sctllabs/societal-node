@@ -1,7 +1,7 @@
 [package]
-name = "pallet-dao"
+name = "dao-primitives"
 version = "4.0.0-dev"
-description = "Societal DAO Pallet"
+description = "Societal DAO Primitives"
 authors = ["Societal <https://github.com/sctllabs/societal-node"]
 homepage = "https://www.sctl.xyz"
 edition = "2021"
@@ -28,12 +28,9 @@ sp-runtime = { version = "6.0.0", default-features = false, git = "https://githu
 sp-std = { version = "4.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 
 # Frame dependencies
-frame-benchmarking = { version = "4.0.0-dev", default-features = false, optional = true, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 frame-support = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 frame-system = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
-
-# Local dependencies
-dao-primitives = { version = "4.0.0-dev", default-features = false, path = "../dao-primitives" }
+node-primitives = { version = "2.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
 
 [dev-dependencies]
 sp-core = { version = "6.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.28" }
@@ -44,19 +41,8 @@ sp-runtime = { version = "6.0.0", default-features = false, git = "https://githu
 default = ["std"]
 std = [
 	"codec/std",
-	"frame-benchmarking/std",
 	"frame-support/std",
 	"frame-system/std",
 	"scale-info/std",
-	"sp-core/std",
-	"sp-io/std",
-	"sp-runtime/std",
-	"sp-std/std",
-]
-runtime-benchmarks = [
-	"frame-benchmarking/runtime-benchmarks",
-	"frame-support/runtime-benchmarks",
-	"frame-system/runtime-benchmarks",
-	"sp-runtime/runtime-benchmarks",
 ]
 try-runtime = ["frame-support/try-runtime"]
