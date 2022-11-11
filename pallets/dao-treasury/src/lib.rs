@@ -51,10 +51,6 @@
 //! - `reject_proposal` - Reject a proposal, slashing the deposit.
 //! - `approve_proposal` - Accept the proposal, returning the deposit.
 //! - `remove_approval` - Remove an approval, the deposit will no longer be returned.
-//!
-//! ## GenesisConfig
-//!
-//! The Treasury pallet depends on the [`GenesisConfig`].
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
