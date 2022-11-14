@@ -128,7 +128,7 @@ impl DaoProvider for TestDaoProvider {
 	type AccountId = u128;
 	type Policy = DaoPolicy<u128>;
 
-	fn exists(id: Self::Id) -> Result<(), DispatchError> {
+	fn exists(_id: Self::Id) -> Result<(), DispatchError> {
 		Ok(())
 	}
 
@@ -136,7 +136,7 @@ impl DaoProvider for TestDaoProvider {
 		1
 	}
 
-	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError> {
+	fn policy(_id: Self::Id) -> Result<Self::Policy, DispatchError> {
 		Ok(DaoPolicy {
 			proposal_bond: 5,
 			proposal_bond_min: 0,
@@ -145,11 +145,6 @@ impl DaoProvider for TestDaoProvider {
 			prime_account: 0,
 			approve_origin: (3, 5),
 			reject_origin: (1, 2),
-			add_origin: (1, 2),
-			remove_origin: (1, 2),
-			swap_origin: (1, 2),
-			reset_origin: (1, 2),
-			prime_origin: (1, 2),
 		})
 	}
 
@@ -221,7 +216,7 @@ fn spend_origin_permissioning_works() {
 fn spend_origin_works() {
 	new_test_ext().execute_with(|| {
 		// Check that accumulate works when we have Some value in Dummy already.
-		Balances::make_free_balance_be(&TestDaoProvider::dao_account_id(0), 101);
+		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
 		assert_ok!(Treasury::spend(Origin::signed(10), 0, 5, 6));
 		assert_ok!(Treasury::spend(Origin::signed(10), 0, 5, 6));
 		assert_ok!(Treasury::spend(Origin::signed(10), 0, 5, 6));
@@ -243,7 +238,7 @@ fn spend_origin_works() {
 fn minting_works() {
 	new_test_ext().execute_with(|| {
 		// Check that accumulate works when we have Some value in Dummy already.
-		Balances::make_free_balance_be(&TestDaoProvider::dao_account_id(0), 101);
+		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
 		assert_eq!(Treasury::pot(0), 100);
 	});
 }
@@ -279,7 +274,7 @@ fn spend_proposal_fails_when_proposer_poor() {
 #[test]
 fn accepted_spend_proposal_ignored_outside_spend_period() {
 	new_test_ext().execute_with(|| {
-		Balances::make_free_balance_be(&TestDaoProvider::dao_account_id(0), 101);
+		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
 
 		assert_ok!(Treasury::propose_spend(Origin::signed(0), 0, 100, 3));
 		assert_ok!(Treasury::approve_proposal(Origin::root(), 0, 0));
@@ -294,7 +289,7 @@ fn accepted_spend_proposal_ignored_outside_spend_period() {
 fn unused_pot_should_diminish() {
 	new_test_ext().execute_with(|| {
 		let init_total_issuance = Balances::total_issuance();
-		Balances::make_free_balance_be(&TestDaoProvider::dao_account_id(0), 101);
+		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
 		assert_eq!(Balances::total_issuance(), init_total_issuance + 101);
 
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
@@ -306,7 +301,7 @@ fn unused_pot_should_diminish() {
 #[test]
 fn rejected_spend_proposal_ignored_on_spend_period() {
 	new_test_ext().execute_with(|| {
-		Balances::make_free_balance_be(&TestDaoProvider::dao_account_id(0), 101);
+		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
 
 		assert_ok!(Treasury::propose_spend(Origin::signed(0), 0, 100, 3));
 		assert_ok!(Treasury::reject_proposal(Origin::root(), 0, 0));
@@ -320,7 +315,7 @@ fn rejected_spend_proposal_ignored_on_spend_period() {
 #[test]
 fn reject_already_rejected_spend_proposal_fails() {
 	new_test_ext().execute_with(|| {
-		Balances::make_free_balance_be(&TestDaoProvider::dao_account_id(0), 101);
+		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
 
 		assert_ok!(Treasury::propose_spend(Origin::signed(0), 0, 100, 3));
 		assert_ok!(Treasury::reject_proposal(Origin::root(), 0, 0));
@@ -354,7 +349,7 @@ fn accept_non_existent_spend_proposal_fails() {
 #[test]
 fn accept_already_rejected_spend_proposal_fails() {
 	new_test_ext().execute_with(|| {
-		Balances::make_free_balance_be(&TestDaoProvider::dao_account_id(0), 101);
+		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
 
 		assert_ok!(Treasury::propose_spend(Origin::signed(0), 0, 100, 3));
 		assert_ok!(Treasury::reject_proposal(Origin::root(), 0, 0));
@@ -368,7 +363,7 @@ fn accept_already_rejected_spend_proposal_fails() {
 #[test]
 fn accepted_spend_proposal_enacted_on_spend_period() {
 	new_test_ext().execute_with(|| {
-		Balances::make_free_balance_be(&TestDaoProvider::dao_account_id(0), 101);
+		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
 		assert_eq!(Treasury::pot(0), 100);
 
 		assert_ok!(Treasury::propose_spend(Origin::signed(0), 0, 100, 3));
@@ -383,7 +378,7 @@ fn accepted_spend_proposal_enacted_on_spend_period() {
 #[test]
 fn pot_underflow_should_not_diminish() {
 	new_test_ext().execute_with(|| {
-		Balances::make_free_balance_be(&TestDaoProvider::dao_account_id(0), 101);
+		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
 		assert_eq!(Treasury::pot(0), 100);
 
 		assert_ok!(Treasury::propose_spend(Origin::signed(0), 0, 150, 3));
@@ -392,7 +387,9 @@ fn pot_underflow_should_not_diminish() {
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 		assert_eq!(Treasury::pot(0), 100); // Pot hasn't changed
 
-		let _ = Balances::deposit_into_existing(&TestDaoProvider::dao_account_id(0), 100).unwrap();
+		let _ =
+			Balances::deposit_into_existing(&<Test as Config>::DaoProvider::dao_account_id(0), 100)
+				.unwrap();
 		<Treasury as OnInitialize<u64>>::on_initialize(4);
 		assert_eq!(Balances::free_balance(3), 150); // Fund has been spent
 		assert_eq!(Treasury::pot(0), 25); // Pot has finally changed
@@ -404,9 +401,10 @@ fn pot_underflow_should_not_diminish() {
 #[test]
 fn treasury_account_doesnt_get_deleted() {
 	new_test_ext().execute_with(|| {
-		Balances::make_free_balance_be(&TestDaoProvider::dao_account_id(0), 101);
+		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
 		assert_eq!(Treasury::pot(0), 100);
-		let treasury_balance = Balances::free_balance(&TestDaoProvider::dao_account_id(0));
+		let treasury_balance =
+			Balances::free_balance(&<Test as Config>::DaoProvider::dao_account_id(0));
 
 		assert_ok!(Treasury::propose_spend(Origin::signed(0), 0, treasury_balance, 3));
 		assert_ok!(Treasury::approve_proposal(Origin::root(), 0, 0));
@@ -419,7 +417,7 @@ fn treasury_account_doesnt_get_deleted() {
 
 		<Treasury as OnInitialize<u64>>::on_initialize(4);
 		assert_eq!(Treasury::pot(0), 0); // Pot is emptied
-		assert_eq!(Balances::free_balance(TestDaoProvider::dao_account_id(0)), 1); // but the account is		                                                                   // still there
+		assert_eq!(Balances::free_balance(<Test as Config>::DaoProvider::dao_account_id(0)), 1); // but the account is still there
 	});
 }
 
@@ -435,7 +433,7 @@ fn inexistent_account_works() {
 	let mut t: sp_io::TestExternalities = t.into();
 
 	t.execute_with(|| {
-		assert_eq!(Balances::free_balance(TestDaoProvider::dao_account_id(0)), 0); // Account does not exist
+		assert_eq!(Balances::free_balance(<Test as Config>::DaoProvider::dao_account_id(0)), 0); // Account does not exist
 		assert_eq!(Treasury::pot(0), 0); // Pot is empty
 
 		assert_ok!(Treasury::propose_spend(Origin::signed(0), 0, 99, 3));
@@ -446,9 +444,9 @@ fn inexistent_account_works() {
 		assert_eq!(Treasury::pot(0), 0); // Pot hasn't changed
 		assert_eq!(Balances::free_balance(3), 0); // Balance of `3` hasn't changed
 
-		Balances::make_free_balance_be(&TestDaoProvider::dao_account_id(0), 100);
+		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 100);
 		assert_eq!(Treasury::pot(0), 99); // Pot now contains funds
-		assert_eq!(Balances::free_balance(TestDaoProvider::dao_account_id(0)), 100); // Account does exist
+		assert_eq!(Balances::free_balance(<Test as Config>::DaoProvider::dao_account_id(0)), 100); // Account does exist
 
 		<Treasury as OnInitialize<u64>>::on_initialize(4);
 
@@ -463,14 +461,20 @@ fn genesis_funding_works() {
 	let initial_funding = 100;
 	pallet_balances::GenesisConfig::<Test> {
 		// Total issuance will be 200 with treasury account initialized with 100.
-		balances: vec![(0, 100), (TestDaoProvider::dao_account_id(0), initial_funding)],
+		balances: vec![
+			(0, 100),
+			(<Test as Config>::DaoProvider::dao_account_id(0), initial_funding),
+		],
 	}
 	.assimilate_storage(&mut t)
 	.unwrap();
 	let mut t: sp_io::TestExternalities = t.into();
 
 	t.execute_with(|| {
-		assert_eq!(Balances::free_balance(TestDaoProvider::dao_account_id(0)), initial_funding);
+		assert_eq!(
+			Balances::free_balance(<Test as Config>::DaoProvider::dao_account_id(0)),
+			initial_funding
+		);
 		assert_eq!(Treasury::pot(0), initial_funding - Balances::minimum_balance());
 	});
 }
@@ -478,7 +482,7 @@ fn genesis_funding_works() {
 #[test]
 fn max_approvals_limited() {
 	new_test_ext().execute_with(|| {
-		Balances::make_free_balance_be(&TestDaoProvider::dao_account_id(0), u64::MAX);
+		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), u64::MAX);
 		Balances::make_free_balance_be(&0, u64::MAX);
 
 		for _ in 0..<Test as Config>::MaxApprovals::get() {
@@ -498,7 +502,7 @@ fn max_approvals_limited() {
 #[test]
 fn remove_already_removed_approval_fails() {
 	new_test_ext().execute_with(|| {
-		Balances::make_free_balance_be(&TestDaoProvider::dao_account_id(0), 101);
+		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
 
 		assert_ok!(Treasury::propose_spend(Origin::signed(0), 0, 100, 3));
 		assert_ok!(Treasury::approve_proposal(Origin::root(), 0, 0));
