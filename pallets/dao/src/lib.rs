@@ -7,9 +7,8 @@ use frame_support::{
 		tokens::fungibles::{metadata::Mutate as MetadataMutate, Create, Inspect, Mutate},
 		Currency,
 		ExistenceRequirement::KeepAlive,
-		Get, ReservableCurrency, UnfilteredDispatchable, UnixTime,
+		Get, ReservableCurrency,
 	},
-	weights::GetDispatchInfo,
 	BoundedVec, PalletId,
 };
 pub use pallet::*;
@@ -64,10 +63,7 @@ pub mod pallet {
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
-		type Call: Parameter + UnfilteredDispatchable<Origin = Self::Origin> + GetDispatchInfo;
 		type Currency: ReservableCurrency<Self::AccountId>;
-		type SupervisorOrigin: EnsureOrigin<Self::Origin>;
-		type TimeProvider: UnixTime;
 
 		type AssetId: Member
 			+ Parameter
@@ -144,11 +140,8 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
 		DaoRegistered(u32, T::AccountId),
 		DaoJoined(u32, T::AccountId),
-		ProposalAdded(u32, T::AccountId),
 	}
 
 	#[pallet::error]
@@ -177,14 +170,8 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin.clone())?;
 
-			let payload = serde_json::from_slice::<DaoPayload>(&data);
-			if payload.is_err() {
-				log::info!("err: {:?}", payload);
-
-				return Err(Error::<T>::InvalidInput.into())
-			}
-
-			let dao = payload.unwrap();
+			let dao = serde_json::from_slice::<DaoPayload>(&data)
+				.map_err(|_| Error::<T>::InvalidInput)?;
 
 			let dao_id = <NextDaoId<T>>::get();
 			let dao_account_id = Self::account_id(dao_id);
@@ -225,50 +212,23 @@ pub mod pallet {
 					return Err(Error::<T>::TokenAlreadyExists.into())
 				} else {
 					log::info!("issuing token: {:?}", token_id);
-
-					let create_result = T::AssetProvider::create(
-						token_id,
-						dao_account_id.clone(),
-						false,
-						min_balance,
-					);
-					match create_result {
-						Ok(_) => {},
-						Err(e) => {
-							log::info!("error occurred while issuing token: {:?}", e);
-
-							return Err(Error::<T>::TokenCreateFailed.into())
-						},
-					}
+					T::AssetProvider::create(token_id, dao_account_id.clone(), false, min_balance)
+						.map_err(|_| Error::<T>::TokenCreateFailed)?;
 
 					log::info!("setting metadata for token: {:?}", token_id);
-					let metadata_result = T::AssetProvider::set(
+					T::AssetProvider::set(
 						token_id,
 						&dao_account_id,
 						metadata.name,
 						metadata.symbol,
 						metadata.decimals,
-					);
-					match metadata_result {
-						Ok(_) => {},
-						Err(e) => {
-							log::info!("error occurred while setting metadata for token: {:?}", e);
-
-							return Err(Error::<T>::TokenCreateFailed.into())
-						},
-					}
+					)
+					.map_err(|_| Error::<T>::TokenCreateFailed)?;
 
 					log::info!("minting token: {:?}", token_id);
-					let mint_result =
-						T::AssetProvider::mint_into(token_id, &dao_account_id, min_balance);
-					match mint_result {
-						Ok(_) => {},
-						Err(e) => {
-							log::info!("error occurred while minting token: {:?}", e);
 
-							return Err(Error::<T>::TokenCreateFailed.into())
-						},
-					}
+					T::AssetProvider::mint_into(token_id, &dao_account_id, min_balance)
+						.map_err(|_| Error::<T>::TokenCreateFailed)?;
 				}
 			}
 
@@ -298,13 +258,8 @@ pub mod pallet {
 				proposal_period: dao.policy.proposal_period /
 					T::ExpectedBlockTime::get() as BlockNumber,
 				prime_account: who.clone(),
-				approve_origin: (3, 5),
-				reject_origin: (1, 2),
-				add_origin: (1, 2),
-				remove_origin: (1, 2),
-				swap_origin: (1, 2),
-				reset_origin: (1, 2),
-				prime_origin: (1, 2),
+				approve_origin: dao.policy.approve_origin,
+				reject_origin: dao.policy.reject_origin,
 			};
 			Policies::<T>::insert(dao_id, policy);
 
@@ -319,7 +274,12 @@ pub mod pallet {
 			// setting submitter as a Dao council by default
 			let mut council_members: Vec<T::AccountId> = vec![who.clone()];
 			for member in council {
-				council_members.push(T::Lookup::lookup(member)?);
+				let account = T::Lookup::lookup(member)?;
+				if council_members.contains(&account) {
+					continue
+				}
+
+				council_members.push(account);
 			}
 			T::CouncilProvider::initialize_members(dao_id, council_members)?;
 

@@ -13,7 +13,7 @@ use sp_runtime::RuntimeDebug;
 use sp_std::prelude::*;
 
 #[derive(
-	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
 pub struct DaoTokenMetadata {
 	#[serde(deserialize_with = "de_string_to_bytes")]
@@ -24,7 +24,7 @@ pub struct DaoTokenMetadata {
 }
 
 #[derive(
-	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
 pub struct DaoGovernanceToken {
 	pub token_id: u32,
@@ -34,16 +34,18 @@ pub struct DaoGovernanceToken {
 }
 
 #[derive(
-	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
 pub struct DaoPolicyPayload {
 	pub proposal_bond: u32,
 	pub proposal_bond_min: u128,
 	pub proposal_period: u32,
+	pub approve_origin: (u32, u32),
+	pub reject_origin: (u32, u32),
 }
 
 #[derive(
-	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
 pub struct DaoPayload {
 	#[serde(deserialize_with = "de_string_to_bytes")]
@@ -57,7 +59,7 @@ pub struct DaoPayload {
 	pub policy: DaoPolicyPayload,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct DaoConfig<BoundedString, BoundedMetadata> {
 	/// Name of the DAO.
 	pub name: BoundedString,
@@ -67,12 +69,14 @@ pub struct DaoConfig<BoundedString, BoundedMetadata> {
 	pub metadata: BoundedMetadata,
 }
 
+// TODO: replace with payload directly
 #[derive(
 	Encode,
 	Decode,
 	Default,
 	Clone,
 	PartialEq,
+	Eq,
 	TypeInfo,
 	RuntimeDebug,
 	Serialize,
@@ -94,14 +98,9 @@ pub struct DaoPolicy<AccountId> {
 	// TODO: use max members for account length
 	pub approve_origin: (u32, u32),
 	pub reject_origin: (u32, u32),
-	pub add_origin: (u32, u32),
-	pub remove_origin: (u32, u32),
-	pub swap_origin: (u32, u32),
-	pub reset_origin: (u32, u32),
-	pub prime_origin: (u32, u32),
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct Dao<AccountId, TokenId, BoundedString, BoundedMetadata> {
 	pub founder: AccountId,
 	pub account_id: AccountId,
