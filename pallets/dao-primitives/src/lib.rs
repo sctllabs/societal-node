@@ -83,7 +83,7 @@ pub struct DaoConfig<BoundedString, BoundedMetadata> {
 	Deserialize,
 	MaxEncodedLen,
 )]
-pub struct DaoPolicy<AccountId> {
+pub struct DaoPolicy {
 	/// Fraction of a proposal's value that should be bonded in order to place the proposal.
 	/// An accepted proposal gets these back. A rejected proposal does not.
 	pub proposal_bond: u32, //TODO: static value or percentage???
@@ -93,8 +93,6 @@ pub struct DaoPolicy<AccountId> {
 	pub proposal_bond_max: Option<u128>,
 	/// In millis
 	pub proposal_period: u32,
-	//TODO: ??
-	pub prime_account: AccountId,
 	// TODO: use max members for account length
 	pub approve_origin: (u32, u32),
 	pub reject_origin: (u32, u32),

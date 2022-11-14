@@ -28,7 +28,6 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
-// TODO
 type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
@@ -38,8 +37,7 @@ type DaoOf<T> = Dao<
 	BoundedVec<u8, <T as Config>::DaoStringLimit>,
 	BoundedVec<u8, <T as Config>::DaoStringLimit>,
 >;
-// TODO
-type PolicyOf<T> = DaoPolicy<<T as frame_system::Config>::AccountId>;
+type PolicyOf = DaoPolicy;
 
 type AssetId<T> = <T as Config>::AssetId;
 type Balance<T> = <T as Config>::Balance;
@@ -132,7 +130,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn policies)]
 	pub(super) type Policies<T: Config> =
-		StorageMap<_, Blake2_128Concat, u32, PolicyOf<T>, OptionQuery>;
+		StorageMap<_, Blake2_128Concat, u32, PolicyOf, OptionQuery>;
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
@@ -257,7 +255,6 @@ pub mod pallet {
 				proposal_bond_max: None,
 				proposal_period: dao.policy.proposal_period /
 					T::ExpectedBlockTime::get() as BlockNumber,
-				prime_account: who.clone(),
 				approve_origin: dao.policy.approve_origin,
 				reject_origin: dao.policy.reject_origin,
 			};
@@ -304,7 +301,6 @@ pub mod pallet {
 			TryInto::<Balance<T>>::try_into(cost).ok().unwrap()
 		}
 
-		// TODO: rework
 		fn u128_to_balance_of(cost: u128) -> BalanceOf<T> {
 			TryInto::<BalanceOf<T>>::try_into(cost).ok().unwrap()
 		}
@@ -314,7 +310,7 @@ pub mod pallet {
 impl<T: Config> DaoProvider for Pallet<T> {
 	type Id = u32;
 	type AccountId = T::AccountId;
-	type Policy = PolicyOf<T>;
+	type Policy = PolicyOf;
 
 	fn exists(id: Self::Id) -> Result<(), DispatchError> {
 		if !Daos::<T>::contains_key(&id) {
