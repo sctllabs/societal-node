@@ -138,7 +138,10 @@ pub mod pallet {
 			dao_id: DaoId,
 			who: T::AccountId,
 		) -> DispatchResult {
-			T::ApproveOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.add_origin)?;
+			T::ApproveOrigin::ensure_origin(
+				origin,
+				&T::DaoProvider::policy(dao_id)?.approve_origin,
+			)?;
 
 			let mut members = <Members<T, I>>::get(dao_id);
 			let location = members.binary_search(&who).err().ok_or(Error::<T, I>::AlreadyMember)?;
@@ -165,7 +168,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			T::ApproveOrigin::ensure_origin(
 				origin,
-				&T::DaoProvider::policy(dao_id)?.remove_origin,
+				&T::DaoProvider::policy(dao_id)?.approve_origin,
 			)?;
 
 			let mut members = <Members<T, I>>::get(dao_id);
@@ -193,7 +196,10 @@ pub mod pallet {
 			remove: T::AccountId,
 			add: T::AccountId,
 		) -> DispatchResult {
-			T::ApproveOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.swap_origin)?;
+			T::ApproveOrigin::ensure_origin(
+				origin,
+				&T::DaoProvider::policy(dao_id)?.approve_origin,
+			)?;
 
 			if remove == add {
 				return Ok(())
@@ -224,7 +230,10 @@ pub mod pallet {
 			dao_id: DaoId,
 			members: Vec<T::AccountId>,
 		) -> DispatchResult {
-			T::ApproveOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.reset_origin)?;
+			T::ApproveOrigin::ensure_origin(
+				origin,
+				&T::DaoProvider::policy(dao_id)?.approve_origin,
+			)?;
 
 			let mut members: BoundedVec<T::AccountId, T::MaxMembers> =
 				BoundedVec::try_from(members).map_err(|_| Error::<T, I>::TooManyMembers)?;
@@ -280,12 +289,14 @@ pub mod pallet {
 			Ok(())
 		}
 
+		// TODO: remove Prime at all?
 		/// Set the prime member. Must be a current member.
-		///
-		/// May only be called from `T::PrimeOrigin`.
 		#[pallet::weight(50_000_000)]
 		pub fn set_prime(origin: OriginFor<T>, dao_id: DaoId, who: T::AccountId) -> DispatchResult {
-			T::ApproveOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.prime_origin)?;
+			T::ApproveOrigin::ensure_origin(
+				origin,
+				&T::DaoProvider::policy(dao_id)?.approve_origin,
+			)?;
 
 			Self::members(dao_id).binary_search(&who).ok().ok_or(Error::<T, I>::NotMember)?;
 			Prime::<T, I>::insert(dao_id, &who);
@@ -295,11 +306,12 @@ pub mod pallet {
 		}
 
 		/// Remove the prime member if it exists.
-		///
-		/// May only be called from `T::PrimeOrigin`.
 		#[pallet::weight(50_000_000)]
 		pub fn clear_prime(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
-			T::ApproveOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.prime_origin)?;
+			T::ApproveOrigin::ensure_origin(
+				origin,
+				&T::DaoProvider::policy(dao_id)?.approve_origin,
+			)?;
 
 			Prime::<T, I>::remove(dao_id);
 
@@ -395,7 +407,6 @@ mod benchmark {
 
 	fn set_members<T: Config<I>, I: 'static>(members: Vec<T::AccountId>, prime: Option<usize>) {
 		let approve_origin = T::ApproveOrigin::successful_origin(&(1, 1));
-		// let prime_origin = T::PrimeOrigin::successful_origin();
 
 		assert_ok!(<Membership<T, I>>::reset_members(approve_origin.clone(), 0, members.clone()));
 		if let Some(prime) = prime.map(|i| members[i].clone()) {
