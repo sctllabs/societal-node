@@ -1348,11 +1348,8 @@ parameter_types! {
 
 impl pallet_dao::Config for Runtime {
 	type Event = Event;
-	type Call = Call;
 	type Currency = Balances;
 	type PalletId = DaoPalletId;
-	type SupervisorOrigin = EnsureRoot<AccountId>;
-	type TimeProvider = pallet_timestamp::Pallet<Runtime>;
 	type DaoStringLimit = DaoStringLimit;
 	type DaoMetadataLimit = DaoMetadataLimit;
 	type AssetId = u32;
