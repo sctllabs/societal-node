@@ -198,11 +198,7 @@ pub mod pallet {
 		type SpendOrigin: EnsureOrigin<Self::Origin, Success = BalanceOf<Self, I>>;
 
 		// TODO: rework providers
-		type DaoProvider: DaoProvider<
-			Id = u32,
-			AccountId = Self::AccountId,
-			Policy = DaoPolicy<Self::AccountId>,
-		>;
+		type DaoProvider: DaoProvider<Id = u32, AccountId = Self::AccountId, Policy = DaoPolicy>;
 	}
 
 	/// Number of proposals that have been made.
@@ -499,7 +495,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	}
 
 	/// The needed bond for a proposal whose spend is `value`.
-	fn calculate_bond(policy: DaoPolicy<T::AccountId>, value: BalanceOf<T, I>) -> BalanceOf<T, I> {
+	fn calculate_bond(policy: DaoPolicy, value: BalanceOf<T, I>) -> BalanceOf<T, I> {
 		let proposal_bond = Permill::from_percent(policy.proposal_bond);
 
 		let mut r = Self::u128_to_balance_of(policy.proposal_bond_min).max(proposal_bond * value);

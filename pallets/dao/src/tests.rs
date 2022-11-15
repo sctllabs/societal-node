@@ -152,7 +152,6 @@ fn create_dao_works() {
 		assert_eq!(
 			DaoFactory::policies(0).unwrap(),
 			DaoPolicy {
-				prime_account: 1,
 				proposal_bond: 1,
 				proposal_bond_min: 1,
 				proposal_bond_max: None,

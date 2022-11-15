@@ -126,7 +126,7 @@ pub struct TestDaoProvider;
 impl DaoProvider for TestDaoProvider {
 	type Id = u32;
 	type AccountId = u128;
-	type Policy = DaoPolicy<u128>;
+	type Policy = DaoPolicy;
 
 	fn exists(_id: Self::Id) -> Result<(), DispatchError> {
 		Ok(())
@@ -142,7 +142,6 @@ impl DaoProvider for TestDaoProvider {
 			proposal_bond_min: 0,
 			proposal_bond_max: None,
 			proposal_period: 100,
-			prime_account: 0,
 			approve_origin: (3, 5),
 			reject_origin: (1, 2),
 		})

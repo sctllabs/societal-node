@@ -192,9 +192,6 @@ pub mod pallet {
 		/// The outer event type.
 		type Event: From<Event<Self, I>> + IsType<<Self as frame_system::Config>::Event>;
 
-		/// Origin from which approvals must come.
-		// type ApproveOrigin: EnsureOriginWithArg<Self::Origin, (u32, u32)>;
-
 		/// Maximum number of proposals allowed to be active in parallel.
 		type MaxProposals: Get<ProposalIndex>;
 
@@ -212,11 +209,7 @@ pub mod pallet {
 		type WeightInfo: WeightInfo;
 
 		// TODO: rework providers
-		type DaoProvider: DaoProvider<
-			Id = u32,
-			AccountId = Self::AccountId,
-			Policy = DaoPolicy<Self::AccountId>,
-		>;
+		type DaoProvider: DaoProvider<Id = u32, AccountId = Self::AccountId, Policy = DaoPolicy>;
 	}
 
 	/// Origin for the collective pallet.
