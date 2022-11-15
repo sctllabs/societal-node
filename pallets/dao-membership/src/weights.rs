@@ -49,7 +49,6 @@ pub trait WeightInfo {
 	fn swap_member(m: u32, ) -> Weight;
 	fn reset_member(m: u32, ) -> Weight;
 	fn change_key(m: u32, ) -> Weight;
-	fn set_prime(m: u32, ) -> Weight;
 	fn clear_prime(m: u32, ) -> Weight;
 }
 
@@ -114,16 +113,6 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add((55_000 as Weight).saturating_mul(m as Weight))
 			.saturating_add(T::DbWeight::get().reads(3 as Weight))
 			.saturating_add(T::DbWeight::get().writes(4 as Weight))
-	}
-	// Storage: TechnicalMembership Members (r:1 w:0)
-	// Storage: TechnicalMembership Prime (r:0 w:1)
-	// Storage: TechnicalCommittee Prime (r:0 w:1)
-	fn set_prime(m: u32, ) -> Weight {
-		(4_869_000 as Weight)
-			// Standard Error: 0
-			.saturating_add((28_000 as Weight).saturating_mul(m as Weight))
-			.saturating_add(T::DbWeight::get().reads(1 as Weight))
-			.saturating_add(T::DbWeight::get().writes(2 as Weight))
 	}
 	// Storage: TechnicalMembership Prime (r:0 w:1)
 	// Storage: TechnicalCommittee Prime (r:0 w:1)
@@ -195,16 +184,6 @@ impl WeightInfo for () {
 			.saturating_add((55_000 as Weight).saturating_mul(m as Weight))
 			.saturating_add(RocksDbWeight::get().reads(3 as Weight))
 			.saturating_add(RocksDbWeight::get().writes(4 as Weight))
-	}
-	// Storage: TechnicalMembership Members (r:1 w:0)
-	// Storage: TechnicalMembership Prime (r:0 w:1)
-	// Storage: TechnicalCommittee Prime (r:0 w:1)
-	fn set_prime(m: u32, ) -> Weight {
-		(4_869_000 as Weight)
-			// Standard Error: 0
-			.saturating_add((28_000 as Weight).saturating_mul(m as Weight))
-			.saturating_add(RocksDbWeight::get().reads(1 as Weight))
-			.saturating_add(RocksDbWeight::get().writes(2 as Weight))
 	}
 	// Storage: TechnicalMembership Prime (r:0 w:1)
 	// Storage: TechnicalCommittee Prime (r:0 w:1)
