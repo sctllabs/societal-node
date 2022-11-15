@@ -564,7 +564,7 @@ impl pallet_dao_collective::Config<DaoCouncilCollective> for Runtime {
 	type Event = Event;
 	type MaxProposals = CouncilMaxProposals;
 	type MaxMembers = CouncilMaxMembers;
-	type DefaultVote = pallet_dao_collective::PrimeDefaultVote;
+	type DefaultVote = pallet_dao_collective::MoreThanMajorityVote;
 	type WeightInfo = pallet_dao_collective::weights::SubstrateWeight<Runtime>;
 	type DaoProvider = Dao;
 }

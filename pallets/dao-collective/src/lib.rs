@@ -83,45 +83,18 @@ pub type MemberCount = u32;
 pub trait DefaultVote {
 	/// Get the default voting strategy, given:
 	///
-	/// - Whether the prime member voted Aye.
 	/// - Raw number of yes votes.
 	/// - Raw number of no votes.
 	/// - Total number of member count.
-	fn default_vote(
-		prime_vote: Option<bool>,
-		yes_votes: MemberCount,
-		no_votes: MemberCount,
-		len: MemberCount,
-	) -> bool;
+	fn default_vote(yes_votes: MemberCount, no_votes: MemberCount, len: MemberCount) -> bool;
 }
 
-/// Set the prime member's vote as the default vote.
-pub struct PrimeDefaultVote;
-
-impl DefaultVote for PrimeDefaultVote {
-	fn default_vote(
-		prime_vote: Option<bool>,
-		_yes_votes: MemberCount,
-		_no_votes: MemberCount,
-		_len: MemberCount,
-	) -> bool {
-		prime_vote.unwrap_or(false)
-	}
-}
-
-/// First see if yes vote are over majority of the whole collective. If so, set the default vote
-/// as yes. Otherwise, use the prime member's vote as the default vote.
-pub struct MoreThanMajorityThenPrimeDefaultVote;
-
-impl DefaultVote for MoreThanMajorityThenPrimeDefaultVote {
-	fn default_vote(
-		prime_vote: Option<bool>,
-		yes_votes: MemberCount,
-		_no_votes: MemberCount,
-		len: MemberCount,
-	) -> bool {
+/// set the default vote as yes if yes vote are over majority of the whole collective.
+pub struct MoreThanMajorityVote;
+impl DefaultVote for MoreThanMajorityVote {
+	fn default_vote(yes_votes: MemberCount, _no_votes: MemberCount, len: MemberCount) -> bool {
 		let more_than_majority = yes_votes * 2 > len;
-		more_than_majority || prime_vote.unwrap_or(false)
+		more_than_majority
 	}
 }
 
@@ -260,12 +233,6 @@ pub mod pallet {
 	pub type Members<T: Config<I>, I: 'static = ()> =
 		StorageMap<_, Twox64Concat, DaoId, Vec<T::AccountId>, ValueQuery>;
 
-	/// The prime member that helps determine the default vote behavior in case of absentations.
-	#[pallet::storage]
-	#[pallet::getter(fn prime)]
-	pub type Prime<T: Config<I>, I: 'static = ()> =
-		StorageMap<_, Twox64Concat, DaoId, T::AccountId, OptionQuery>;
-
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config<I>, I: 'static = ()> {
@@ -367,11 +334,11 @@ pub mod pallet {
 			),
 			DispatchClass::Operational
 		))]
+		// TODO: should be proceeded via dao origin - no roots allowed
 		pub fn set_members(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			new_members: Vec<T::AccountId>,
-			prime: Option<T::AccountId>,
 			old_count: MemberCount,
 		) -> DispatchResultWithPostInfo {
 			ensure_root(origin)?;
@@ -400,7 +367,6 @@ pub mod pallet {
 				&new_members,
 				&old,
 			);
-			Prime::<T, I>::set(dao_id, prime);
 
 			// TODO: revise weights across all functions
 			// TODO: max proposals per dao
@@ -863,10 +829,8 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		// Only allow actual closing of the proposal after the voting period has ended.
 		ensure!(frame_system::Pallet::<T>::block_number() >= voting.end, Error::<T, I>::TooEarly);
 
-		let prime_vote = Self::prime(dao_id).map(|who| voting.ayes.iter().any(|a| a == &who));
-
 		// default voting strategy.
-		let default = T::DefaultVote::default_vote(prime_vote, yes_votes, no_votes, seats);
+		let default = T::DefaultVote::default_vote(yes_votes, no_votes, seats);
 
 		let abstentions = seats - (yes_votes + no_votes);
 		match default {
@@ -928,6 +892,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		let proposal =
 			ProposalOf::<T, I>::get(dao_id, hash).ok_or(Error::<T, I>::ProposalMissing)?;
 		let proposal_weight = proposal.get_dispatch_info().weight;
+
 		ensure!(proposal_weight <= weight_bound, Error::<T, I>::WrongProposalWeight);
 		Ok((proposal, proposal_len as usize))
 	}
@@ -1044,15 +1009,6 @@ impl<T: Config<I>, I: 'static> ChangeDaoMembers<DaoId, T::AccountId> for Pallet<
 			});
 		}
 		Members::<T, I>::insert(dao_id, new);
-		Prime::<T, I>::remove(dao_id);
-	}
-
-	fn set_prime(dao_id: DaoId, prime: Option<T::AccountId>) {
-		Prime::<T, I>::set(dao_id, prime);
-	}
-
-	fn get_prime(dao_id: DaoId) -> Option<T::AccountId> {
-		Prime::<T, I>::get(dao_id)
 	}
 }
 
@@ -1156,7 +1112,7 @@ impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin(arg: &(u32, u32)) -> Result<O, ()> {
+	fn try_successful_origin(_arg: &(u32, u32)) -> Result<O, ()> {
 		Ok(O::from(RawOrigin::Members(1u32, 0u32)))
 	}
 }
@@ -1201,7 +1157,7 @@ impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin(arg: &(u32, u32)) -> Result<O, ()> {
+	fn try_successful_origin(_arg: &(u32, u32)) -> Result<O, ()> {
 		Ok(O::from(RawOrigin::Members(0u32, 0u32)))
 	}
 }
