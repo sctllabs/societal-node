@@ -15,7 +15,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Treasury pallet benchmarking.
+// Changes made comparing to the original benchmarking of the FRAME pallet-treasure:
+// - using DAO as a parameter for pallet functions
+
+//! DAO Treasury pallet benchmarking.
 
 #![cfg(feature = "runtime-benchmarks")]
 
@@ -36,8 +39,7 @@ fn setup_proposal<T: Config<I>, I: 'static>(
 	u: u32,
 ) -> (T::AccountId, BalanceOf<T, I>, <T::Lookup as StaticLookup>::Source) {
 	let caller = account("caller", u, SEED);
-	let value: BalanceOf<T, I> = 100u32.into(); // T::ProposalBondMinimum::get().saturating_mul(100u32.into());
-											// let value: BalanceOf<T, I> = T::ProposalBondMinimum::get().saturating_mul(100u32.into());
+	let value: BalanceOf<T, I> = 100u32.into();
 	let _ = T::Currency::make_free_balance_be(&caller, value);
 	let beneficiary = account("beneficiary", u, SEED);
 	let beneficiary_lookup = T::Lookup::unlookup(beneficiary);

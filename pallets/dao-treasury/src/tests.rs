@@ -15,6 +15,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Changes made comparing to the original tests of the FRAME pallet-treasure:
+// - using DAO as a parameter for pallet functions
+
 //! DAO Treasury pallet tests.
 
 #![cfg(test)]

@@ -15,6 +15,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Changes made comparing to the original tests of the FRAME pallet-collective:
+// - using DAO as a parameter for pallet functions
+
+//! DAO Collective pallet tests.
+
 use super::{Event as CollectiveEvent, *};
 use crate as pallet_dao_collective;
 use frame_support::{

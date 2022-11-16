@@ -15,10 +15,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! # Membership Module
+// Re-purposing the pallet to manage membership for the DAOs created by the pallet-dao factory:
+// - re-worked pallet storage to persist membership data for each DAO
+// - updated pallet extrinsic functions adding dao support
+// - added support for DaoProvider retrieving custom configuration for each DAO
+// - updated origins using EnsureOriginWithArg to support custom configuration by DaoProvider
+// - removed GenesisConfig
+// - removed support for 'prime' member
+// - exported benchmarking/tests to separate modules
+
+//! # DAO Membership Module
 //!
-//! Allows control of membership of a set of `AccountId`s, useful for managing membership of of a
-//! collective. A prime member may be set
+//! Allows control of DAO membership of a set of `AccountId`s, useful for managing membership of of a
+//! collective.
 
 // Ensure we're `no_std` when compiling for Wasm.
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -185,8 +194,6 @@ pub mod pallet {
 		/// Swap out one member `remove` for another `add`.
 		///
 		/// May only be called from `T::SwapOrigin`.
-		///
-		/// Prime membership is *not* passed from `remove` to `add`, if extant.
 		#[pallet::weight(50_000_000)]
 		pub fn swap_member(
 			origin: OriginFor<T>,
@@ -247,8 +254,6 @@ pub mod pallet {
 		/// Swap out the sending member for some other key `new`.
 		///
 		/// May only be called from `Signed` origin of a current member.
-		///
-		/// Prime membership is passed from the origin account to `new`, if extant.
 		#[pallet::weight(50_000_000)]
 		pub fn change_key(
 			origin: OriginFor<T>,

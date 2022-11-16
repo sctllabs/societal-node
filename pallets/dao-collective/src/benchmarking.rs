@@ -15,7 +15,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Staking pallet benchmarking.
+// Changes made comparing to the original benchmarking of the FRAME pallet-collective:
+// - using DAO as a parameter for pallet functions
+
+//! DAO Collective pallet benchmarking.
 
 use super::*;
 use crate::Pallet as Collective;
@@ -530,7 +533,6 @@ benchmarks_instance_pallet! {
 
 		System::<T>::set_block_number(T::BlockNumber::max_value());
 		assert_eq!(Collective::<T, I>::proposals(0).len(), p as usize);
-
 	}: close(SystemOrigin::Signed(caller), 0, last_hash, index, Weight::max_value(), bytes_in_storage)
 	verify {
 		assert_eq!(Collective::<T, I>::proposals(0).len(), (p - 1) as usize);
