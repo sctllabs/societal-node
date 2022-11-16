@@ -1,12 +1,12 @@
 [package]
 name = "pallet-dao-treasury"
 version = "4.0.0-dev"
-authors = ["Parity Technologies <admin@parity.io>"]
+authors = ["Societal Labs <https://github.com/sctllabs>"]
 edition = "2021"
 license = "Apache-2.0"
-homepage = "https://substrate.io"
-repository = "https://github.com/paritytech/substrate/"
-description = "FRAME pallet to manage treasury"
+homepage = "https://www.sctl.xyz"
+repository = "https://github.com/sctllabs/societal-node"
+description = "Societal pallet to manage DAO treasury"
 readme = "README.md"
 
 [package.metadata.docs.rs]

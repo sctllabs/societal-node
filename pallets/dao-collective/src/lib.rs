@@ -15,6 +15,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Re-purposing the pallet to manage collective for the DAOs created by the pallet-dao factory:
+// - re-worked pallet storage to persist collective data for each DAO
+// - updated pallet extrinsic functions adding dao support
+// - added support for DaoProvider retrieving custom configuration for each DAO
+// - updated origins using EnsureOriginWithArg to support custom configuration by DaoProvider
+// - removed GenesisConfig
+// - removed support for 'prime' member
+
 //! Collective system: Members of a set of account IDs can make their collective feelings known
 //! through dispatched calls from one of two specialized origins.
 //!
@@ -23,21 +31,14 @@
 //! The pallet assumes that the amount of members stays at or below `MaxMembers` for its weight
 //! calculations, but enforces this neither in `set_members` nor in `change_members_sorted`.
 //!
-//! A "prime" member may be set to help determine the default vote behavior based on chain
-//! config. If `PrimeDefaultVote` is used, the prime vote acts as the default vote in case of any
-//! abstentions after the voting period. If `MoreThanMajorityThenPrimeDefaultVote` is used, then
-//! abstentions will first follow the majority of the collective voting, and then the prime
-//! member.
-//!
 //! Voting happens through motions comprising a proposal (i.e. a curried dispatchable) plus a
 //! number of approvals required for it to pass and be called. Motions are open for members to
 //! vote on for a minimum period given by `MotionDuration`. As soon as the needed number of
 //! approvals is given, the motion is closed and executed. If the number of approvals is not reached
 //! during the voting period, then `close` may be called by any account in order to force the end
-//! the motion explicitly. If a prime member is defined then their vote is used in place of any
-//! abstentions and the proposal is executed if there are enough approvals counting the new votes.
+//! the motion explicitly. The proposal is executed if there are enough approvals counting the new votes.
 //!
-//! If there are not, or if no prime is set, then the motion is dropped without being executed.
+//! If there are not, then the motion is dropped without being executed.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![recursion_limit = "128"]
@@ -297,7 +298,6 @@ pub mod pallet {
 		/// Set the collective's membership.
 		///
 		/// - `new_members`: The new member list. Be nice to the chain and provide it sorted.
-		/// - `prime`: The prime member whose vote sets the default.
 		/// - `old_count`: The upper bound for the previous number of members in storage. Used for
 		///   weight estimation.
 		///
@@ -324,7 +324,6 @@ pub mod pallet {
 		///     members
 		///   - 1 storage read (codec `O(P)`) for reading the proposals
 		///   - `P` storage mutations (codec `O(M)`) for updating the votes for each proposal
-		///   - 1 storage write (codec `O(1)`) for deleting the old `prime` and setting the new one
 		/// # </weight>
 		#[pallet::weight((
 			T::WeightInfo::set_members(
@@ -552,7 +551,6 @@ pub mod pallet {
 		/// has enough votes to be approved or disapproved.
 		///
 		/// If called after the end of the voting period abstentions are counted as rejections
-		/// unless there is a prime member set and the prime member cast an approval.
 		///
 		/// If the close operation completes successfully with disapproval, the transaction fee will
 		/// be waived. Otherwise execution of the approved operation will be charged to the caller.
@@ -570,7 +568,7 @@ pub mod pallet {
 		///   - `P1` is the complexity of `proposal` preimage.
 		///   - `P2` is proposal-count (code-bounded)
 		/// - DB:
-		///  - 2 storage reads (`Members`: codec `O(M)`, `Prime`: codec `O(1)`)
+		///  - 1 storage read (`Members`: codec `O(M)`)
 		///  - 3 mutations (`Voting`: codec `O(M)`, `ProposalOf`: codec `O(B)`, `Proposals`: codec
 		///    `O(P2)`)
 		///  - any mutations done while executing `proposal` (`P1`)
@@ -957,7 +955,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 
 // TODO re-work pallet-membership for Dao members management
 impl<T: Config<I>, I: 'static> ChangeDaoMembers<DaoId, T::AccountId> for Pallet<T, I> {
-	/// Update the members of the collective. Votes are updated and the prime is reset.
+	/// Update the members of the collective. Votes are updated.
 	///
 	/// NOTE: Does not enforce the expected `MaxMembers` limit on the amount of members, but
 	///       the weight estimations rely on it to estimate dispatchable weight.
@@ -972,7 +970,6 @@ impl<T: Config<I>, I: 'static> ChangeDaoMembers<DaoId, T::AccountId> for Pallet<
 	///   - 1 storage read (codec `O(P)`) for reading the proposals
 	///   - `P` storage mutations for updating the votes (codec `O(M)`)
 	///   - 1 storage write (codec `O(N)`) for storing the new members
-	///   - 1 storage write (codec `O(1)`) for deleting the old prime
 	/// # </weight>
 	fn change_members_sorted(
 		dao_id: DaoId,

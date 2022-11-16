@@ -10,3 +10,6 @@ members = [
 ]
 [profile.release]
 panic = "unwind"
+
+[profile.production]
+inherits = "release"

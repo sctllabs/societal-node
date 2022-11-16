@@ -11,7 +11,7 @@ RUN cargo build --locked --release
 FROM docker.io/library/ubuntu:20.04
 LABEL description="Multistage Docker image for Societal Node" \
   image.type="builder" \
-  image.authors="Societal <https://github.com/sctllabs/societal-node>" \
+  image.authors="Societal Labs <https://github.com/sctllabs>" \
   image.vendor="Societal Labs" \
   image.description="Multistage Docker image for Societal Node" \
   image.source="https://github.com/sctllabs/societal-node" \

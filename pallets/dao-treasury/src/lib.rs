@@ -15,7 +15,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! # Treasury Pallet
+// Re-purposing the pallet to manage funds for the DAOs created by the pallet-dao factory:
+// - re-worked pallet storage to persist proposals/approvals for each DAO
+// - updated pallet extrinsic functions adding dao support
+// - added support for DaoProvider retrieving custom configuration for each DAO
+// - updated origins using EnsureOriginWithArg to support custom configuration by DaoProvider
+// - removed GenesisConfig
+
+//! # DAO Treasury Pallet
 //!
 //! The Treasury pallet provides a "pot" of funds that can be managed by stakeholders in the system
 //! and a structure for making spending proposals from this pot.
