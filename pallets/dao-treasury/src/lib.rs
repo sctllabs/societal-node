@@ -561,17 +561,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			&mut missed_any,
 		);
 
-		if !missed_any {
-			// burn some proportion of the remaining budget if we run a surplus.
-			let burn = (T::Burn::get() * budget_remaining).min(budget_remaining);
-			budget_remaining -= burn;
-
-			let (debit, credit) = T::Currency::pair(burn);
-			imbalance.subsume(debit);
-			T::BurnDestination::on_unbalanced(credit);
-			Self::deposit_event(Event::Burnt { dao_id, burnt_funds: burn })
-		}
-
 		// Must never be an error, but better to be safe.
 		// proof: budget_remaining is account free balance minus ED;
 		// Thus we can't spend more than account free balance minus ED;
