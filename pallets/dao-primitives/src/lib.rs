@@ -117,7 +117,6 @@ pub trait DaoProvider {
 	fn count() -> u32;
 }
 
-// TODO: rename to InitializeMembers?
 pub trait InitializeDaoMembers<DaoId, AccountId> {
 	fn initialize_members(dao_id: DaoId, members: Vec<AccountId>) -> Result<(), DispatchError>;
 }
@@ -126,8 +125,6 @@ pub trait InitializeDaoMembers<DaoId, AccountId> {
 pub trait ChangeDaoMembers<DaoId, AccountId: Clone + Ord> {
 	/// A number of members `incoming` just joined the set and replaced some `outgoing` ones. The
 	/// new set is given by `new`, and need not be sorted.
-	///
-	/// This resets any previous value of prime.
 	fn change_members(
 		dao_id: DaoId,
 		incoming: &[AccountId],
@@ -141,9 +138,7 @@ pub trait ChangeDaoMembers<DaoId, AccountId: Clone + Ord> {
 	/// A number of members `_incoming` just joined the set and replaced some `_outgoing` ones. The
 	/// new set is thus given by `sorted_new` and **must be sorted**.
 	///
-	/// NOTE: This is the only function that needs to be implemented in `ChangeMembers`.
-	///
-	/// This resets any previous value of prime.
+	/// NOTE: This is the only function that needs to be implemented in `ChangeDaoMembers`.
 	fn change_members_sorted(
 		dao_id: DaoId,
 		incoming: &[AccountId],
@@ -153,8 +148,6 @@ pub trait ChangeDaoMembers<DaoId, AccountId: Clone + Ord> {
 
 	/// Set the new members; they **must already be sorted**. This will compute the diff and use it
 	/// to call `change_members_sorted`.
-	///
-	/// This resets any previous value of prime.
 	fn set_members_sorted(dao_id: DaoId, new_members: &[AccountId], old_members: &[AccountId]) {
 		let (incoming, outgoing) = Self::compute_members_diff_sorted(new_members, old_members);
 		Self::change_members_sorted(dao_id, &incoming[..], &outgoing[..], new_members);
@@ -196,21 +189,6 @@ pub trait ChangeDaoMembers<DaoId, AccountId: Clone + Ord> {
 		}
 		(incoming, outgoing)
 	}
-
-	/// Set the prime member.
-	fn set_prime(_dao_id: DaoId, _prime: Option<AccountId>) {}
-
-	/// Get the current prime.
-	fn get_prime(_dao_id: DaoId) -> Option<AccountId> {
-		None
-	}
-}
-
-impl<D, T: Clone + Ord> ChangeDaoMembers<D, T> for () {
-	fn change_members(_: D, _: &[T], _: &[T], _: Vec<T>) {}
-	fn change_members_sorted(_: D, _: &[T], _: &[T], _: &[T]) {}
-	fn set_members_sorted(_: D, _: &[T], _: &[T]) {}
-	fn set_prime(_: D, _: Option<T>) {}
 }
 
 pub fn de_string_to_bytes<'de, D>(de: D) -> Result<Vec<u8>, D::Error>
