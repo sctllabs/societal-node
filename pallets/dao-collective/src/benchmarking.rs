@@ -460,6 +460,7 @@ benchmarks_instance_pallet! {
 		assert_last_event::<T, I>(Event::Executed { dao_id: 0, proposal_hash: last_hash, result: Err(DispatchError::BadOrigin) }.into());
 	}
 
+	// TODO: get back to it in case if prime member returned back
 	close_disapproved {
 		// We choose 4 as a minimum so we always trigger a vote in the voting loop (`for j in ...`)
 		let m in 4 .. T::MaxMembers::get();
@@ -509,7 +510,7 @@ benchmarks_instance_pallet! {
 		// A few abstainers will be the nay votes needed to fail the vote.
 		for j in 2 .. m - 1 {
 			let voter = &members[j as usize];
-			let approve = true;
+			let approve = false;
 			Collective::<T, I>::vote(
 				SystemOrigin::Signed(voter.clone()).into(),
 				0,
@@ -530,7 +531,6 @@ benchmarks_instance_pallet! {
 		System::<T>::set_block_number(T::BlockNumber::max_value());
 		assert_eq!(Collective::<T, I>::proposals(0).len(), p as usize);
 
-		// Prime nay will close it as disapproved
 	}: close(SystemOrigin::Signed(caller), 0, last_hash, index, Weight::max_value(), bytes_in_storage)
 	verify {
 		assert_eq!(Collective::<T, I>::proposals(0).len(), (p - 1) as usize);
@@ -578,7 +578,6 @@ benchmarks_instance_pallet! {
 			last_hash = T::Hashing::hash_of(&proposal);
 		}
 
-		// The prime member votes aye, so abstentions default to aye.
 		Collective::<T, _>::vote(
 			SystemOrigin::Signed(caller.clone()).into(),
 			0,
@@ -587,11 +586,11 @@ benchmarks_instance_pallet! {
 			true // Vote aye.
 		)?;
 
-		// Have almost everyone vote nay on last proposal, while keeping it from failing.
+		// Have almost everyone vote yay on last proposal, while keeping it from failing.
 		// A few abstainers will be the aye votes needed to pass the vote.
 		for j in 2 .. m - 1 {
 			let voter = &members[j as usize];
-			let approve = false;
+			let approve = true;
 			Collective::<T, I>::vote(
 				SystemOrigin::Signed(voter.clone()).into(),
 				0,
