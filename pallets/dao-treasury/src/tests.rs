@@ -292,8 +292,8 @@ fn unused_pot_should_diminish() {
 		assert_eq!(Balances::total_issuance(), init_total_issuance + 101);
 
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
-		assert_eq!(Treasury::pot(0), 50);
-		assert_eq!(Balances::total_issuance(), init_total_issuance + 51);
+		assert_eq!(Treasury::pot(0), 100);
+		assert_eq!(Balances::total_issuance(), init_total_issuance + 101);
 	});
 }
 
@@ -307,7 +307,7 @@ fn rejected_spend_proposal_ignored_on_spend_period() {
 
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 		assert_eq!(Balances::free_balance(3), 0);
-		assert_eq!(Treasury::pot(0), 50);
+		assert_eq!(Treasury::pot(0), 100);
 	});
 }
 
@@ -391,7 +391,7 @@ fn pot_underflow_should_not_diminish() {
 				.unwrap();
 		<Treasury as OnInitialize<u64>>::on_initialize(4);
 		assert_eq!(Balances::free_balance(3), 150); // Fund has been spent
-		assert_eq!(Treasury::pot(0), 25); // Pot has finally changed
+		assert_eq!(Treasury::pot(0), 50); // Pot has finally changed
 	});
 }
 
