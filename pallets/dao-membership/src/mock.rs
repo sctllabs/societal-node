@@ -140,5 +140,26 @@ impl Config for Test {
 }
 
 pub(crate) fn new_test_ext() -> sp_io::TestExternalities {
-	frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
+	let mut ext: sp_io::TestExternalities =
+		frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into();
+	ext.execute_with(|| {
+		init_members();
+	});
+	ext
+}
+
+pub(crate) fn init_members() {
+	let mut members: HashMap<u32, Vec<u64>> = HashMap::new();
+	members.insert(0, vec![10, 20, 30]);
+
+	Members::set(members);
+
+	Membership::initialize_members(0, vec![10, 20, 30]).ok();
+}
+
+pub(crate) fn clean() {
+	let mut members: HashMap<u32, Vec<u64>> = HashMap::new();
+	members.insert(0, vec![]);
+
+	Members::set(members);
 }

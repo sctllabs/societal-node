@@ -8,5 +8,9 @@ members = [
     "pallets/dao-treasury",
     "runtime",
 ]
+
 [profile.release]
 panic = "unwind"
+
+[profile.production]
+inherits = "release"

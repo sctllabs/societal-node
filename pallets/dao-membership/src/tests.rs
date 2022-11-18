@@ -5,30 +5,9 @@ use std::collections::HashMap;
 
 use dao_primitives::InitializeDaoMembers;
 
-pub(crate) fn init_members() {
-	let mut members: HashMap<u32, Vec<u64>> = HashMap::new();
-	members.insert(0, vec![10, 20, 30]);
-
-	Members::set(members);
-
-	Membership::initialize_members(0, vec![10, 20, 30]).ok();
-}
-
-#[cfg(feature = "runtime-benchmarks")]
-pub(crate) fn new_bench_ext() -> sp_io::TestExternalities {
-	frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
-}
-
-#[cfg(feature = "runtime-benchmarks")]
-pub(crate) fn clean() {
-	Members::set(HashMap::new());
-}
-
 #[test]
 fn query_membership_works() {
 	new_test_ext().execute_with(|| {
-		init_members();
-
 		assert_eq!(Membership::members(0), vec![10, 20, 30]);
 		assert_eq!(MEMBERS.with(|m| m.borrow().clone()).get(&0).unwrap().clone(), vec![10, 20, 30]);
 	});
@@ -37,8 +16,6 @@ fn query_membership_works() {
 #[test]
 fn add_member_works() {
 	new_test_ext().execute_with(|| {
-		init_members();
-
 		assert_noop!(Membership::add_member(Origin::signed(5), 0, 15), BadOrigin);
 		assert_noop!(
 			Membership::add_member(Origin::signed(1), 0, 10),
@@ -56,8 +33,6 @@ fn add_member_works() {
 #[test]
 fn remove_member_works() {
 	new_test_ext().execute_with(|| {
-		init_members();
-
 		assert_noop!(Membership::remove_member(Origin::signed(5), 0, 20), BadOrigin);
 		assert_noop!(
 			Membership::remove_member(Origin::signed(1), 0, 15),
@@ -75,8 +50,6 @@ fn remove_member_works() {
 #[test]
 fn swap_member_works() {
 	new_test_ext().execute_with(|| {
-		init_members();
-
 		assert_noop!(Membership::swap_member(Origin::signed(5), 0, 10, 25), BadOrigin);
 		assert_noop!(
 			Membership::swap_member(Origin::signed(1), 0, 15, 25),
@@ -102,8 +75,6 @@ fn swap_member_works() {
 #[test]
 fn swap_member_works_that_does_not_change_order() {
 	new_test_ext().execute_with(|| {
-		init_members();
-
 		assert_ok!(Membership::swap_member(Origin::signed(1), 0, 10, 5));
 		assert_eq!(Membership::members(0), vec![5, 20, 30]);
 		assert_eq!(
@@ -116,8 +87,6 @@ fn swap_member_works_that_does_not_change_order() {
 #[test]
 fn change_key_works() {
 	new_test_ext().execute_with(|| {
-		init_members();
-
 		Membership::add_member(Origin::signed(1), 0, 1).ok();
 		assert_noop!(
 			Membership::change_key(Origin::signed(1), 0, 20),
@@ -135,8 +104,6 @@ fn change_key_works() {
 #[test]
 fn change_key_works_that_does_not_change_order() {
 	new_test_ext().execute_with(|| {
-		init_members();
-
 		Membership::add_member(Origin::signed(1), 0, 1).ok();
 
 		assert_ok!(Membership::change_key(Origin::signed(1), 0, 5));
@@ -150,8 +117,6 @@ fn change_key_works_that_does_not_change_order() {
 #[test]
 fn reset_members_works() {
 	new_test_ext().execute_with(|| {
-		init_members();
-
 		assert_noop!(
 			Membership::reset_members(Origin::signed(10), 0, bounded_vec![20, 40, 30]),
 			BadOrigin

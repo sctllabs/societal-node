@@ -23,7 +23,7 @@ benchmarks_instance_pallet! {
 	}
 	verify {
 		assert!(<Members<T, I>>::get(0).contains(&new_member));
-		#[cfg(test)] crate::tests::clean();
+		#[cfg(test)] crate::mock::clean();
 	}
 
 	remove_member {
@@ -37,7 +37,7 @@ benchmarks_instance_pallet! {
 		assert_ok!(<Membership<T, I>>::remove_member(T::ApproveOrigin::successful_origin(&(1, 1)), 0, to_remove.clone()));
 	} verify {
 		assert!(!<Members<T, I>>::get(0).contains(&to_remove));
-		#[cfg(test)] crate::tests::clean();
+		#[cfg(test)] crate::mock::clean();
 	}
 
 	swap_member {
@@ -57,7 +57,7 @@ benchmarks_instance_pallet! {
 	} verify {
 		assert!(!<Members<T, I>>::get(0).contains(&remove));
 		assert!(<Members<T, I>>::get(0).contains(&add));
-		#[cfg(test)] crate::tests::clean();
+		#[cfg(test)] crate::mock::clean();
 	}
 
 	reset_member {
@@ -71,21 +71,24 @@ benchmarks_instance_pallet! {
 	} verify {
 		new_members.sort();
 		assert_eq!(<Members<T, I>>::get(0), new_members);
-		#[cfg(test)] crate::tests::clean();
+		#[cfg(test)] crate::mock::clean();
 	}
-
 	change_key {
 		let m in 1 .. T::MaxMembers::get();
 
 		let members = (0..m).map(|i| account("member", i, SEED)).collect::<Vec<T::AccountId>>();
+		let prime = members.last().cloned().unwrap();
 		set_members::<T, I>(members.clone());
 
 		let add = account::<T::AccountId>("member", m, SEED);
+		whitelist!(prime);
 	}: {
+		assert_ok!(<Membership<T, I>>::change_key(RawOrigin::Signed(prime.clone()).into(), 0, add.clone()));
 	} verify {
+		assert!(!<Members<T, I>>::get(0).contains(&prime));
 		assert!(<Members<T, I>>::get(0).contains(&add));
-		#[cfg(test)] crate::tests::clean();
+		#[cfg(test)] crate::mock::clean();
 	}
 
-	impl_benchmark_test_suite!(Membership, crate::tests::new_bench_ext(), crate::tests::Test);
+	impl_benchmark_test_suite!(Membership, crate::mock::new_test_ext(), crate::mock::Test);
 }
