@@ -4,10 +4,10 @@ use super::*;
 
 #[allow(unused)]
 use crate::Pallet as Dao;
-use frame_benchmarking::{account, benchmarks, whitelisted_caller};
+use frame_benchmarking::{account, benchmarks};
 use frame_system::RawOrigin;
 
-use serde_json::{json, Value};
+use serde_json::json;
 
 const SEED: u32 = 0;
 
