@@ -60,7 +60,7 @@ pub mod pallet {
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
-		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		type Currency: ReservableCurrency<Self::AccountId>;
 
 		type AssetId: Member
@@ -160,7 +160,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		// TODO: calculate dynamic weight
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(4))]
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(4).ref_time())]
 		pub fn create_dao(
 			origin: OriginFor<T>,
 			council: Vec<<T::Lookup as StaticLookup>::Source>,

@@ -22,7 +22,7 @@
 
 use super::{Pallet as Membership, *};
 use frame_benchmarking::{account, benchmarks_instance_pallet, whitelist};
-use frame_support::{assert_ok, traits::EnsureOrigin};
+use frame_support::assert_ok;
 use frame_system::RawOrigin;
 
 const SEED: u32 = 0;
