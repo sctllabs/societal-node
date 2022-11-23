@@ -1003,11 +1003,11 @@ impl pallet_referenda::Config for Runtime {
 }
 
 parameter_types! {
-	pub const AssetDeposit: Balance = 100 * DOLLARS;
-	pub const ApprovalDeposit: Balance = 1 * DOLLARS;
+	pub const AssetDeposit: Balance = 0;
+	pub const ApprovalDeposit: Balance = 0;
 	pub const StringLimit: u32 = 50;
-	pub const MetadataDepositBase: Balance = 1 * DOLLARS;
-	pub const MetadataDepositPerByte: Balance = 1 * DOLLARS;
+	pub const MetadataDepositBase: Balance = 0;
+	pub const MetadataDepositPerByte: Balance = 0;
 }
 
 // TODO - Update settings
@@ -1364,6 +1364,7 @@ parameter_types! {
 	pub const DaoPalletId: PalletId = PalletId(*b"py/sctld");
 	pub const DaoStringLimit: u32 = 50;
 	pub const DaoMetadataLimit: u32 = 500;
+	pub const DaoTokenBalanceLimit: u128 = 1_000_000_000;
 }
 
 impl pallet_dao::Config for Runtime {
@@ -1372,6 +1373,7 @@ impl pallet_dao::Config for Runtime {
 	type PalletId = DaoPalletId;
 	type DaoStringLimit = DaoStringLimit;
 	type DaoMetadataLimit = DaoMetadataLimit;
+	type DaoTokenBalanceLimit = DaoTokenBalanceLimit;
 	type AssetId = u32;
 	type Balance = Balance;
 	type ExpectedBlockTime = ExpectedBlockTime;
