@@ -5,9 +5,7 @@ use frame_support::{
 	dispatch::{DispatchError, DispatchResult},
 	traits::{
 		tokens::fungibles::{metadata::Mutate as MetadataMutate, Create, Inspect, Mutate},
-		Currency,
-		ExistenceRequirement::KeepAlive,
-		Get, ReservableCurrency,
+		Currency, Get, ReservableCurrency,
 	},
 	BoundedVec, PalletId,
 };
@@ -95,6 +93,9 @@ pub mod pallet {
 		type DaoMetadataLimit: Get<u32>;
 
 		#[pallet::constant]
+		type DaoTokenBalanceLimit: Get<u128>;
+
+		#[pallet::constant]
 		type ExpectedBlockTime: Get<u64>;
 
 		// TODO: rework providers
@@ -153,6 +154,7 @@ pub mod pallet {
 		TokenAlreadyExists,
 		TokenNotExists,
 		TokenCreateFailed,
+		TokenBalanceInvalid,
 		InvalidInput,
 		PolicyNotExist,
 	}
@@ -201,6 +203,11 @@ pub mod pallet {
 				has_token_id = Some(token_id);
 
 				let metadata = token.metadata;
+
+				if token.min_balance == 0 || token.min_balance > T::DaoTokenBalanceLimit::get() {
+					return Err(Error::<T>::TokenBalanceInvalid.into())
+				}
+
 				let min_balance = Self::u128_to_balance(token.min_balance);
 
 				let issuance =
