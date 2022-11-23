@@ -188,14 +188,6 @@ pub mod pallet {
 			let min = <T as Config>::Currency::minimum_balance();
 			let _ = <T as Config>::Currency::make_free_balance_be(&dao_account_id, min);
 
-			// reserving some deposit for token metadata storage
-			let _ = <T as Config>::Currency::transfer(
-				&who,
-				&dao_account_id,
-				Self::u128_to_balance_of(2_000_000_000_000_000), //TODO: should be dynamic
-				KeepAlive,
-			);
-
 			let mut has_token_id: Option<AssetId<T>> = None;
 
 			if let Some(token) = dao.token {
