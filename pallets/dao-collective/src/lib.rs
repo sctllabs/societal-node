@@ -36,7 +36,8 @@
 //! vote on for a minimum period given by `MotionDuration`. As soon as the needed number of
 //! approvals is given, the motion is closed and executed. If the number of approvals is not reached
 //! during the voting period, then `close` may be called by any account in order to force the end
-//! the motion explicitly. The proposal is executed if there are enough approvals counting the new votes.
+//! the motion explicitly. The proposal is executed if there are enough approvals counting the new
+//! votes.
 //!
 //! If there are not, then the motion is dropped without being executed.
 
@@ -52,10 +53,13 @@ use dao_primitives::{ChangeDaoMembers, DaoPolicy, DaoProvider, InitializeDaoMemb
 
 use frame_support::{
 	codec::{Decode, Encode, MaxEncodedLen},
-	dispatch::{DispatchError, DispatchResultWithPostInfo, Dispatchable, PostDispatchInfo},
+	dispatch::{
+		DispatchError, DispatchResultWithPostInfo, Dispatchable, GetDispatchInfo, Pays,
+		PostDispatchInfo,
+	},
 	ensure,
 	traits::{Backing, EnsureOrigin, EnsureOriginWithArg, Get, GetBacking, StorageVersion},
-	weights::{GetDispatchInfo, Pays, Weight},
+	weights::Weight,
 };
 
 #[cfg(test)]
@@ -155,16 +159,19 @@ pub mod pallet {
 	pub trait Config<I: 'static = ()>: frame_system::Config {
 		// TODO: use collective origin
 		/// The outer origin type.
-		type Origin: From<RawOrigin<Self::AccountId, I>>;
+		type RuntimeOrigin: From<RawOrigin<Self::AccountId, I>>;
 
 		/// The outer call dispatch type.
 		type Proposal: Parameter
-			+ Dispatchable<Origin = <Self as Config<I>>::Origin, PostInfo = PostDispatchInfo>
-			+ From<frame_system::Call<Self>>
+			+ Dispatchable<
+				RuntimeOrigin = <Self as Config<I>>::RuntimeOrigin,
+				PostInfo = PostDispatchInfo,
+			> + From<frame_system::Call<Self>>
 			+ GetDispatchInfo;
 
 		/// The outer event type.
-		type Event: From<Event<Self, I>> + IsType<<Self as frame_system::Config>::Event>;
+		type RuntimeEvent: From<Event<Self, I>>
+			+ IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		/// Maximum number of proposals allowed to be active in parallel.
 		type MaxProposals: Get<ProposalIndex>;
@@ -593,7 +600,7 @@ pub mod pallet {
 			dao_id: DaoId,
 			proposal_hash: T::Hash,
 			#[pallet::compact] index: ProposalIndex,
-			#[pallet::compact] proposal_weight_bound: Weight,
+			proposal_weight_bound: Weight,
 			#[pallet::compact] length_bound: u32,
 		) -> DispatchResultWithPostInfo {
 			let _ = ensure_signed(origin)?;
@@ -891,7 +898,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			ProposalOf::<T, I>::get(dao_id, hash).ok_or(Error::<T, I>::ProposalMissing)?;
 		let proposal_weight = proposal.get_dispatch_info().weight;
 
-		ensure!(proposal_weight <= weight_bound, Error::<T, I>::WrongProposalWeight);
+		ensure!(proposal_weight.all_lte(weight_bound), Error::<T, I>::WrongProposalWeight);
 		Ok((proposal, proposal_len as usize))
 	}
 

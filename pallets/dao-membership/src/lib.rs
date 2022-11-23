@@ -26,8 +26,8 @@
 
 //! # DAO Membership Module
 //!
-//! Allows control of DAO membership of a set of `AccountId`s, useful for managing membership of of a
-//! collective.
+//! Allows control of DAO membership of a set of `AccountId`s, useful for managing membership of of
+//! a collective.
 
 // Ensure we're `no_std` when compiling for Wasm.
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -75,10 +75,11 @@ pub mod pallet {
 	#[pallet::config]
 	pub trait Config<I: 'static = ()>: frame_system::Config {
 		/// The overarching event type.
-		type Event: From<Event<Self, I>> + IsType<<Self as frame_system::Config>::Event>;
+		type RuntimeEvent: From<Event<Self, I>>
+			+ IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		/// Required origin for adding a member (though can always be Root).
-		type ApproveOrigin: EnsureOriginWithArg<Self::Origin, (u32, u32)>;
+		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, (u32, u32)>;
 
 		/// The receiver of the signal for when the membership has been initialized. This happens
 		/// pre-genesis and will usually be the same as `MembershipChanged`. If you need to do
@@ -122,7 +123,7 @@ pub mod pallet {
 		/// One of the members' keys changed.
 		KeyChanged,
 		/// Phantom member, never used.
-		Dummy { _phantom_data: PhantomData<(T::AccountId, <T as Config<I>>::Event)> },
+		Dummy { _phantom_data: PhantomData<(T::AccountId, <T as Config<I>>::RuntimeEvent)> },
 	}
 
 	#[pallet::error]
