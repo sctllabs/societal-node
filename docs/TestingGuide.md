@@ -145,7 +145,7 @@ lengthBound: 100
 
 - Submit Transaction
 
-- Use different accounts(2 overall) to vote 'yes' to overcome the approval threshold
+- Use different accounts(2 overall) to vote `yes` to overcome the approval threshold
 
 - Try to use the account that is not in council to check that its vote is rejected
 
@@ -163,7 +163,7 @@ lengthBound: 100
 
 <img src="images/Screenshot%202022-11-18%20at%2013.12.48.png" width="600" style="padding-left: 50px;">
 
-- Go to `Developer --> Chain State` and select system --> account with the DAO Account and press `+` button
+- Go to `Developer --> Chain State` and select `system --> account` with the DAO Account and press `+` button
 
 - From the response payload we might see that 500 tokens from the DAO Treasury pot have been spent since the proposal has been approved
 
@@ -200,7 +200,7 @@ lengthBound: 100
 
 - After successful voting and closing the proposal go to `Developer --> Chain State`
 
-- select `daoCouncil --> members` and press + button 
+- select `daoCouncil --> members` and press `+` button 
 
 <img src="images/Screenshot%202022-11-18%20at%2013.55.23.png" width="600" style="padding-left: 50px;">
 
