@@ -74,6 +74,19 @@ pallet-asset-tx-payment = { version = "4.0.0-dev", default-features = false, git
 pallet-contracts = { version = "4.0.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
 pallet-im-online = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
 
+# Frontier
+fc-cli = { version = "1.0.0-dev", git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+fc-consensus = { version = "2.0.0-dev", git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+fc-db = { version = "2.0.0-dev", git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+fc-mapping-sync = { version = "2.0.0-dev", git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+fc-rpc = { version = "2.0.0-dev", git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+fc-rpc-core = { version = "1.1.0-dev", git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+fp-consensus = { version = "2.0.0-dev", git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+fp-dynamic-fee = { version = "1.0.0-dev", git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+fp-evm = { version = "3.0.0-dev", git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+fp-rpc = { version = "3.0.0-dev", git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+fp-storage = { version = "2.0.0-dev", git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+
 # node-specific dependencies
 node-rpc = { version = "3.0.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
 node-primitives = { version = "2.0.0", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }

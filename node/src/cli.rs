@@ -1,3 +1,48 @@
+/// Available Sealing methods.
+#[cfg(feature = "manual-seal")]
+#[derive(Debug, Copy, Clone, clap::ValueEnum)]
+pub enum Sealing {
+	// Seal using rpc method.
+	Manual,
+	// Seal when transaction is executed.
+	Instant,
+}
+
+#[cfg(feature = "manual-seal")]
+impl Default for Sealing {
+	fn default() -> Sealing {
+		Sealing::Manual
+	}
+}
+
+#[allow(missing_docs)]
+#[derive(Debug, clap::Parser)]
+pub struct RunCmd {
+	#[allow(missing_docs)]
+	#[command(flatten)]
+	pub base: sc_cli::RunCmd,
+
+	/// Choose sealing method.
+	#[cfg(feature = "manual-seal")]
+	#[arg(long, value_enum, ignore_case = true)]
+	pub sealing: Sealing,
+
+	#[arg(long)]
+	pub enable_dev_signer: bool,
+
+	/// Maximum number of logs in a query.
+	#[arg(long, default_value = "10000")]
+	pub max_past_logs: u32,
+
+	/// Maximum fee history cache size.
+	#[arg(long, default_value = "2048")]
+	pub fee_history_limit: u64,
+
+	/// The dynamic-fee pallet target gas price set by block author
+	#[arg(long, default_value = "1")]
+	pub target_gas_price: u64,
+}
+
 #[derive(Debug, clap::Parser)]
 pub struct Cli {
 	/// Possible subcommand with parameters.
@@ -6,7 +51,7 @@ pub struct Cli {
 
 	#[allow(missing_docs)]
 	#[clap(flatten)]
-	pub run: sc_cli::RunCmd,
+	pub run: RunCmd,
 
 	/// Disable automatic hardware benchmarks.
 	///
@@ -60,4 +105,7 @@ pub enum Subcommand {
 
 	/// Db meta columns information.
 	ChainInfo(sc_cli::ChainInfoCmd),
+
+	/// Db meta columns information.
+	FrontierDb(fc_cli::FrontierDbCmd),
 }
