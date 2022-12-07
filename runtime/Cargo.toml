@@ -111,7 +111,10 @@ hex-literal = { version = "0.3.4", optional = true }
 pallet-dao = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao" }
 pallet-dao-collective = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-collective" }
 pallet-dao-membership = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-membership" }
+pallet-dao-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao" }
 pallet-dao-treasury = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-treasury" }
+# From Moonbeam
+precompile-utils = { version = "0.1.0", default-features = false, path = "../precompiles/utils" }
 
 [build-dependencies]
 substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
@@ -145,6 +148,7 @@ std = [
 	"pallet-dao/std",
 	"pallet-dao-collective/std",
 	"pallet-dao-membership/std",
+#	"pallet-dao-precompile/std",
 	"pallet-dao-treasury/std",
 	"pallet-democracy/std",
 	"pallet-dynamic-fee/std",
@@ -181,6 +185,7 @@ std = [
 	"pallet-treasury/std",
 	"pallet-uniques/std",
 	"pallet-vesting/std",
+	"precompile-utils/std",
 	"scale-info/std",
 	"sp-api/std",
 	"sp-authority-discovery/std",
