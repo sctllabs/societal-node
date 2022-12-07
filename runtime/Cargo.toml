@@ -85,6 +85,19 @@ pallet-treasury = { version = "4.0.0-dev", default-features = false, git = "http
 pallet-uniques = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
 pallet-vesting = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
 
+# Frontier dependencies
+fp-rpc = { version = "3.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+fp-self-contained = { version = "1.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+pallet-base-fee = { version = "1.0.0", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+pallet-dynamic-fee = { version = "4.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+pallet-ethereum = { version = "4.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+pallet-evm = { version = "6.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+pallet-evm-chain-id = { version = "1.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+pallet-evm-precompile-modexp = { version = "2.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+pallet-evm-precompile-sha3fips = { version = "2.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+pallet-evm-precompile-simple = { version = "2.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+pallet-hotfix-sufficients = { version = "1.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+
 # Used for the node's RPCs
 frame-system-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
 pallet-transaction-payment-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
@@ -108,6 +121,8 @@ default = ["std"]
 std = [
 	"codec/std",
 	"node-primitives/std",
+	"fp-rpc/std",
+	"fp-self-contained/std",
 	"frame-executive/std",
 	"frame-support/std",
 	"frame-system-benchmarking?/std",
@@ -120,20 +135,29 @@ std = [
 	"pallet-babe/std",
 	"pallet-bags-list/std",
 	"pallet-balances/std",
+	"pallet-base-fee/std",
 	"pallet-bounties/std",
 	"pallet-child-bounties/std",
 	"pallet-collective/std",
 	"pallet-contracts/std",
   	"pallet-contracts-primitives/std",
 	"pallet-conviction-voting/std",
-	"pallet-democracy/std",
 	"pallet-dao/std",
 	"pallet-dao-collective/std",
 	"pallet-dao-membership/std",
 	"pallet-dao-treasury/std",
+	"pallet-democracy/std",
+	"pallet-dynamic-fee/std",
 	"pallet-elections-phragmen/std",
 	"pallet-election-provider-multi-phase/std",
+	"pallet-ethereum/std",
+	"pallet-evm/std",
+	"pallet-evm-chain-id/std",
+	"pallet-evm-precompile-modexp/std",
+	"pallet-evm-precompile-sha3fips/std",
+	"pallet-evm-precompile-simple/std",
 	"pallet-grandpa/std",
+	"pallet-hotfix-sufficients/std",
 	"pallet-im-online/std",
 	"pallet-indices/std",
 	"pallet-membership/std",
@@ -196,7 +220,10 @@ runtime-benchmarks = [
 	"pallet-dao-treasury/runtime-benchmarks",
 	"pallet-election-provider-multi-phase/runtime-benchmarks",
 	"pallet-elections-phragmen/runtime-benchmarks",
+	"pallet-ethereum/runtime-benchmarks",
+	"pallet-evm/runtime-benchmarks",
 	"pallet-grandpa/runtime-benchmarks",
+	"pallet-hotfix-sufficients/runtime-benchmarks",
 	"pallet-im-online/runtime-benchmarks",
 	"pallet-indices/runtime-benchmarks",
 	"pallet-membership/runtime-benchmarks",
