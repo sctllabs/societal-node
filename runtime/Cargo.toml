@@ -113,6 +113,7 @@ pallet-dao-collective = { version = "4.0.0-dev", default-features = false, path 
 pallet-dao-membership = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-membership" }
 pallet-dao-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao" }
 pallet-dao-treasury = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-treasury" }
+pallet-dao-treasury-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao-treasury" }
 # From Moonbeam
 precompile-utils = { version = "0.1.0", default-features = false, path = "../precompiles/utils" }
 
@@ -148,7 +149,6 @@ std = [
 	"pallet-dao/std",
 	"pallet-dao-collective/std",
 	"pallet-dao-membership/std",
-#	"pallet-dao-precompile/std",
 	"pallet-dao-treasury/std",
 	"pallet-democracy/std",
 	"pallet-dynamic-fee/std",
