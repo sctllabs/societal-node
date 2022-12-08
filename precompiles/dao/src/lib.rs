@@ -18,7 +18,7 @@ pub const ARRAY_LIMIT: u32 = 10u32;
 type GetEncodedProposalSizeLimit = ConstU32<ENCODED_PROPOSAL_SIZE_LIMIT>;
 type GetArrayLimit = ConstU32<ARRAY_LIMIT>;
 
-/// A precompile to wrap the functionality from pallet-dao.
+/// A precompile to wrap the functionality from pallet-proxy.
 pub struct DaoPrecompile<Runtime>(PhantomData<Runtime>);
 
 #[precompile_utils::precompile]
@@ -29,21 +29,31 @@ where
 	<Runtime::RuntimeCall as Dispatchable>::RuntimeOrigin: From<Option<Runtime::AccountId>>,
 	Runtime::RuntimeCall: From<pallet_dao::Call<Runtime>>,
 {
-	/// Create a DAO from pallet-dao.
 	/// The dispatch origin for this call must be Signed.
 	///
 	/// Parameters:
+	/// * council: Set of accounts to be selected as DAO council
 	/// * data: HEX encoded JSON DAO configuration
-	#[precompile::public("create_dao(bytes)")]
+	#[precompile::public("create_dao(address[],bytes)")]
 	fn create_dao(
 		handle: &mut impl PrecompileHandle,
+		council: BoundedVec<Address, GetArrayLimit>,
 		data: BoundedBytes<GetEncodedProposalSizeLimit>,
 	) -> EvmResult {
 		let origin = Runtime::AddressMapping::into_account_id(handle.context().caller);
 
 		handle.record_cost(RuntimeHelper::<Runtime>::db_read_gas_cost())?;
 
-		let call = pallet_dao::Call::<Runtime>::create_dao { council: vec![], data: data.into() };
+		let council = Vec::from(council)
+			.into_iter()
+			.map(|address| {
+				Runtime::Lookup::unlookup(
+					Runtime::AddressMapping::into_account_id(address.into()).clone(),
+				)
+			})
+			.collect();
+
+		let call = pallet_dao::Call::<Runtime>::create_dao { council, data: data.into() };
 
 		<RuntimeHelper<Runtime>>::try_dispatch(handle, Some(origin).into(), call)?;
 

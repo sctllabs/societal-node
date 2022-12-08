@@ -498,7 +498,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		T::PalletId::get().into_account_truncating()
 	}
 
-	fn u128_to_balance_of(cost: u128) -> BalanceOf<T, I> {
+	pub fn u128_to_balance_of(cost: u128) -> BalanceOf<T, I> {
 		TryInto::<BalanceOf<T, I>>::try_into(cost).ok().unwrap()
 	}
 
