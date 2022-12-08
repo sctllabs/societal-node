@@ -518,8 +518,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		let mut total_weight: Weight = Zero::zero();
 
 		let mut budget_remaining = Self::pot(dao_id);
-		log::info!("budget remaining: {:?}", budget_remaining);
-
 		Self::deposit_event(Event::Spending { dao_id, budget_remaining });
 		let account_id = T::DaoProvider::dao_account_id(dao_id);
 

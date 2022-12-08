@@ -1,5 +1,6 @@
 use frame_support::parameter_types;
 use pallet_dao_precompile::DaoPrecompile;
+use pallet_dao_treasury_precompile::DaoTreasuryPrecompile;
 use pallet_evm_precompile_modexp::Modexp;
 use pallet_evm_precompile_sha3fips::Sha3FIPS256;
 use pallet_evm_precompile_simple::{ECRecover, ECRecoverPublicKey, Identity, Ripemd160, Sha256};
@@ -20,6 +21,7 @@ pub type FrontierPrecompiles<R> = PrecompileSetBuilder<
 				PrecompileAt<AddressU64<4>, Identity, ForbidRecursion, AllowDelegateCall>,
 				PrecompileAt<AddressU64<5>, Modexp, ForbidRecursion, AllowDelegateCall>,
 				PrecompileAt<AddressU64<6>, DaoPrecompile<R>>,
+				PrecompileAt<AddressU64<7>, DaoTreasuryPrecompile<R>>,
 			),
 		>,
 	),
