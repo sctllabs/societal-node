@@ -5,11 +5,10 @@ extern crate core;
 
 use fp_evm::PrecompileHandle;
 use frame_support::dispatch::{Dispatchable, GetDispatchInfo, PostDispatchInfo};
-use pallet_dao::Pallet as DaoPallet;
 use pallet_evm::AddressMapping;
 use precompile_utils::{data::Address, prelude::*};
 use sp_core::ConstU32;
-use sp_runtime::{codec::Decode, traits::StaticLookup};
+use sp_runtime::traits::StaticLookup;
 use sp_std::{marker::PhantomData, prelude::*};
 
 pub const ENCODED_PROPOSAL_SIZE_LIMIT: u32 = 2u32.pow(16);
@@ -47,9 +46,7 @@ where
 		let council = Vec::from(council)
 			.into_iter()
 			.map(|address| {
-				Runtime::Lookup::unlookup(
-					Runtime::AddressMapping::into_account_id(address.into()).clone(),
-				)
+				Runtime::Lookup::unlookup(Runtime::AddressMapping::into_account_id(address.into()))
 			})
 			.collect();
 
