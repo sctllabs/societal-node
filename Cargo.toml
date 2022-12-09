@@ -8,6 +8,7 @@ members = [
     "pallets/dao-treasury",
 	"precompiles/dao",
 	"precompiles/dao-treasury",
+	"precompiles/dao-collective",
 	"precompiles/utils",
 	"precompiles/utils/macro",
     "runtime",

@@ -110,6 +110,7 @@ hex-literal = { version = "0.3.4", optional = true }
 # Local Dependencies
 pallet-dao = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao" }
 pallet-dao-collective = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-collective" }
+pallet-dao-collective-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao-collective" }
 pallet-dao-membership = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-membership" }
 pallet-dao-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao" }
 pallet-dao-treasury = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-treasury" }

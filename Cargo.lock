@@ -4764,6 +4764,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-dao-collective-precompile"
+version = "1.0.0-dev"
+dependencies = [
+ "fp-evm",
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-dao-collective",
+ "pallet-evm",
+ "parity-scale-codec",
+ "precompile-utils",
+ "sp-core",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-dao-membership"
 version = "4.0.0-dev"
 dependencies = [
@@ -8244,6 +8261,7 @@ dependencies = [
  "pallet-conviction-voting",
  "pallet-dao",
  "pallet-dao-collective",
+ "pallet-dao-collective-precompile",
  "pallet-dao-membership",
  "pallet-dao-precompile",
  "pallet-dao-treasury",

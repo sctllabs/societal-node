@@ -86,7 +86,7 @@ pub mod prelude {
 			EvmDataWriter, SolidityConvert, UnboundedBytes, UnboundedString,
 		},
 		handle::PrecompileHandleExt,
-		logs::{log0, log1, log2, log3, log4, LogExt},
+		logs::{log0, log1, log2, log3, log4, log5, LogExt},
 		modifier::{check_function_modifier, FunctionModifier},
 		read_args, read_struct, revert,
 		revert::{BacktraceExt, InjectBacktrace, MayRevert, Revert, RevertExt, RevertReason},

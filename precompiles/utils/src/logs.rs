@@ -75,6 +75,24 @@ pub fn log4(
 	}
 }
 
+/// Create a 5-topics log.
+#[must_use]
+pub fn log5(
+	address: impl Into<H160>,
+	topic0: impl Into<H256>,
+	topic1: impl Into<H256>,
+	topic2: impl Into<H256>,
+	topic3: impl Into<H256>,
+	topic4: impl Into<H256>,
+	data: impl Into<Vec<u8>>,
+) -> Log {
+	Log {
+		address: address.into(),
+		topics: vec![topic0.into(), topic1.into(), topic2.into(), topic3.into(), topic4.into()],
+		data: data.into(),
+	}
+}
+
 /// Extension trait allowing to record logs into a PrecompileHandle.
 pub trait LogExt {
 	fn record(self, handle: &mut impl PrecompileHandle) -> EvmResult;

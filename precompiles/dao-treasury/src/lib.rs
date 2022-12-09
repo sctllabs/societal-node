@@ -7,8 +7,8 @@ use fp_evm::PrecompileHandle;
 use frame_support::dispatch::{Dispatchable, GetDispatchInfo, PostDispatchInfo};
 use pallet_evm::AddressMapping;
 use precompile_utils::prelude::*;
-use sp_runtime::{traits::StaticLookup};
-use sp_std::{marker::PhantomData};
+use sp_runtime::traits::StaticLookup;
+use sp_std::marker::PhantomData;
 
 /// Dao ID. Just a `u32`.
 pub type DaoId = u32;
