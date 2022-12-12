@@ -5,14 +5,12 @@ extern crate core;
 use fp_evm::{Log, PrecompileHandle};
 use frame_support::{
 	dispatch::{Dispatchable, GetDispatchInfo, Pays, PostDispatchInfo},
-	sp_runtime::traits::Hash,
 	weights::Weight,
 };
 use pallet_evm::AddressMapping;
 use parity_scale_codec::Decode;
 use precompile_utils::{helpers::hash, prelude::*};
 use sp_core::{ConstU32, H160, H256};
-use sp_runtime::traits::StaticLookup;
 use sp_std::{boxed::Box, marker::PhantomData, vec::Vec};
 
 /// Dao ID. Just a `u32`.
@@ -89,7 +87,7 @@ pub fn log_closed(address: impl Into<H160>, dao_id: DaoId, hash: H256) -> Log {
 	)
 }
 
-/// A precompile to wrap the functionality from pallet-dao.
+/// A precompile to wrap the functionality from pallet-dao-collective.
 pub struct DaoCollectivePrecompile<Runtime, Instance: 'static>(PhantomData<(Runtime, Instance)>);
 
 #[precompile_utils::precompile]

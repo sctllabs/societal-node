@@ -2,18 +2,13 @@
 
 extern crate core;
 
-use fp_evm::{Log, PrecompileHandle};
-use frame_support::{
-	dispatch::{Dispatchable, GetDispatchInfo, Pays, PostDispatchInfo},
-	sp_runtime::traits::Hash,
-	weights::Weight,
-};
+use fp_evm::PrecompileHandle;
+use frame_support::dispatch::{Dispatchable, GetDispatchInfo, PostDispatchInfo};
 use pallet_evm::AddressMapping;
 use parity_scale_codec::Decode;
-use precompile_utils::{helpers::hash, prelude::*};
-use sp_core::{ConstU32, H160, H256};
-use sp_runtime::traits::StaticLookup;
-use sp_std::{boxed::Box, marker::PhantomData, vec::Vec};
+use precompile_utils::prelude::*;
+use sp_core::H256;
+use sp_std::marker::PhantomData;
 
 /// Dao ID. Just a `u32`.
 pub type DaoId = u32;

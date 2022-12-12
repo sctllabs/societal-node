@@ -10,10 +10,5 @@ interface PalletDao {
     /// @param data DAO spec
     function createDao(address[] memory council, bytes memory data) external;
 
-    /// @dev Get the DAO by ID.
-    ///
-    /// @param dao_id DAO ID.
-    function dao(uint32 dao_id) external view returns (bytes32[] memory dao);
-
     event DaoRegistered(address indexed who, uint32 dao_id);
 }

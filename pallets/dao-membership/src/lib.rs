@@ -34,7 +34,7 @@
 
 use frame_support::{
 	dispatch::DispatchError,
-	traits::{Contains, EnsureOriginWithArg, Get},
+	traits::{EnsureOriginWithArg, Get},
 	BoundedVec,
 };
 use sp_std::prelude::*;
@@ -276,7 +276,7 @@ pub mod pallet {
 				T::MembershipChanged::change_members_sorted(
 					dao_id,
 					&[new.clone()],
-					&[remove.clone()],
+					&[remove],
 					&members[..],
 				);
 			}

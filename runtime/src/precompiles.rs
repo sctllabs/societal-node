@@ -1,12 +1,10 @@
 use crate::{DaoCouncilCollective, DaoCouncilMembership};
-use frame_support::parameter_types;
 use pallet_dao_collective_precompile::DaoCollectivePrecompile;
 use pallet_dao_membership_precompile::DaoMembershipPrecompile;
 use pallet_dao_precompile::DaoPrecompile;
 use pallet_dao_treasury_precompile::DaoTreasuryPrecompile;
 use pallet_evm_precompile_modexp::Modexp;
-use pallet_evm_precompile_sha3fips::Sha3FIPS256;
-use pallet_evm_precompile_simple::{ECRecover, ECRecoverPublicKey, Identity, Ripemd160, Sha256};
+use pallet_evm_precompile_simple::{ECRecover, Identity, Ripemd160, Sha256};
 use precompile_utils::precompile_set::*;
 
 pub type FrontierPrecompiles<R> = PrecompileSetBuilder<

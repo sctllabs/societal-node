@@ -98,8 +98,7 @@ pub trait DefaultVote {
 pub struct MoreThanMajorityVote;
 impl DefaultVote for MoreThanMajorityVote {
 	fn default_vote(yes_votes: MemberCount, _no_votes: MemberCount, len: MemberCount) -> bool {
-		let more_than_majority = yes_votes * 2 > len;
-		more_than_majority
+		yes_votes * 2 > len
 	}
 }
 

@@ -6,7 +6,7 @@ extern crate core;
 use fp_evm::{Log, PrecompileHandle};
 use frame_support::dispatch::{Dispatchable, GetDispatchInfo, PostDispatchInfo};
 use pallet_evm::AddressMapping;
-use precompile_utils::{helpers::hash, prelude::*};
+use precompile_utils::prelude::*;
 use sp_core::{H160, H256};
 use sp_runtime::traits::StaticLookup;
 use sp_std::{marker::PhantomData, vec::Vec};
@@ -30,7 +30,7 @@ pub fn log_proposed(address: impl Into<H160>, dao_id: DaoId, proposal_index: Pro
 	)
 }
 
-/// A precompile to wrap the functionality from pallet-dao.
+/// A precompile to wrap the functionality from pallet-dao-treasury.
 pub struct DaoTreasuryPrecompile<Runtime>(PhantomData<Runtime>);
 
 #[precompile_utils::precompile]
