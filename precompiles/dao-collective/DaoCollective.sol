@@ -12,8 +12,6 @@ interface PalletDaoCollective {
     ///
     /// @param dao_id DAO ID.
     /// @param proposal SCALE-encoded Substrate call.
-    ///
-    /// @custom:selector 09c5eabe
     function execute(uint32 dao_id, bytes memory proposal) external;
 
     /// @dev Make a proposal for a call.
@@ -25,8 +23,6 @@ interface PalletDaoCollective {
     /// @param threshold Amount of members required to dispatch the proposal.
     /// @param proposal SCALE-encoded Substrate call.
     /// @return index Index of the new proposal. Meaningless if threshold < 2
-    ///
-    /// @custom:selector c57f3260
     function propose(uint32 dao_id, uint32 threshold, bytes memory proposal)
         external
         returns (uint32 index);
@@ -39,8 +35,6 @@ interface PalletDaoCollective {
     /// voting in case of front-running or reorgs.
     /// @param proposalIndex Index of the proposal (returned by propose).
     /// @param approve The vote itself, is the caller approving or not the proposal.
-    ///
-    /// @custom:selector 73e37688
     function vote(
         uint32 dao_id,
         bytes32 proposalHash,
@@ -60,8 +54,6 @@ interface PalletDaoCollective {
     /// @param lengthBound Must be a value higher or equal to the length of the SCALE-encoded
     /// proposal in bytes.
     /// @return executed Was the proposal executed or removed?
-    ///
-    /// @custom:selector 638d9d47
     function close(
         uint32 dao_id,
         bytes32 proposalHash,
@@ -74,8 +66,6 @@ interface PalletDaoCollective {
     ///
     /// @param proposal SCALE-encoded Substrate call.
     /// @return proposalHash Hash of the proposal.
-    ///
-    /// @custom:selector fc379417
     function proposalHash(bytes memory proposal)
         external
         view
@@ -85,24 +75,18 @@ interface PalletDaoCollective {
     ///
     /// @param dao_id DAO ID.
     /// @return proposalsHash Hashes of active proposals.
-    ///
-    /// @custom:selector 55ef20e6
     function proposals(uint32 dao_id) external view returns (bytes32[] memory proposalsHash);
 
     /// @dev Get the list of members.
     ///
     /// @param dao_id DAO ID.
     /// @return members List of members.
-    ///
-    /// @custom:selector bdd4d18d
     function members(uint32 dao_id) external view returns (address[] memory members);
 
     /// @dev Check if the given account is a member of the collective.
     ///
     /// @param dao_id DAO ID.
     /// @param account Account to check membership.
-    ///
-    /// @custom:selector a230c524
     function isMember(uint32 dao_id, address account) external view returns (bool);
 
     event Executed(uint32 dao_id, bytes32 indexed proposalHash);
