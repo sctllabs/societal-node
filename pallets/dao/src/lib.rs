@@ -140,7 +140,6 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		DaoRegistered(u32, T::AccountId),
-		DaoJoined(u32, T::AccountId),
 	}
 
 	#[pallet::error]

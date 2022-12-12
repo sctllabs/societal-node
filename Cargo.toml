@@ -6,6 +6,12 @@ members = [
     "pallets/dao-membership",
     "pallets/dao-primitives",
     "pallets/dao-treasury",
+	"precompiles/dao",
+	"precompiles/dao-collective",
+	"precompiles/dao-membership",
+	"precompiles/dao-treasury",
+	"precompiles/utils",
+	"precompiles/utils/macro",
     "runtime",
 ]
 

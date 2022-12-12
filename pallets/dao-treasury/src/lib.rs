@@ -386,7 +386,7 @@ pub mod pallet {
 		/// - DbReads: `Proposals`, `Approvals`
 		/// - DbWrite: `Approvals`
 		/// # </weight>
-		#[pallet::weight((T::WeightInfo::approve_proposal(T::MaxApprovals::get()), DispatchClass::Operational))]
+		#[pallet::weight(10000)]
 		pub fn approve_proposal(
 			origin: OriginFor<T>,
 			#[pallet::compact] dao_id: DaoId,
@@ -498,7 +498,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		T::PalletId::get().into_account_truncating()
 	}
 
-	fn u128_to_balance_of(cost: u128) -> BalanceOf<T, I> {
+	pub fn u128_to_balance_of(cost: u128) -> BalanceOf<T, I> {
 		TryInto::<BalanceOf<T, I>>::try_into(cost).ok().unwrap()
 	}
 
@@ -518,8 +518,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		let mut total_weight: Weight = Zero::zero();
 
 		let mut budget_remaining = Self::pot(dao_id);
-		log::info!("budget remaining: {:?}", budget_remaining);
-
 		Self::deposit_event(Event::Spending { dao_id, budget_remaining });
 		let account_id = T::DaoProvider::dao_account_id(dao_id);
 
