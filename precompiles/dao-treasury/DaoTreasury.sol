@@ -11,4 +11,6 @@ interface PalletDaoTreasury {
     /// @param value Balance amount to be spent
     /// @param beneficiary Account to transfer balance to
     function propose_spend(uint32 dao_id, uint128 value, address beneficiary) external;
+
+    event Proposed(uint32 dao_id, uint32 indexed proposalIndex);
 }

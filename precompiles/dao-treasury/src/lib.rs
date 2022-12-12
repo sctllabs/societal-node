@@ -3,15 +3,32 @@
 
 extern crate core;
 
-use fp_evm::PrecompileHandle;
+use fp_evm::{Log, PrecompileHandle};
 use frame_support::dispatch::{Dispatchable, GetDispatchInfo, PostDispatchInfo};
 use pallet_evm::AddressMapping;
 use precompile_utils::prelude::*;
+use sp_core::{H160, H256};
 use sp_runtime::traits::StaticLookup;
-use sp_std::marker::PhantomData;
+use sp_std::{marker::PhantomData, vec::Vec};
 
 /// Dao ID. Just a `u32`.
 pub type DaoId = u32;
+
+/// An index of a proposal. Just a `u32`.
+pub type ProposalIndex = u32;
+
+/// Solidity selector of the Proposed log.
+pub const SELECTOR_LOG_PROPOSED: [u8; 32] = keccak256!("Proposed(uint32,uint32)");
+
+pub fn log_proposed(address: impl Into<H160>, dao_id: DaoId, proposal_index: ProposalIndex) -> Log {
+	log3(
+		address.into(),
+		SELECTOR_LOG_PROPOSED,
+		H256::from_slice(&EvmDataWriter::new().write(dao_id).build()),
+		H256::from_slice(&EvmDataWriter::new().write(proposal_index).build()),
+		Vec::new(),
+	)
+}
 
 /// A precompile to wrap the functionality from pallet-dao.
 pub struct DaoTreasuryPrecompile<Runtime>(PhantomData<Runtime>);
@@ -42,6 +59,8 @@ where
 
 		handle.record_cost(RuntimeHelper::<Runtime>::db_read_gas_cost())?;
 
+		let proposal_index = pallet_dao_treasury::Pallet::<Runtime>::proposal_count(dao_id);
+
 		let call = pallet_dao_treasury::Call::<Runtime>::propose_spend {
 			dao_id,
 			value: pallet_dao_treasury::Pallet::<Runtime>::u128_to_balance_of(value),
@@ -51,6 +70,11 @@ where
 		};
 
 		<RuntimeHelper<Runtime>>::try_dispatch(handle, Some(origin).into(), call)?;
+
+		let log = log_proposed(handle.context().address, dao_id, proposal_index);
+
+		handle.record_log_costs(&[&log])?;
+		log.record(handle)?;
 
 		Ok(())
 	}
