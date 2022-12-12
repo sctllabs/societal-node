@@ -6,7 +6,7 @@ extern crate core;
 use fp_evm::{Log, PrecompileHandle};
 use frame_support::dispatch::{Dispatchable, GetDispatchInfo, PostDispatchInfo};
 use pallet_evm::AddressMapping;
-use precompile_utils::prelude::*;
+use precompile_utils::{helpers::hash, prelude::*};
 use sp_core::{H160, H256};
 use sp_runtime::traits::StaticLookup;
 use sp_std::{marker::PhantomData, vec::Vec};
@@ -40,6 +40,8 @@ where
 	Runtime::RuntimeCall: Dispatchable<PostInfo = PostDispatchInfo> + GetDispatchInfo,
 	<Runtime::RuntimeCall as Dispatchable>::RuntimeOrigin: From<Option<Runtime::AccountId>>,
 	Runtime::RuntimeCall: From<pallet_dao_treasury::Call<Runtime>>,
+	H256: From<<Runtime as frame_system::Config>::Hash>
+		+ Into<<Runtime as frame_system::Config>::Hash>,
 {
 	/// Propose Treasury Spend
 	/// The dispatch origin for this call must be Signed.
@@ -48,7 +50,7 @@ where
 	/// * dao_id: DAO ID
 	/// * value: Balance amount to be spent
 	/// * beneficiary: Account to transfer balance to
-	#[precompile::public("propose_spend(uint32,uint128,address)")]
+	#[precompile::public("proposeSpend(uint32,uint128,address)")]
 	fn propose_spend(
 		handle: &mut impl PrecompileHandle,
 		dao_id: DaoId,
@@ -77,5 +79,26 @@ where
 		log.record(handle)?;
 
 		Ok(())
+	}
+
+	#[precompile::public("proposalCount(uint32)")]
+	#[precompile::view]
+	fn proposal_count(handle: &mut impl PrecompileHandle, dao_id: DaoId) -> EvmResult<u32> {
+		handle.record_cost(RuntimeHelper::<Runtime>::db_read_gas_cost())?;
+
+		let count = pallet_dao_treasury::Pallet::<Runtime>::proposal_count(dao_id);
+
+		Ok(count)
+	}
+
+	#[precompile::public("approvals(uint32)")]
+	#[precompile::view]
+	fn approvals(handle: &mut impl PrecompileHandle, dao_id: DaoId) -> EvmResult<Vec<u32>> {
+		handle.record_cost(RuntimeHelper::<Runtime>::db_read_gas_cost())?;
+
+		let approvals =
+			pallet_dao_treasury::Pallet::<Runtime>::approvals(dao_id).into_iter().collect();
+
+		Ok(approvals)
 	}
 }

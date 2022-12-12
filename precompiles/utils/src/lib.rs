@@ -21,6 +21,7 @@ extern crate alloc;
 
 pub mod costs;
 pub mod handle;
+pub mod helpers;
 pub mod logs;
 pub mod modifier;
 pub mod precompile_set;

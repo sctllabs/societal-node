@@ -10,7 +10,19 @@ interface PalletDaoTreasury {
     /// @param dao_id DAO ID
     /// @param value Balance amount to be spent
     /// @param beneficiary Account to transfer balance to
-    function propose_spend(uint32 dao_id, uint128 value, address beneficiary) external;
+    function proposeSpend(uint32 dao_id, uint128 value, address beneficiary) external;
+
+    /// @dev Get the number of proposals.
+    ///
+    /// @param dao_id DAO ID.
+    /// @return proposalCount Number of proposals.
+    function proposalCount(uint32 dao_id) external view returns (uint32 proposalCount);
+
+    /// @dev Get indices of proposals that have been approved but not yet awarded.
+    ///
+    /// @param dao_id DAO ID.
+    /// @return approvals indices of approved proposals.
+    function approvals(uint32 dao_id) external view returns (uint32[] memory approvals);
 
     event Proposed(uint32 dao_id, uint32 indexed proposalIndex);
 }
