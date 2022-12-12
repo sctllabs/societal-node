@@ -3,19 +3,35 @@
 
 extern crate core;
 
-use fp_evm::PrecompileHandle;
+use fp_evm::{Log, PrecompileHandle};
 use frame_support::dispatch::{Dispatchable, GetDispatchInfo, PostDispatchInfo};
 use pallet_evm::AddressMapping;
 use precompile_utils::{data::Address, prelude::*};
-use sp_core::ConstU32;
+use sp_core::{ConstU32, H160, H256};
 use sp_runtime::traits::StaticLookup;
 use sp_std::{marker::PhantomData, prelude::*};
+
+/// Dao ID. Just a `u32`.
+pub type DaoId = u32;
 
 pub const ENCODED_PROPOSAL_SIZE_LIMIT: u32 = 2u32.pow(16);
 pub const ARRAY_LIMIT: u32 = 10u32;
 
 type GetEncodedProposalSizeLimit = ConstU32<ENCODED_PROPOSAL_SIZE_LIMIT>;
 type GetArrayLimit = ConstU32<ARRAY_LIMIT>;
+
+/// Solidity selector of the DaoRegistered log.
+pub const SELECTOR_LOG_DAO_REGISTERED: [u8; 32] = keccak256!("DaoRegistered(uint32,address)");
+
+pub fn log_dao_registered(address: impl Into<H160>, dao_id: DaoId, who: impl Into<H160>) -> Log {
+	log3(
+		address.into(),
+		SELECTOR_LOG_DAO_REGISTERED,
+		H256::from_slice(&EvmDataWriter::new().write(dao_id).build()),
+		who.into(),
+		Vec::new(),
+	)
+}
 
 /// A precompile to wrap the functionality from pallet-proxy.
 pub struct DaoPrecompile<Runtime>(PhantomData<Runtime>);
@@ -43,6 +59,8 @@ where
 
 		handle.record_cost(RuntimeHelper::<Runtime>::db_read_gas_cost())?;
 
+		let dao_id = pallet_dao::Pallet::<Runtime>::next_dao_id();
+
 		let council = Vec::from(council)
 			.into_iter()
 			.map(|address| {
@@ -53,6 +71,11 @@ where
 		let call = pallet_dao::Call::<Runtime>::create_dao { council, data: data.into() };
 
 		<RuntimeHelper<Runtime>>::try_dispatch(handle, Some(origin).into(), call)?;
+
+		let log = log_dao_registered(handle.context().address, dao_id, handle.context().caller);
+
+		handle.record_log_costs(&[&log])?;
+		log.record(handle)?;
 
 		Ok(())
 	}
