@@ -8,7 +8,7 @@ interface PalletDao {
 
     /// @dev Create DAO .
     /// @param data DAO spec
-    function create_dao(address[] memory council, bytes memory data) external;
+    function createDao(address[] memory council, bytes memory data) external;
 
     /// @dev Get the DAO by ID.
     ///
