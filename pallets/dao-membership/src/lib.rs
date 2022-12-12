@@ -34,7 +34,7 @@
 
 use frame_support::{
 	dispatch::DispatchError,
-	traits::{EnsureOriginWithArg, Get},
+	traits::{Contains, EnsureOriginWithArg, Get},
 	BoundedVec,
 };
 use sp_std::prelude::*;
@@ -287,12 +287,12 @@ pub mod pallet {
 	}
 }
 
-// TODO
-// impl<T: Config<I>, I: 'static> Contains<T::AccountId> for Pallet<T, I> {
-// 	fn contains(dao_id: DaoId, t: &T::AccountId) -> bool {
-// 		Self::members(dao_id).binary_search(t).is_ok()
-// 	}
-// }
+impl<T: Config<I>, I: 'static> Pallet<T, I> {
+	/// Check whether `who` is a member of the collective.
+	pub fn is_member(dao_id: DaoId, who: &T::AccountId) -> bool {
+		Self::contains(dao_id, who)
+	}
+}
 
 /// A trait for a set which can enumerate its members in order.
 pub trait DaoSortedMembers<T: Ord> {
