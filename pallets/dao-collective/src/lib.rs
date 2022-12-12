@@ -581,20 +581,7 @@ pub mod pallet {
 		///  - any mutations done while executing `proposal` (`P1`)
 		/// - up to 3 events
 		/// # </weight>
-		#[pallet::weight((
-			{
-				let b = *length_bound;
-				let m = T::MaxMembers::get();
-				let p1 = *proposal_weight_bound;
-				let p2 = T::MaxProposals::get();
-				T::WeightInfo::close_early_approved(b, m, p2)
-					.max(T::WeightInfo::close_early_disapproved(m, p2))
-					.max(T::WeightInfo::close_approved(b, m, p2))
-					.max(T::WeightInfo::close_disapproved(m, p2))
-					.saturating_add(p1)
-			},
-			DispatchClass::Operational
-		))]
+		#[pallet::weight(10_000)]
 		pub fn close(
 			origin: OriginFor<T>,
 			dao_id: DaoId,

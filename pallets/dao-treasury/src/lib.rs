@@ -386,7 +386,7 @@ pub mod pallet {
 		/// - DbReads: `Proposals`, `Approvals`
 		/// - DbWrite: `Approvals`
 		/// # </weight>
-		#[pallet::weight((T::WeightInfo::approve_proposal(T::MaxApprovals::get()), DispatchClass::Operational))]
+		#[pallet::weight(10000)]
 		pub fn approve_proposal(
 			origin: OriginFor<T>,
 			#[pallet::compact] dao_id: DaoId,
