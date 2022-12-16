@@ -205,7 +205,6 @@ pub mod pallet {
 		/// spend at a time.
 		type SpendOrigin: EnsureOrigin<Self::RuntimeOrigin, Success = BalanceOf<Self, I>>;
 
-		// TODO: rework providers
 		type DaoProvider: DaoProvider<Id = u32, AccountId = Self::AccountId, Policy = DaoPolicy>;
 	}
 
@@ -327,6 +326,11 @@ pub mod pallet {
 			beneficiary: <T::Lookup as StaticLookup>::Source,
 		) -> DispatchResult {
 			let proposer = ensure_signed(origin.clone())?;
+
+			T::DaoProvider::ensure_member(dao_id, &proposer)?;
+
+			T::DaoProvider::ensure_token_balance(dao_id, &proposer)?;
+
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
 
 			let bond = Self::calculate_bond(T::DaoProvider::policy(dao_id)?, value);
@@ -407,6 +411,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		// TODO: remove?
 		/// Propose and approve a spend of treasury funds.
 		///
 		/// - `origin`: Must be `SpendOrigin` with the `Success` value being at least `amount`.

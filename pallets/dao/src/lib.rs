@@ -45,7 +45,7 @@ pub type BlockNumber = u32;
 #[frame_support::pallet]
 pub mod pallet {
 	pub use super::*;
-	use frame_support::pallet_prelude::*;
+	use frame_support::{pallet_prelude::*, traits::fungibles::Transfer};
 	use frame_system::pallet_prelude::*;
 
 	/// The current storage version.
@@ -93,13 +93,19 @@ pub mod pallet {
 		type DaoMetadataLimit: Get<u32>;
 
 		#[pallet::constant]
+		type DaoTokenMinBalanceLimit: Get<u128>;
+
+		#[pallet::constant]
 		type DaoTokenBalanceLimit: Get<u128>;
+
+		#[pallet::constant]
+		type DaoTokenVotingMinThreshold: Get<u128>;
 
 		#[pallet::constant]
 		type ExpectedBlockTime: Get<u64>;
 
-		// TODO: rework providers
-		type CouncilProvider: InitializeDaoMembers<u32, Self::AccountId>;
+		type CouncilProvider: InitializeDaoMembers<u32, Self::AccountId>
+			+ ContainsDaoMember<u32, Self::AccountId>;
 
 		type AssetProvider: Inspect<
 				Self::AccountId,
@@ -114,6 +120,10 @@ pub mod pallet {
 				AssetId = <Self as pallet::Config>::AssetId,
 				Balance = <Self as pallet::Config>::Balance,
 			> + Mutate<
+				Self::AccountId,
+				AssetId = <Self as pallet::Config>::AssetId,
+				Balance = <Self as pallet::Config>::Balance,
+			> + Transfer<
 				Self::AccountId,
 				AssetId = <Self as pallet::Config>::AssetId,
 				Balance = <Self as pallet::Config>::Balance,
@@ -154,6 +164,8 @@ pub mod pallet {
 		TokenNotExists,
 		TokenCreateFailed,
 		TokenBalanceInvalid,
+		TokenBalanceLow,
+		TokenTransferFailed,
 		InvalidInput,
 		PolicyNotExist,
 	}
@@ -187,6 +199,17 @@ pub mod pallet {
 			let min = <T as Config>::Currency::minimum_balance();
 			let _ = <T as Config>::Currency::make_free_balance_be(&dao_account_id, min);
 
+			// setting submitter as a Dao council by default
+			let mut council_members: Vec<T::AccountId> = vec![who.clone()];
+			for member in council {
+				let account = T::Lookup::lookup(member)?;
+				if council_members.contains(&account) {
+					continue
+				}
+
+				council_members.push(account);
+			}
+
 			let mut has_token_id: Option<AssetId<T>> = None;
 
 			if let Some(token) = dao.token {
@@ -199,7 +222,7 @@ pub mod pallet {
 					return Err(Error::<T>::TokenBalanceInvalid.into())
 				}
 
-				let min_balance = Self::u128_to_balance(token.min_balance);
+				let min_balance = Self::u128_to_balance(T::DaoTokenMinBalanceLimit::get());
 
 				let issuance =
 					T::AssetProvider::total_issuance(token_id).try_into().unwrap_or(0u128);
@@ -207,11 +230,9 @@ pub mod pallet {
 				if issuance > 0 {
 					return Err(Error::<T>::TokenAlreadyExists.into())
 				} else {
-					log::info!("issuing token: {:?}", token_id);
 					T::AssetProvider::create(token_id, dao_account_id.clone(), false, min_balance)
 						.map_err(|_| Error::<T>::TokenCreateFailed)?;
 
-					log::info!("setting metadata for token: {:?}", token_id);
 					T::AssetProvider::set(
 						token_id,
 						&dao_account_id,
@@ -221,10 +242,25 @@ pub mod pallet {
 					)
 					.map_err(|_| Error::<T>::TokenCreateFailed)?;
 
-					log::info!("minting token: {:?}", token_id);
+					T::AssetProvider::mint_into(
+						token_id,
+						&dao_account_id,
+						Self::u128_to_balance(
+							T::DaoTokenBalanceLimit::get().min(token.min_balance),
+						),
+					)
+					.map_err(|_| Error::<T>::TokenCreateFailed)?;
 
-					T::AssetProvider::mint_into(token_id, &dao_account_id, min_balance)
-						.map_err(|_| Error::<T>::TokenCreateFailed)?;
+					for member in council_members.clone() {
+						T::AssetProvider::transfer(
+							token_id,
+							&dao_account_id,
+							&member,
+							Self::u128_to_balance(T::DaoTokenVotingMinThreshold::get()),
+							true,
+						)
+						.map_err(|_| Error::<T>::TokenTransferFailed)?;
+					}
 				}
 			}
 
@@ -255,6 +291,7 @@ pub mod pallet {
 					T::ExpectedBlockTime::get() as BlockNumber,
 				approve_origin: dao.policy.approve_origin,
 				reject_origin: dao.policy.reject_origin,
+				token_voting_min_threshold: T::DaoTokenVotingMinThreshold::get(),
 			};
 			Policies::<T>::insert(dao_id, policy);
 
@@ -266,16 +303,6 @@ pub mod pallet {
 			};
 			Daos::<T>::insert(dao_id, dao);
 
-			// setting submitter as a Dao council by default
-			let mut council_members: Vec<T::AccountId> = vec![who.clone()];
-			for member in council {
-				let account = T::Lookup::lookup(member)?;
-				if council_members.contains(&account) {
-					continue
-				}
-
-				council_members.push(account);
-			}
 			T::CouncilProvider::initialize_members(dao_id, council_members)?;
 
 			<NextDaoId<T>>::put(dao_id.checked_add(1).unwrap());
@@ -295,7 +322,7 @@ pub mod pallet {
 			asset_id.try_into().ok().unwrap()
 		}
 
-		fn u128_to_balance(cost: u128) -> Balance<T> {
+		pub fn u128_to_balance(cost: u128) -> Balance<T> {
 			TryInto::<Balance<T>>::try_into(cost).ok().unwrap()
 		}
 
@@ -308,6 +335,7 @@ pub mod pallet {
 impl<T: Config> DaoProvider for Pallet<T> {
 	type Id = u32;
 	type AccountId = T::AccountId;
+	type AssetId = T::AssetId;
 	type Policy = PolicyOf;
 
 	fn exists(id: Self::Id) -> Result<(), DispatchError> {
@@ -327,6 +355,22 @@ impl<T: Config> DaoProvider for Pallet<T> {
 			Some(policy) => Ok(policy),
 			None => Err(Error::<T>::PolicyNotExist.into()),
 		}
+	}
+
+	fn ensure_member(id: Self::Id, who: &T::AccountId) -> Result<bool, DispatchError> {
+		T::CouncilProvider::contains(id, who)
+	}
+
+	fn ensure_token_balance(id: Self::Id, who: &Self::AccountId) -> Result<(), DispatchError> {
+		let dao = Daos::<T>::get(id).ok_or_else(|| Error::<T>::DaoNotExist)?;
+
+		if T::AssetProvider::balance(dao.token_id, who) <
+			Self::u128_to_balance(T::DaoTokenVotingMinThreshold::get())
+		{
+			return Err(Error::<T>::TokenBalanceLow.into())
+		}
+
+		Ok(())
 	}
 
 	fn dao_account_id(id: Self::Id) -> Self::AccountId {

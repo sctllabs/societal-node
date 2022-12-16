@@ -188,7 +188,6 @@ pub mod pallet {
 		/// Weight information for extrinsics in this pallet.
 		type WeightInfo: WeightInfo;
 
-		// TODO: rework providers
 		type DaoProvider: DaoProvider<Id = u32, AccountId = Self::AccountId, Policy = DaoPolicy>;
 	}
 
@@ -485,6 +484,9 @@ pub mod pallet {
 			let members = Self::members(dao_id);
 			ensure!(members.contains(&who), Error::<T, I>::NotMember);
 
+			T::DaoProvider::ensure_token_balance(dao_id, &who)?;
+
+			//TODO: move threshold to dao/proposal settings???
 			if threshold < 2 {
 				let (proposal_len, result) =
 					Self::do_propose_execute(dao_id, proposal, length_bound)?;
@@ -537,6 +539,8 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 			let members = Self::members(dao_id);
 			ensure!(members.contains(&who), Error::<T, I>::NotMember);
+
+			T::DaoProvider::ensure_token_balance(dao_id, &who)?;
 
 			// Detects first vote of the member in the motion
 			let is_account_voting_first_time =
@@ -594,6 +598,7 @@ pub mod pallet {
 			Self::do_close(dao_id, proposal_hash, index, proposal_weight_bound, length_bound)
 		}
 
+		// TODO: no roots allowed - remove or re-work for DAO purposes
 		/// Disapprove a proposal, close, and remove it from the system, regardless of its current
 		/// state.
 		///

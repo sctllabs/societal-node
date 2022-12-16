@@ -96,6 +96,7 @@ pub struct DaoPolicy {
 	// TODO: use max members for account length
 	pub approve_origin: (u32, u32),
 	pub reject_origin: (u32, u32),
+	pub token_voting_min_threshold: u128,
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
@@ -109,16 +110,23 @@ pub struct Dao<AccountId, TokenId, BoundedString, BoundedMetadata> {
 pub trait DaoProvider {
 	type Id;
 	type AccountId;
+	type AssetId;
 	type Policy;
 
 	fn exists(id: Self::Id) -> Result<(), DispatchError>;
 	fn dao_account_id(id: Self::Id) -> Self::AccountId;
 	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError>;
 	fn count() -> u32;
+	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError>;
+	fn ensure_token_balance(id: Self::Id, who: &Self::AccountId) -> Result<(), DispatchError>;
 }
 
 pub trait InitializeDaoMembers<DaoId, AccountId> {
 	fn initialize_members(dao_id: DaoId, members: Vec<AccountId>) -> Result<(), DispatchError>;
+}
+
+pub trait ContainsDaoMember<DaoId, AccountId> {
+	fn contains(dao_id: DaoId, who: &AccountId) -> Result<bool, DispatchError>;
 }
 
 /// Trait for type that can handle incremental changes to a set of account IDs.

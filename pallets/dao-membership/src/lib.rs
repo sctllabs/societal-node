@@ -53,7 +53,9 @@ mod benchmarking;
 pub use pallet::*;
 pub use weights::WeightInfo;
 
-use dao_primitives::{ChangeDaoMembers, DaoPolicy, DaoProvider, InitializeDaoMembers};
+use dao_primitives::{
+	ChangeDaoMembers, ContainsDaoMember, DaoPolicy, DaoProvider, InitializeDaoMembers,
+};
 
 /// Dao ID. Just a `u32`.
 pub type DaoId = u32;
@@ -290,7 +292,17 @@ pub mod pallet {
 impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	/// Check whether `who` is a member of the collective.
 	pub fn is_member(dao_id: DaoId, who: &T::AccountId) -> bool {
-		Self::contains(dao_id, who)
+		Self::sorted_members(dao_id).binary_search(who).is_ok()
+	}
+}
+
+impl<T: Config<I>, I: 'static> ContainsDaoMember<DaoId, T::AccountId> for Pallet<T, I> {
+	fn contains(dao_id: DaoId, who: &T::AccountId) -> Result<bool, DispatchError> {
+		if Self::is_member(dao_id, who) {
+			return Ok(true)
+		}
+
+		Err(Error::<T, I>::NotMember.into())
 	}
 }
 
@@ -298,11 +310,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 pub trait DaoSortedMembers<T: Ord> {
 	/// Get a vector of all members in the set, ordered.
 	fn sorted_members(dao_id: DaoId) -> Vec<T>;
-
-	/// Return `true` if this "contains" the given value `t`.
-	fn contains(dao_id: DaoId, t: &T) -> bool {
-		Self::sorted_members(dao_id).binary_search(t).is_ok()
-	}
 
 	/// Get the number of items in the set.
 	fn count(dao_id: DaoId) -> usize {
