@@ -78,6 +78,32 @@ fn properties() -> Properties {
 }
 
 fn development_config_genesis() -> GenesisConfig {
+	testnet_genesis(
+		vec![authority_keys_from_seed("Alice")],
+		vec![],
+		get_account_id_from_seed::<sr25519::Public>("Alice"),
+		None,
+		1516,
+	)
+}
+
+/// Development config (single validator Alice)
+pub fn development_config() -> ChainSpec {
+	ChainSpec::from_genesis(
+		"Societal Development",
+		"societal_dev",
+		ChainType::Development,
+		development_config_genesis,
+		vec![],
+		None,
+		None,
+		None,
+		Some(properties()),
+		Default::default(),
+	)
+}
+
+fn local_testnet_genesis() -> GenesisConfig {
 	#[rustfmt::skip]
 	// stash, controller, session-key
 	// generated with secret:
@@ -121,32 +147,6 @@ fn development_config_genesis() -> GenesisConfig {
 	let endowed_accounts: Vec<AccountId> = vec![root_key.clone()];
 
 	testnet_genesis(initial_authorities, vec![], root_key, Some(endowed_accounts), 1516)
-}
-
-/// Development config (single validator Alice)
-pub fn development_config() -> ChainSpec {
-	ChainSpec::from_genesis(
-		"Societal Development",
-		"societal_dev",
-		ChainType::Development,
-		development_config_genesis,
-		vec![],
-		None,
-		None,
-		None,
-		Some(properties()),
-		Default::default(),
-	)
-}
-
-fn local_testnet_genesis() -> GenesisConfig {
-	testnet_genesis(
-		vec![authority_keys_from_seed("Alice"), authority_keys_from_seed("Bob")],
-		vec![],
-		get_account_id_from_seed::<sr25519::Public>("Alice"),
-		None,
-		1516,
-	)
 }
 
 /// Local testnet config (multivalidator Alice + Bob)
