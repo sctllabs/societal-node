@@ -1,4 +1,3 @@
-use hex_literal::hex;
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sc_chain_spec::{ChainSpecExtension, Properties};
 use sc_service::ChainType;
