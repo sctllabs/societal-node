@@ -1,5 +1,5 @@
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
-use sc_chain_spec::ChainSpecExtension;
+use sc_chain_spec::{ChainSpecExtension, Properties};
 use sc_service::ChainType;
 use serde::{Deserialize, Serialize};
 use societal_node_runtime::{
@@ -11,7 +11,7 @@ use societal_node_runtime::{
 };
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_consensus_babe::AuthorityId as BabeId;
-use sp_core::{sr25519, Pair, Public, H160, U256};
+use sp_core::{crypto::UncheckedInto, sr25519, Pair, Public, H160, U256};
 use sp_finality_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::{
 	traits::{IdentifyAccount, Verify},
@@ -71,54 +71,95 @@ pub fn authority_keys_from_seed(
 	)
 }
 
+fn properties() -> Properties {
+	serde_json::from_str("{\"tokenDecimals\": 12, \"tokenSymbol\": \"SCTL\", \"SS58Prefix\": 1516}")
+		.expect("Provided valid json map")
+}
+
 fn development_config_genesis() -> GenesisConfig {
 	testnet_genesis(
 		vec![authority_keys_from_seed("Alice")],
 		vec![],
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
 		None,
-		42, // TODO
+		1516,
 	)
 }
 
 /// Development config (single validator Alice)
 pub fn development_config() -> ChainSpec {
 	ChainSpec::from_genesis(
-		"Development",
-		"dev",
+		"Societal Development",
+		"societal_dev",
 		ChainType::Development,
 		development_config_genesis,
 		vec![],
 		None,
 		None,
 		None,
-		None,
+		Some(properties()),
 		Default::default(),
 	)
 }
 
 fn local_testnet_genesis() -> GenesisConfig {
-	testnet_genesis(
-		vec![authority_keys_from_seed("Alice"), authority_keys_from_seed("Bob")],
-		vec![],
-		get_account_id_from_seed::<sr25519::Public>("Alice"),
-		None,
-		42, // TODO
-	)
+	#[rustfmt::skip]
+	// stash, controller, session-key
+	// generated with secret:
+	// for i in 1 2 3 4 ; do for j in stash controller; do subkey inspect "$secret"//fir//$j//$i; done; done
+	//
+	// and
+	//
+	// for i in 1 2 3 4 ; do for j in session; do subkey --ed25519 inspect "$secret"//fir//$j//$i; done; done
+	let initial_authorities: Vec<(
+		AccountId,
+		AccountId,
+		GrandpaId,
+		BabeId,
+		ImOnlineId,
+		AuthorityDiscoveryId,
+	)> = vec![(
+		// 5CoLMkimzM8CnWvFcvYsnPNxPf6PjPVxTmvSPTQvrMYit7CY
+		array_bytes::hex_n_into_unchecked("0x20832e9244ba5191bd776b47ad8f56e9e3c5213d42bb79042dd907addf45a03f"),
+		// 5Ev1mRCYm6XWsT9TezzFVcMemYrkbtvg7J6AxywVeJwmJ1iP
+		array_bytes::hex_n_into_unchecked("0x7e13c7c6702bb8fe6d1d2917ea303975f82cc05acb77a9ceece9b1527c380231"),
+		// 5G4DFSomE21btAoHbreqFn2WMivJg3vGgYkxLJ3HK3WiRY9t
+		array_bytes::hex2array_unchecked("0xb090a211774bd2860bcba90e579e31eb686fc698aa53aa00594e3944919379e5")
+			.unchecked_into(),
+		// 5EUFiuMACg57Kd1hgPJQre3FY4n3NMhW6F7FndwPKKBiNXAE
+		array_bytes::hex2array_unchecked("0x6a6e61d1d594e96cdc94745511c0c431a2369d9963956999c7e29b40b53a4c44")
+			.unchecked_into(),
+		// 5EUFiuMACg57Kd1hgPJQre3FY4n3NMhW6F7FndwPKKBiNXAE
+		array_bytes::hex2array_unchecked("0x6a6e61d1d594e96cdc94745511c0c431a2369d9963956999c7e29b40b53a4c44")
+			.unchecked_into(),
+		// 5EUFiuMACg57Kd1hgPJQre3FY4n3NMhW6F7FndwPKKBiNXAE
+		array_bytes::hex2array_unchecked("0x6a6e61d1d594e96cdc94745511c0c431a2369d9963956999c7e29b40b53a4c44")
+			.unchecked_into(),
+	)];
+
+	// generated with secret: subkey inspect "$secret"//fir
+	let root_key: AccountId = array_bytes::hex_n_into_unchecked(
+		// 5FNv39HixKnNhDab5vAu1Wm7fxP1UgcA5t1V36c3AHFPYwxz
+		"0x92981f0715ab7755e8168b4e8b5bdbd08a5a643adb1438eff3873f3197457b4f",
+	);
+
+	let endowed_accounts: Vec<AccountId> = vec![root_key.clone()];
+
+	testnet_genesis(initial_authorities, vec![], root_key, Some(endowed_accounts), 1516)
 }
 
 /// Local testnet config (multivalidator Alice + Bob)
 pub fn local_testnet_config() -> ChainSpec {
 	ChainSpec::from_genesis(
-		"Local Testnet",
-		"local_testnet",
+		"Societal Local Testnet",
+		"societal_local_testnet",
 		ChainType::Local,
 		local_testnet_genesis,
 		vec![],
 		None,
 		None,
 		None,
-		None,
+		Some(properties()),
 		Default::default(),
 	)
 }
