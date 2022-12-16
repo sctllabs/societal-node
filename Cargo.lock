@@ -8189,7 +8189,6 @@ dependencies = [
  "frame-system",
  "frame-system-rpc-runtime-api",
  "futures",
- "hex-literal",
  "jsonrpsee",
  "node-inspect",
  "node-primitives",
