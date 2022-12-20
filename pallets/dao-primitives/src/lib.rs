@@ -56,6 +56,9 @@ pub struct DaoPayload {
 	pub metadata: Vec<u8>,
 	pub token: Option<DaoGovernanceToken>,
 	pub token_id: Option<u32>,
+	#[serde(default)]
+	#[serde(deserialize_with = "de_option_string_to_bytes")]
+	pub token_address: Option<Vec<u8>>,
 	pub policy: DaoPolicyPayload,
 }
 
@@ -99,12 +102,46 @@ pub struct DaoPolicy {
 	pub token_voting_min_threshold: u128,
 }
 
+// TODO: add token enum
+
+#[derive(
+	Encode, Decode, Copy, Clone, Default, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen,
+)]
+pub enum DaoStatus {
+	// Pending approval from off-chain
+	#[default]
+	Pending,
+	// DAO approved on-chain
+	Success,
+	// An error occurred while approving DAO
+	Error,
+}
+
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct Dao<AccountId, TokenId, BoundedString, BoundedMetadata> {
 	pub founder: AccountId,
 	pub account_id: AccountId,
-	pub token_id: TokenId,
+	pub token_id: Option<TokenId>,
+	pub token_address: Option<BoundedString>,
+	pub status: DaoStatus,
 	pub config: DaoConfig<BoundedString, BoundedMetadata>,
+}
+
+#[derive(
+	Encode,
+	Decode,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	RuntimeDebug,
+	MaxEncodedLen,
+	Deserialize,
+)]
+pub struct DaoApprovalPayload<DaoId, BoundedString> {
+	pub dao_id: DaoId,
+	pub token_address: BoundedString,
 }
 
 pub trait DaoProvider {
@@ -205,6 +242,16 @@ where
 {
 	let s: &str = Deserialize::deserialize(de)?;
 	Ok(s.as_bytes().to_vec())
+}
+
+pub fn de_option_string_to_bytes<'de, D>(de: D) -> Result<Option<Vec<u8>>, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	match Option::<&str>::deserialize(de)? {
+		None => Ok(None),
+		Some(s) => Ok(Some(s.as_bytes().to_vec())),
+	}
 }
 
 pub fn de_string_to_u128<'de, D>(de: D) -> Result<u128, D::Error>

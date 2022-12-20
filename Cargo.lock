@@ -8268,6 +8268,7 @@ dependencies = [
  "frame-system-rpc-runtime-api",
  "frame-try-runtime",
  "hex-literal",
+ "log",
  "node-primitives",
  "pallet-asset-tx-payment",
  "pallet-assets",
