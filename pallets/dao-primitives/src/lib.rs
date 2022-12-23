@@ -144,7 +144,19 @@ pub struct DaoApprovalPayload<DaoId, BoundedString> {
 	pub token_address: BoundedString,
 }
 
-pub trait DaoProvider {
+#[derive(
+	Encode, Decode, Copy, Clone, Default, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen,
+)]
+pub enum AccountTokenBalance {
+	#[default]
+	// Insufficient
+	Insufficient,
+	Sufficient,
+	// An off-chain action should be performed
+	Offchain,
+}
+
+pub trait DaoProvider<Hash> {
 	type Id;
 	type AccountId;
 	type AssetId;
@@ -155,7 +167,17 @@ pub trait DaoProvider {
 	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError>;
 	fn count() -> u32;
 	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError>;
-	fn ensure_token_balance(id: Self::Id, who: &Self::AccountId) -> Result<(), DispatchError>;
+	fn ensure_proposal_allowed(
+		id: Self::Id,
+		who: &Self::AccountId,
+		threshold: u32,
+		hash: Hash,
+		length_bound: u32,
+	) -> Result<AccountTokenBalance, DispatchError>;
+	fn ensure_token_balance(
+		id: Self::Id,
+		who: &Self::AccountId,
+	) -> Result<AccountTokenBalance, DispatchError>;
 }
 
 pub trait InitializeDaoMembers<DaoId, AccountId> {
@@ -164,6 +186,16 @@ pub trait InitializeDaoMembers<DaoId, AccountId> {
 
 pub trait ContainsDaoMember<DaoId, AccountId> {
 	fn contains(dao_id: DaoId, who: &AccountId) -> Result<bool, DispatchError>;
+}
+
+pub trait ApprovePropose<DaoId, AccountId, Hash> {
+	fn approve_propose(
+		dao_id: DaoId,
+		who: AccountId,
+		threshold: u32,
+		hash: Hash,
+		length_bound: u32,
+	) -> Result<(), DispatchError>;
 }
 
 /// Trait for type that can handle incremental changes to a set of account IDs.

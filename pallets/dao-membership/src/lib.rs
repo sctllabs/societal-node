@@ -102,7 +102,12 @@ pub mod pallet {
 		type WeightInfo: WeightInfo;
 
 		// TODO: rework providers
-		type DaoProvider: DaoProvider<Id = u32, AccountId = Self::AccountId, Policy = DaoPolicy>;
+		type DaoProvider: DaoProvider<
+			<Self as frame_system::Config>::Hash,
+			Id = u32,
+			AccountId = Self::AccountId,
+			Policy = DaoPolicy,
+		>;
 	}
 
 	/// The current membership, stored as an ordered Vec.

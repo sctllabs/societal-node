@@ -47,9 +47,11 @@
 use scale_info::TypeInfo;
 use sp_io::storage;
 use sp_runtime::{traits::Hash, RuntimeDebug};
-use sp_std::{marker::PhantomData, prelude::*, result};
+use sp_std::{marker::PhantomData, prelude::*, result, str};
 
-use dao_primitives::{ChangeDaoMembers, DaoPolicy, DaoProvider, InitializeDaoMembers};
+use dao_primitives::{
+	ApprovePropose, ChangeDaoMembers, DaoPolicy, DaoProvider, InitializeDaoMembers,
+};
 
 use frame_support::{
 	codec::{Decode, Encode, MaxEncodedLen},
@@ -142,6 +144,7 @@ pub struct Votes<AccountId, BlockNumber> {
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
+	use dao_primitives::AccountTokenBalance;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
@@ -188,7 +191,12 @@ pub mod pallet {
 		/// Weight information for extrinsics in this pallet.
 		type WeightInfo: WeightInfo;
 
-		type DaoProvider: DaoProvider<Id = u32, AccountId = Self::AccountId, Policy = DaoPolicy>;
+		type DaoProvider: DaoProvider<
+			<Self as frame_system::Config>::Hash,
+			Id = u32,
+			AccountId = Self::AccountId,
+			Policy = DaoPolicy,
+		>;
 	}
 
 	/// Origin for the collective pallet.
@@ -205,6 +213,19 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn proposal_of)]
 	pub type ProposalOf<T: Config<I>, I: 'static = ()> = StorageDoubleMap<
+		_,
+		Twox64Concat,
+		DaoId,
+		Identity,
+		T::Hash,
+		<T as Config<I>>::Proposal,
+		OptionQuery,
+	>;
+
+	/// Actual pending proposal for a given hash.
+	#[pallet::storage]
+	#[pallet::getter(fn pending_proposal_of)]
+	pub type PendingProposalOf<T: Config<I>, I: 'static = ()> = StorageDoubleMap<
 		_,
 		Twox64Concat,
 		DaoId,
@@ -481,10 +502,26 @@ pub mod pallet {
 			#[pallet::compact] length_bound: u32,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
+
 			let members = Self::members(dao_id);
 			ensure!(members.contains(&who), Error::<T, I>::NotMember);
 
-			T::DaoProvider::ensure_token_balance(dao_id, &who)?;
+			let proposal_hash = T::Hashing::hash_of(&proposal);
+
+			let account_token_balance = T::DaoProvider::ensure_proposal_allowed(
+				dao_id,
+				&who,
+				threshold,
+				proposal_hash,
+				length_bound,
+			)?;
+			if account_token_balance == AccountTokenBalance::Offchain {
+				// TODO: add checks for vec size limits
+
+				<PendingProposalOf<T, I>>::insert(dao_id, proposal_hash, proposal);
+
+				return Ok(Default::default())
+			}
 
 			//TODO: move threshold to dao/proposal settings???
 			if threshold < 2 {
@@ -1162,6 +1199,28 @@ impl<T: Config<I>, I: 'static> InitializeDaoMembers<DaoId, T::AccountId> for Pal
 	fn initialize_members(dao_id: DaoId, members: Vec<T::AccountId>) -> Result<(), DispatchError> {
 		// considering we've checked everything in membership pallet
 		<Members<T, I>>::insert(dao_id, members);
+
+		Ok(())
+	}
+}
+
+impl<T: Config<I>, I: 'static> ApprovePropose<DaoId, T::AccountId, T::Hash> for Pallet<T, I> {
+	fn approve_propose(
+		dao_id: DaoId,
+		who: T::AccountId,
+		threshold: u32,
+		hash: T::Hash,
+		length_bound: u32,
+	) -> Result<(), DispatchError> {
+		log::info!("we are finally here at dao collective: {:?}", who);
+		log::info!("dao id: {:?}", dao_id);
+		log::info!("hash: {:?}", hash);
+
+		let proposal = <PendingProposalOf<T, I>>::get(dao_id, hash).expect("Proposal not found");
+
+		Self::do_propose_proposed(who, dao_id, threshold, Box::new(proposal), length_bound)?;
+
+		PendingProposalOf::<T, I>::remove(dao_id, &hash);
 
 		Ok(())
 	}

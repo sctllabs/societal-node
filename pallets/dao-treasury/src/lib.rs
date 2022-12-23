@@ -205,7 +205,12 @@ pub mod pallet {
 		/// spend at a time.
 		type SpendOrigin: EnsureOrigin<Self::RuntimeOrigin, Success = BalanceOf<Self, I>>;
 
-		type DaoProvider: DaoProvider<Id = u32, AccountId = Self::AccountId, Policy = DaoPolicy>;
+		type DaoProvider: DaoProvider<
+			<Self as frame_system::Config>::Hash,
+			Id = u32,
+			AccountId = Self::AccountId,
+			Policy = DaoPolicy,
+		>;
 	}
 
 	/// Number of proposals that have been made.
