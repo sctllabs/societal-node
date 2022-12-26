@@ -114,8 +114,9 @@ pub struct EthRPCResponse {
 pub enum OffchainData<AccountId, Hash> {
 	#[default]
 	Default,
-	ApproveDao((u32, Vec<u8>)),
+	ApproveDao((Hash, Vec<u8>)),
 	ApproveProposal((u32, Vec<u8>, AccountId, u32, Hash, u32)),
+	ApproveTreasuryProposal((u32, Vec<u8>, AccountId, Hash)),
 }
 
 #[derive(Debug, Deserialize, Encode, Decode, Default)]
@@ -202,6 +203,8 @@ pub mod pallet {
 
 		type CouncilApproveProvider: ApprovePropose<u32, Self::AccountId, Self::Hash>;
 
+		type ApproveTreasuryPropose: ApproveTreasuryPropose<u32, Self::AccountId, Self::Hash>;
+
 		type AssetProvider: Inspect<
 				Self::AccountId,
 				AssetId = <Self as pallet::Config>::AssetId,
@@ -266,14 +269,17 @@ pub mod pallet {
 				let mut call = None;
 				match offchain_data.clone() {
 					OffchainData::ApproveDao(data) => {
+						let dao_hash = data.0;
+
 						match Self::ensure_token_balance(Self::fetch_token_total_supply(data.1)) {
-							Ok(_) => {
-								call = Some(Call::approve_dao { dao_id: data.0 });
+							Ok(total_supply) => {
+								call =
+									Some(Call::approve_dao { dao_hash, approve: total_supply > 0 });
 							},
 							Err(e) => {
-								log::error!("offchain_worker error: {:?}", e)
+								log::error!("offchain_worker error: {:?}", e);
 
-								//TODO: disapprove dao - remove?
+								call = Some(Call::approve_dao { dao_hash, approve: false });
 							},
 						}
 					},
@@ -282,22 +288,46 @@ pub mod pallet {
 							data.1,
 							data.2.clone(),
 						)) {
-							Ok(_) => {
+							Ok(token_balance) => {
 								call = Some(Call::approve_council_propose {
 									dao_id: data.0,
-									who: data.2,
-									threshold: data.3,
 									hash: data.4,
-									length_bound: data.5,
+									approve: token_balance >= T::DaoTokenVotingMinThreshold::get(),
 								});
 							},
 							Err(e) => {
-								log::error!("offchain_worker error: {:?}", e)
+								log::error!("offchain_worker error: {:?}", e);
 
-								//TODO: disapprove proposal - remove?
+								call = Some(Call::approve_council_propose {
+									dao_id: data.0,
+									hash: data.4,
+									approve: false,
+								});
 							},
 						}
 					},
+					OffchainData::ApproveTreasuryProposal(data) =>
+						match Self::ensure_token_balance(Self::fetch_token_balance_of(
+							data.1,
+							data.2.clone(),
+						)) {
+							Ok(token_balance) => {
+								call = Some(Call::approve_treasury_propose {
+									dao_id: data.0,
+									hash: data.3,
+									approve: token_balance >= T::DaoTokenVotingMinThreshold::get(),
+								});
+							},
+							Err(e) => {
+								log::error!("offchain_worker error: {:?}", e);
+
+								call = Some(Call::approve_treasury_propose {
+									dao_id: data.0,
+									hash: data.3,
+									approve: false,
+								});
+							},
+						},
 					_ => {},
 				};
 
@@ -351,9 +381,11 @@ pub mod pallet {
 			};
 
 			match call {
-				Call::approve_dao { dao_id } => valid_tx(b"approve_dao".to_vec()),
-				Call::approve_council_propose { dao_id, who, threshold, hash, length_bound } =>
+				Call::approve_dao { dao_hash, approve } => valid_tx(b"approve_dao".to_vec()),
+				Call::approve_council_propose { dao_id, hash, approve } =>
 					valid_tx(b"approve_council_dao".to_vec()),
+				Call::approve_treasury_propose { dao_id, hash, approve } =>
+					valid_tx(b"approve_treasury_propose".to_vec()),
 				_ => InvalidTransaction::Call.into(),
 			}
 		}
@@ -528,10 +560,12 @@ pub mod pallet {
 							.map_err(|_| Error::<T>::TokenAddressInvalid)?;
 					has_token_address = Some(address);
 
+					let dao_hash = T::Hashing::hash_of(&dao);
+
 					let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
 					let data: IndexingData<T::AccountId, T::Hash> = IndexingData(
 						b"approve_dao".to_vec(),
-						OffchainData::ApproveDao((dao_id, token_address)),
+						OffchainData::ApproveDao((dao_hash, token_address)),
 					);
 
 					offchain_index::set(&key, &data.encode());
@@ -543,10 +577,7 @@ pub mod pallet {
 					)
 					.map_err(|_| Error::<T>::CouncilMembersOverflow)?;
 
-					PendingDaos::<T>::insert(
-						T::Hashing::hash_of(&dao),
-						PendingDao { dao: dao.clone(), policy, council },
-					);
+					PendingDaos::<T>::insert(dao_hash, PendingDao { dao, policy, council });
 
 					Self::deposit_event(Event::DaoPendingApproval(dao_id, who));
 
@@ -562,23 +593,21 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(10_000)]
-		pub fn approve_dao(origin: OriginFor<T>, dao_id: u32) -> DispatchResult {
+		pub fn approve_dao(
+			origin: OriginFor<T>,
+			dao_hash: T::Hash,
+			approve: bool,
+		) -> DispatchResult {
 			ensure_none(origin)?;
 
-			let dao_option = Daos::<T>::get(dao_id);
+			let PendingDao { dao, policy, council } = match <PendingDaos<T>>::take(dao_hash) {
+				None => return Err(Error::<T>::DaoNotExist.into()),
+				Some(dao) => dao,
+			};
 
-			if dao_option.is_none() {
-				return Err(Error::<T>::DaoNotExist.into())
+			if approve {
+				return Self::do_register_dao(dao, policy, council.to_vec())
 			}
-
-			let mut dao = dao_option.unwrap();
-			dao.status = DaoStatus::Success;
-
-			let founder = dao.clone().founder;
-
-			Daos::<T>::insert(dao_id, dao);
-
-			Self::deposit_event(Event::DaoRegistered(dao_id, founder));
 
 			Ok(())
 		}
@@ -587,14 +616,26 @@ pub mod pallet {
 		pub fn approve_council_propose(
 			origin: OriginFor<T>,
 			dao_id: u32,
-			who: T::AccountId,
-			threshold: u32,
 			hash: T::Hash,
-			length_bound: u32,
+			approve: bool,
 		) -> DispatchResult {
 			ensure_none(origin)?;
 
-			T::CouncilApproveProvider::approve_propose(dao_id, who, threshold, hash, length_bound)?;
+			T::CouncilApproveProvider::approve_propose(dao_id, hash, approve)?;
+
+			Ok(())
+		}
+
+		#[pallet::weight(10_000)]
+		pub fn approve_treasury_propose(
+			origin: OriginFor<T>,
+			dao_id: u32,
+			hash: T::Hash,
+			approve: bool,
+		) -> DispatchResult {
+			ensure_none(origin)?;
+
+			T::ApproveTreasuryPropose::approve_treasury_propose(dao_id, hash, approve)?;
 
 			Ok(())
 		}
@@ -668,9 +709,9 @@ pub mod pallet {
 				}
 			}
 
-			let total_supply = Result::unwrap_or(u128::from_str_radix(value_stripped, 16), 0_u128);
+			let token_balance = Result::unwrap_or(u128::from_str_radix(value_stripped, 16), 0_u128);
 
-			Ok(total_supply)
+			Ok(token_balance)
 		}
 
 		// TODO: add balanceOf at some block
@@ -809,6 +850,27 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 		T::CouncilProvider::contains(id, who)
 	}
 
+	fn ensure_treasury_proposal_allowed(
+		id: Self::Id,
+		who: &Self::AccountId,
+		hash: T::Hash,
+	) -> Result<AccountTokenBalance, DispatchError> {
+		let token_balance = Self::ensure_token_balance(id, who)?;
+
+		if let AccountTokenBalance::Offchain { token_address } = token_balance.clone() {
+			let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
+
+			let data: IndexingData<T::AccountId, T::Hash> = IndexingData(
+				b"approve_treasury_propose".to_vec(),
+				OffchainData::ApproveTreasuryProposal((id, token_address, who.clone(), hash)),
+			);
+
+			offchain_index::set(&key, &data.encode());
+		}
+
+		Ok(token_balance)
+	}
+
 	fn ensure_proposal_allowed(
 		id: Self::Id,
 		who: &Self::AccountId,
@@ -816,45 +878,27 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 		hash: T::Hash,
 		length_bound: u32,
 	) -> Result<AccountTokenBalance, DispatchError> {
-		let dao = Daos::<T>::get(id).ok_or(Error::<T>::DaoNotExist)?;
+		let token_balance = Self::ensure_token_balance(id, who)?;
 
-		match dao.token_id {
-			None => {},
-			Some(token_id) => {
-				if T::AssetProvider::balance(token_id, who) <
-					Self::u128_to_balance(T::DaoTokenVotingMinThreshold::get())
-				{
-					return Err(Error::<T>::TokenBalanceLow.into())
-				}
+		if let AccountTokenBalance::Offchain { token_address } = token_balance.clone() {
+			let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
 
-				return Ok(AccountTokenBalance::Sufficient)
-			},
+			let data: IndexingData<T::AccountId, T::Hash> = IndexingData(
+				b"approve_council_propose".to_vec(),
+				OffchainData::ApproveProposal((
+					id,
+					token_address,
+					who.clone(),
+					threshold,
+					hash,
+					length_bound,
+				)),
+			);
+
+			offchain_index::set(&key, &data.encode());
 		}
 
-		match dao.token_address {
-			None => {},
-			Some(token_address) => {
-				let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
-
-				let data: IndexingData<T::AccountId, T::Hash> = IndexingData(
-					b"approve_council_propose".to_vec(),
-					OffchainData::ApproveProposal((
-						id,
-						Vec::from(token_address),
-						who.clone(),
-						threshold,
-						hash,
-						length_bound,
-					)),
-				);
-
-				offchain_index::set(&key, &data.encode());
-
-				return Ok(AccountTokenBalance::Offchain)
-			},
-		}
-
-		Ok(AccountTokenBalance::default())
+		Ok(token_balance)
 	}
 
 	fn ensure_token_balance(
@@ -878,7 +922,8 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 
 		match dao.token_address {
 			None => {},
-			Some(_) => return Ok(AccountTokenBalance::Offchain),
+			Some(token_address) =>
+				return Ok(AccountTokenBalance::Offchain { token_address: token_address.to_vec() }),
 		}
 
 		Ok(AccountTokenBalance::default())
@@ -893,20 +938,5 @@ impl<T: Config> BlockNumberProvider for Pallet<T> {
 	type BlockNumber = T::BlockNumber;
 	fn current_block_number() -> Self::BlockNumber {
 		<frame_system::Pallet<T>>::block_number()
-	}
-}
-
-impl<T: Config> MaybeApproveDao<T::Hash> for Pallet<T> {
-	fn approve_dao(dao_hash: T::Hash, approve: bool) -> Result<(), DispatchError> {
-		let PendingDao { dao, policy, council } = match <PendingDaos<T>>::take(dao_hash) {
-			None => return Err(Error::<T>::DaoNotExist.into()),
-			Some(dao) => dao,
-		};
-
-		if approve {
-			return Self::do_register_dao(dao, policy, council.to_vec())
-		}
-
-		Ok(())
 	}
 }

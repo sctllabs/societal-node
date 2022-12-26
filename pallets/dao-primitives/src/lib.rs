@@ -134,6 +134,13 @@ pub struct PendingDao<AccountId, TokenId, BoundedString, BoundedMetadata, Bounde
 	pub council: BoundedCouncilMembers,
 }
 
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+pub struct PendingProposal<AccountId> {
+	pub who: AccountId,
+	pub threshold: u32,
+	pub length_bound: u32,
+}
+
 #[derive(
 	Encode,
 	Decode,
@@ -151,16 +158,15 @@ pub struct DaoApprovalPayload<DaoId, BoundedString> {
 	pub token_address: BoundedString,
 }
 
-#[derive(
-	Encode, Decode, Copy, Clone, Default, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen,
-)]
+#[derive(Clone, Default, PartialEq, Eq, TypeInfo, RuntimeDebug)]
 pub enum AccountTokenBalance {
 	#[default]
-	// Insufficient
 	Insufficient,
 	Sufficient,
 	// An off-chain action should be performed
-	Offchain,
+	Offchain {
+		token_address: Vec<u8>,
+	},
 }
 
 pub trait DaoProvider<Hash> {
@@ -174,6 +180,11 @@ pub trait DaoProvider<Hash> {
 	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError>;
 	fn count() -> u32;
 	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError>;
+	fn ensure_treasury_proposal_allowed(
+		id: Self::Id,
+		who: &Self::AccountId,
+		hash: Hash,
+	) -> Result<AccountTokenBalance, DispatchError>;
 	fn ensure_proposal_allowed(
 		id: Self::Id,
 		who: &Self::AccountId,
@@ -195,17 +206,15 @@ pub trait ContainsDaoMember<DaoId, AccountId> {
 	fn contains(dao_id: DaoId, who: &AccountId) -> Result<bool, DispatchError>;
 }
 
-pub trait MaybeApproveDao<Hash> {
-	fn approve_dao(dao_hash: Hash, approve: bool) -> Result<(), DispatchError>;
+pub trait ApprovePropose<DaoId, AccountId, Hash> {
+	fn approve_propose(dao_id: DaoId, hash: Hash, approve: bool) -> Result<(), DispatchError>;
 }
 
-pub trait ApprovePropose<DaoId, AccountId, Hash> {
-	fn approve_propose(
+pub trait ApproveTreasuryPropose<DaoId, AccountId, Hash> {
+	fn approve_treasury_propose(
 		dao_id: DaoId,
-		who: AccountId,
-		threshold: u32,
 		hash: Hash,
-		length_bound: u32,
+		approve: bool,
 	) -> Result<(), DispatchError>;
 }
 
