@@ -114,9 +114,24 @@ pub struct EthRPCResponse {
 pub enum OffchainData<AccountId, Hash> {
 	#[default]
 	Default,
-	ApproveDao((Hash, Vec<u8>)),
-	ApproveProposal((u32, Vec<u8>, AccountId, u32, Hash, u32)),
-	ApproveTreasuryProposal((u32, Vec<u8>, AccountId, Hash)),
+	ApproveDao {
+		dao_hash: Hash,
+		token_address: Vec<u8>,
+	},
+	ApproveProposal {
+		dao_id: u32,
+		token_address: Vec<u8>,
+		who: AccountId,
+		threshold: u32,
+		hash: Hash,
+		length_bound: u32,
+	},
+	ApproveTreasuryProposal {
+		dao_id: u32,
+		token_address: Vec<u8>,
+		who: AccountId,
+		hash: Hash,
+	},
 }
 
 #[derive(Debug, Deserialize, Encode, Decode, Default)]
@@ -268,10 +283,10 @@ pub mod pallet {
 
 				let mut call = None;
 				match offchain_data.clone() {
-					OffchainData::ApproveDao(data) => {
-						let dao_hash = data.0;
-
-						match Self::ensure_token_balance(Self::fetch_token_total_supply(data.1)) {
+					OffchainData::ApproveDao { dao_hash, token_address } =>
+						match Self::ensure_token_balance(Self::fetch_token_total_supply(
+							token_address,
+						)) {
 							Ok(total_supply) => {
 								call =
 									Some(Call::approve_dao { dao_hash, approve: total_supply > 0 });
@@ -281,17 +296,23 @@ pub mod pallet {
 
 								call = Some(Call::approve_dao { dao_hash, approve: false });
 							},
-						}
-					},
-					OffchainData::ApproveProposal(data) => {
+						},
+					OffchainData::ApproveProposal {
+						dao_id,
+						token_address,
+						who,
+						threshold,
+						hash,
+						length_bound,
+					} => {
 						match Self::ensure_token_balance(Self::fetch_token_balance_of(
-							data.1,
-							data.2.clone(),
+							token_address,
+							who.clone(),
 						)) {
 							Ok(token_balance) => {
 								call = Some(Call::approve_council_propose {
-									dao_id: data.0,
-									hash: data.4,
+									dao_id,
+									hash,
 									approve: token_balance >= T::DaoTokenVotingMinThreshold::get(),
 								});
 							},
@@ -299,22 +320,22 @@ pub mod pallet {
 								log::error!("offchain_worker error: {:?}", e);
 
 								call = Some(Call::approve_council_propose {
-									dao_id: data.0,
-									hash: data.4,
+									dao_id,
+									hash,
 									approve: false,
 								});
 							},
 						}
 					},
-					OffchainData::ApproveTreasuryProposal(data) =>
+					OffchainData::ApproveTreasuryProposal { dao_id, token_address, who, hash } =>
 						match Self::ensure_token_balance(Self::fetch_token_balance_of(
-							data.1,
-							data.2.clone(),
+							token_address,
+							who.clone(),
 						)) {
 							Ok(token_balance) => {
 								call = Some(Call::approve_treasury_propose {
-									dao_id: data.0,
-									hash: data.3,
+									dao_id,
+									hash,
 									approve: token_balance >= T::DaoTokenVotingMinThreshold::get(),
 								});
 							},
@@ -322,8 +343,8 @@ pub mod pallet {
 								log::error!("offchain_worker error: {:?}", e);
 
 								call = Some(Call::approve_treasury_propose {
-									dao_id: data.0,
-									hash: data.3,
+									dao_id,
+									hash,
 									approve: false,
 								});
 							},
@@ -345,14 +366,21 @@ pub mod pallet {
 
 				if result.is_err() {
 					match offchain_data {
-						OffchainData::ApproveDao(data) => {
-							log::error!("dao approval error: {:?}", data.0);
+						OffchainData::ApproveDao { dao_hash, .. } => {
+							log::error!("dao approval error: {:?}", dao_hash);
 						},
-						OffchainData::ApproveProposal(data) => {
+						OffchainData::ApproveProposal { dao_id, hash, .. } => {
 							log::error!(
 								"proposal approval error: dao_id: {:?}, proposal_hash: {:?}",
-								data.0,
-								data.4
+								dao_id,
+								hash
+							);
+						},
+						OffchainData::ApproveTreasuryProposal { dao_id, hash, .. } => {
+							log::error!(
+								"treasury proposal approval error: dao_id: {:?}, proposal_hash: {:?}",
+								dao_id,
+								hash
 							);
 						},
 						_ => {},
@@ -565,7 +593,7 @@ pub mod pallet {
 					let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
 					let data: IndexingData<T::AccountId, T::Hash> = IndexingData(
 						b"approve_dao".to_vec(),
-						OffchainData::ApproveDao((dao_hash, token_address)),
+						OffchainData::ApproveDao { dao_hash, token_address },
 					);
 
 					offchain_index::set(&key, &data.encode());
@@ -862,7 +890,12 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 
 			let data: IndexingData<T::AccountId, T::Hash> = IndexingData(
 				b"approve_treasury_propose".to_vec(),
-				OffchainData::ApproveTreasuryProposal((id, token_address, who.clone(), hash)),
+				OffchainData::ApproveTreasuryProposal {
+					dao_id: id,
+					token_address,
+					who: who.clone(),
+					hash,
+				},
 			);
 
 			offchain_index::set(&key, &data.encode());
@@ -885,14 +918,14 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 
 			let data: IndexingData<T::AccountId, T::Hash> = IndexingData(
 				b"approve_council_propose".to_vec(),
-				OffchainData::ApproveProposal((
-					id,
+				OffchainData::ApproveProposal {
+					dao_id: id,
 					token_address,
-					who.clone(),
+					who: who.clone(),
 					threshold,
 					hash,
 					length_bound,
-				)),
+				},
 			);
 
 			offchain_index::set(&key, &data.encode());
