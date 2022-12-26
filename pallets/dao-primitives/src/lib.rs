@@ -141,6 +141,14 @@ pub struct PendingProposal<AccountId> {
 	pub length_bound: u32,
 }
 
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+pub struct PendingVote<AccountId, Hash> {
+	pub who: AccountId,
+	pub proposal_hash: Hash,
+	pub proposal_index: u32,
+	pub vote: bool,
+}
+
 #[derive(
 	Encode,
 	Decode,
@@ -192,6 +200,11 @@ pub trait DaoProvider<Hash> {
 		hash: Hash,
 		length_bound: u32,
 	) -> Result<AccountTokenBalance, DispatchError>;
+	fn ensure_voting_allowed(
+		id: Self::Id,
+		who: &Self::AccountId,
+		hash: Hash,
+	) -> Result<AccountTokenBalance, DispatchError>;
 	fn ensure_token_balance(
 		id: Self::Id,
 		who: &Self::AccountId,
@@ -208,6 +221,10 @@ pub trait ContainsDaoMember<DaoId, AccountId> {
 
 pub trait ApprovePropose<DaoId, AccountId, Hash> {
 	fn approve_propose(dao_id: DaoId, hash: Hash, approve: bool) -> Result<(), DispatchError>;
+}
+
+pub trait ApproveVote<DaoId, AccountId, Hash> {
+	fn approve_vote(dao_id: DaoId, hash: Hash, approve: bool) -> Result<(), DispatchError>;
 }
 
 pub trait ApproveTreasuryPropose<DaoId, AccountId, Hash> {
