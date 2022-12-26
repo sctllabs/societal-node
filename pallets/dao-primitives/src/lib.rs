@@ -127,6 +127,13 @@ pub struct Dao<AccountId, TokenId, BoundedString, BoundedMetadata> {
 	pub config: DaoConfig<BoundedString, BoundedMetadata>,
 }
 
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+pub struct PendingDao<AccountId, TokenId, BoundedString, BoundedMetadata, BoundedCouncilMembers> {
+	pub dao: Dao<AccountId, TokenId, BoundedString, BoundedMetadata>,
+	pub policy: DaoPolicy,
+	pub council: BoundedCouncilMembers,
+}
+
 #[derive(
 	Encode,
 	Decode,
@@ -186,6 +193,10 @@ pub trait InitializeDaoMembers<DaoId, AccountId> {
 
 pub trait ContainsDaoMember<DaoId, AccountId> {
 	fn contains(dao_id: DaoId, who: &AccountId) -> Result<bool, DispatchError>;
+}
+
+pub trait MaybeApproveDao<Hash> {
+	fn approve_dao(dao_hash: Hash, approve: bool) -> Result<(), DispatchError>;
 }
 
 pub trait ApprovePropose<DaoId, AccountId, Hash> {

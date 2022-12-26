@@ -1212,10 +1212,6 @@ impl<T: Config<I>, I: 'static> ApprovePropose<DaoId, T::AccountId, T::Hash> for 
 		hash: T::Hash,
 		length_bound: u32,
 	) -> Result<(), DispatchError> {
-		log::info!("we are finally here at dao collective: {:?}", who);
-		log::info!("dao id: {:?}", dao_id);
-		log::info!("hash: {:?}", hash);
-
 		let proposal = <PendingProposalOf<T, I>>::get(dao_id, hash).expect("Proposal not found");
 
 		Self::do_propose_proposed(who, dao_id, threshold, Box::new(proposal), length_bound)?;

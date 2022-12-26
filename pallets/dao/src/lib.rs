@@ -46,6 +46,14 @@ type DaoOf<T> = Dao<
 >;
 type PolicyOf = DaoPolicy;
 
+type PendingDaoOf<T> = PendingDao<
+	<T as frame_system::Config>::AccountId,
+	<T as Config>::AssetId,
+	BoundedVec<u8, <T as Config>::DaoStringLimit>,
+	BoundedVec<u8, <T as Config>::DaoStringLimit>,
+	BoundedVec<<T as frame_system::Config>::AccountId, <T as Config>::DaoMaxCouncilMembers>,
+>;
+
 type AssetId<T> = <T as Config>::AssetId;
 type Balance<T> = <T as Config>::Balance;
 
@@ -122,9 +130,12 @@ pub mod pallet {
 		pallet_prelude::*,
 	};
 	use serde_json::json;
-	use sp_runtime::offchain::{
-		storage::StorageValueRef,
-		storage_lock::{BlockAndTime, StorageLock},
+	use sp_runtime::{
+		offchain::{
+			storage::StorageValueRef,
+			storage_lock::{BlockAndTime, StorageLock},
+		},
+		traits::Hash,
 	};
 
 	/// The current storage version.
@@ -172,6 +183,9 @@ pub mod pallet {
 		type DaoMetadataLimit: Get<u32>;
 
 		#[pallet::constant]
+		type DaoMaxCouncilMembers: Get<u32>;
+
+		#[pallet::constant]
 		type DaoTokenMinBalanceLimit: Get<u128>;
 
 		#[pallet::constant]
@@ -212,8 +226,6 @@ pub mod pallet {
 
 		/// The identifier type for an offchain worker.
 		type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
-
-		// type ConvertIntoAccountId: Convert<sp_core::sr25519::Public, Self::AccountId>;
 	}
 
 	#[pallet::storage]
@@ -223,6 +235,11 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn daos)]
 	pub(super) type Daos<T: Config> = StorageMap<_, Blake2_128Concat, u32, DaoOf<T>, OptionQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn pending_daos)]
+	pub(super) type PendingDaos<T: Config> =
+		StorageMap<_, Blake2_128Concat, T::Hash, PendingDaoOf<T>, OptionQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn policies)]
@@ -346,7 +363,7 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		DaoRegistered(u32, T::AccountId),
-		DaoApproved(u32),
+		DaoPendingApproval(u32, T::AccountId),
 	}
 
 	#[pallet::error]
@@ -356,6 +373,7 @@ pub mod pallet {
 		NameTooLong,
 		PurposeTooLong,
 		MetadataTooLong,
+		CouncilMembersOverflow,
 		TokenNotProvided,
 		TokenAlreadyExists,
 		TokenNotExists,
@@ -382,20 +400,22 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin.clone())?;
 
-			let dao = serde_json::from_slice::<DaoPayload>(&data)
+			let dao_payload = serde_json::from_slice::<DaoPayload>(&data)
 				.map_err(|_| Error::<T>::InvalidInput)?;
 
 			let dao_id = <NextDaoId<T>>::get();
 			let dao_account_id = Self::account_id(dao_id);
 
-			let dao_name = BoundedVec::<u8, T::DaoStringLimit>::try_from(dao.name.clone())
+			let dao_name = BoundedVec::<u8, T::DaoStringLimit>::try_from(dao_payload.name.clone())
 				.map_err(|_| Error::<T>::NameTooLong)?;
 
-			let dao_purpose = BoundedVec::<u8, T::DaoStringLimit>::try_from(dao.purpose.clone())
-				.map_err(|_| Error::<T>::PurposeTooLong)?;
+			let dao_purpose =
+				BoundedVec::<u8, T::DaoStringLimit>::try_from(dao_payload.purpose.clone())
+					.map_err(|_| Error::<T>::PurposeTooLong)?;
 
-			let dao_metadata = BoundedVec::<u8, T::DaoStringLimit>::try_from(dao.metadata.clone())
-				.map_err(|_| Error::<T>::MetadataTooLong)?;
+			let dao_metadata =
+				BoundedVec::<u8, T::DaoStringLimit>::try_from(dao_payload.metadata.clone())
+					.map_err(|_| Error::<T>::MetadataTooLong)?;
 
 			let min = <T as Config>::Currency::minimum_balance();
 			let _ = <T as Config>::Currency::make_free_balance_be(&dao_account_id, min);
@@ -411,11 +431,31 @@ pub mod pallet {
 				council_members.push(account);
 			}
 
+			let mut dao = Dao {
+				founder: who.clone(),
+				account_id: dao_account_id.clone(),
+				token_id: None,
+				token_address: None,
+				status: DaoStatus::Pending,
+				config: DaoConfig { name: dao_name, purpose: dao_purpose, metadata: dao_metadata },
+			};
+
+			// TODO
+			let policy = DaoPolicy {
+				proposal_bond: dao_payload.policy.proposal_bond,
+				proposal_bond_min: dao_payload.policy.proposal_bond_min,
+				proposal_bond_max: None,
+				proposal_period: dao_payload.policy.proposal_period /
+					T::ExpectedBlockTime::get() as BlockNumber,
+				approve_origin: dao_payload.policy.approve_origin,
+				reject_origin: dao_payload.policy.reject_origin,
+				token_voting_min_threshold: T::DaoTokenVotingMinThreshold::get(),
+			};
+
 			let mut has_token_id: Option<AssetId<T>> = None;
 			let mut has_token_address: Option<BoundedVec<u8, <T as Config>::DaoStringLimit>> = None;
-			let mut dao_status: DaoStatus = DaoStatus::Pending;
 
-			if let Some(token) = dao.token {
+			if let Some(token) = dao_payload.token {
 				let token_id = Self::u32_to_asset_id(token.token_id);
 				has_token_id = Some(token_id);
 
@@ -466,11 +506,11 @@ pub mod pallet {
 					}
 				}
 
-				dao_status = DaoStatus::Success;
+				dao.status = DaoStatus::Success;
 			}
 
 			if has_token_id.is_none() {
-				if let Some(id) = dao.token_id {
+				if let Some(id) = dao_payload.token_id {
 					let token_id = Self::u32_to_asset_id(id);
 					has_token_id = Some(token_id);
 
@@ -481,8 +521,8 @@ pub mod pallet {
 						return Err(Error::<T>::TokenNotExists.into())
 					}
 
-					dao_status = DaoStatus::Success;
-				} else if let Some(token_address) = dao.token_address {
+					dao.status = DaoStatus::Success;
+				} else if let Some(token_address) = dao_payload.token_address {
 					let address =
 						BoundedVec::<u8, T::DaoStringLimit>::try_from(token_address.clone())
 							.map_err(|_| Error::<T>::TokenAddressInvalid)?;
@@ -495,6 +535,22 @@ pub mod pallet {
 					);
 
 					offchain_index::set(&key, &data.encode());
+
+					dao.token_address = has_token_address;
+
+					let council = BoundedVec::<T::AccountId, T::DaoMaxCouncilMembers>::try_from(
+						council_members.clone(),
+					)
+					.map_err(|_| Error::<T>::CouncilMembersOverflow)?;
+
+					PendingDaos::<T>::insert(
+						T::Hashing::hash_of(&dao),
+						PendingDao { dao: dao.clone(), policy, council },
+					);
+
+					Self::deposit_event(Event::DaoPendingApproval(dao_id, who));
+
+					return Ok(())
 				}
 			}
 
@@ -502,36 +558,7 @@ pub mod pallet {
 				return Err(Error::<T>::TokenNotProvided.into())
 			}
 
-			// TODO
-			let policy = DaoPolicy {
-				proposal_bond: dao.policy.proposal_bond,
-				proposal_bond_min: dao.policy.proposal_bond_min,
-				proposal_bond_max: None,
-				proposal_period: dao.policy.proposal_period /
-					T::ExpectedBlockTime::get() as BlockNumber,
-				approve_origin: dao.policy.approve_origin,
-				reject_origin: dao.policy.reject_origin,
-				token_voting_min_threshold: T::DaoTokenVotingMinThreshold::get(),
-			};
-			Policies::<T>::insert(dao_id, policy);
-
-			let dao = Dao {
-				founder: who.clone(),
-				account_id: dao_account_id,
-				token_id: has_token_id,
-				token_address: has_token_address,
-				status: dao_status,
-				config: DaoConfig { name: dao_name, purpose: dao_purpose, metadata: dao_metadata },
-			};
-			Daos::<T>::insert(dao_id, dao);
-
-			T::CouncilProvider::initialize_members(dao_id, council_members)?;
-
-			<NextDaoId<T>>::put(dao_id.checked_add(1).unwrap());
-
-			Self::deposit_event(Event::DaoRegistered(dao_id, who));
-
-			Ok(())
+			Self::do_register_dao(dao, policy, council_members)
 		}
 
 		#[pallet::weight(10_000)]
@@ -547,9 +574,11 @@ pub mod pallet {
 			let mut dao = dao_option.unwrap();
 			dao.status = DaoStatus::Success;
 
+			let founder = dao.clone().founder;
+
 			Daos::<T>::insert(dao_id, dao);
 
-			Self::deposit_event(Event::DaoApproved(dao_id));
+			Self::deposit_event(Event::DaoRegistered(dao_id, founder));
 
 			Ok(())
 		}
@@ -586,6 +615,30 @@ pub mod pallet {
 
 		fn u128_to_balance_of(cost: u128) -> BalanceOf<T> {
 			TryInto::<BalanceOf<T>>::try_into(cost).ok().unwrap()
+		}
+
+		pub fn do_register_dao(
+			mut dao: DaoOf<T>,
+			policy: PolicyOf,
+			council: Vec<T::AccountId>,
+		) -> DispatchResult {
+			let dao_id = <NextDaoId<T>>::get();
+
+			dao.account_id = Self::account_id(dao_id);
+
+			let founder = dao.clone().founder;
+
+			Policies::<T>::insert(dao_id, policy);
+
+			Daos::<T>::insert(dao_id, dao);
+
+			T::CouncilProvider::initialize_members(dao_id, council)?;
+
+			<NextDaoId<T>>::put(dao_id.checked_add(1).unwrap());
+
+			Self::deposit_event(Event::DaoRegistered(dao_id, founder));
+
+			Ok(())
 		}
 
 		#[deny(clippy::clone_double_ref)]
@@ -637,7 +690,6 @@ pub mod pallet {
 
 		fn fetch_from_eth(token_address: Vec<u8>, data: &str) -> Result<EthRPCResponse, Error<T>> {
 			let key_suffix = &token_address[..];
-			let some = data.as_bytes();
 			let key =
 				[&b"societal-dao::eth::"[..19], key_suffix, &b"::"[..2], data.as_bytes()].concat();
 			let s_info = StorageValueRef::persistent(&key[..]);
@@ -841,5 +893,20 @@ impl<T: Config> BlockNumberProvider for Pallet<T> {
 	type BlockNumber = T::BlockNumber;
 	fn current_block_number() -> Self::BlockNumber {
 		<frame_system::Pallet<T>>::block_number()
+	}
+}
+
+impl<T: Config> MaybeApproveDao<T::Hash> for Pallet<T> {
+	fn approve_dao(dao_hash: T::Hash, approve: bool) -> Result<(), DispatchError> {
+		let PendingDao { dao, policy, council } = match <PendingDaos<T>>::take(dao_hash) {
+			None => return Err(Error::<T>::DaoNotExist.into()),
+			Some(dao) => dao,
+		};
+
+		if approve {
+			return Self::do_register_dao(dao, policy, council.to_vec())
+		}
+
+		Ok(())
 	}
 }

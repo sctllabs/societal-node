@@ -1470,6 +1470,7 @@ parameter_types! {
 	pub const DaoPalletId: PalletId = PalletId(*b"py/sctld");
 	pub const DaoStringLimit: u32 = 50;
 	pub const DaoMetadataLimit: u32 = 500;
+	pub const DaoMaxCouncilMembers: u32 = 100; // TODO
 	pub const DaoTokenMinBalanceLimit: u128 = 1_000;
 	pub const DaoTokenBalanceLimit: u128 = 1_000_000_000;
 	pub const DaoTokenVotingMinThreshold: u128 = 1_000;
@@ -1481,6 +1482,7 @@ impl pallet_dao::Config for Runtime {
 	type PalletId = DaoPalletId;
 	type DaoStringLimit = DaoStringLimit;
 	type DaoMetadataLimit = DaoMetadataLimit;
+	type DaoMaxCouncilMembers = DaoMaxCouncilMembers;
 	type DaoTokenMinBalanceLimit = DaoTokenMinBalanceLimit;
 	type DaoTokenBalanceLimit = DaoTokenBalanceLimit;
 	type DaoTokenVotingMinThreshold = DaoTokenVotingMinThreshold;
