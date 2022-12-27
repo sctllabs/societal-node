@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-// `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
-#![recursion_limit = "256"]
+// `construct_runtime!` does a lot of recursion and requires us to increase the limit to 384.
+#![recursion_limit = "384"]
 
 // Make the WASM binary available.
 #[cfg(feature = "std")]
@@ -587,6 +587,18 @@ impl pallet_dao_collective::Config<DaoCouncilCollective> for Runtime {
 	type DaoProvider = Dao;
 }
 
+type DaoTechnicalCommitteeCollective = pallet_dao_collective::Instance2;
+impl pallet_dao_collective::Config<DaoTechnicalCommitteeCollective> for Runtime {
+	type RuntimeOrigin = RuntimeOrigin;
+	type Proposal = RuntimeCall;
+	type RuntimeEvent = RuntimeEvent;
+	type MaxProposals = TechnicalMaxProposals;
+	type MaxMembers = TechnicalMaxMembers;
+	type DefaultVote = pallet_dao_collective::MoreThanMajorityVote;
+	type WeightInfo = pallet_dao_collective::weights::SubstrateWeight<Runtime>;
+	type DaoProvider = Dao;
+}
+
 parameter_types! {
 	pub const ImOnlineUnsignedPriority: TransactionPriority = TransactionPriority::max_value();
 	/// We prioritize im-online heartbeats over election solution submission.
@@ -883,6 +895,24 @@ impl pallet_dao_membership::Config<DaoCouncilMembership> for Runtime {
 		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
 	type MembershipInitialized = DaoCouncil;
 	type MembershipChanged = DaoCouncil;
+	type MaxMembers = TechnicalMaxMembers;
+	type WeightInfo = pallet_dao_membership::weights::SubstrateWeight<Runtime>;
+
+	type DaoProvider = Dao;
+}
+
+// TODO - Update settings
+type DaoTechnicalCommitteeMembership = pallet_dao_membership::Instance2;
+impl pallet_dao_membership::Config<DaoTechnicalCommitteeMembership> for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+
+	// TODO: dynamic properties - move to dao-primitives for generic types
+	type ApproveOrigin = pallet_dao_collective::EnsureProportionAtLeastWithArg<
+		AccountId,
+		DaoTechnicalCommitteeCollective,
+	>;
+	type MembershipInitialized = DaoTechnicalCommittee;
+	type MembershipChanged = DaoTechnicalCommittee;
 	type MaxMembers = TechnicalMaxMembers;
 	type WeightInfo = pallet_dao_membership::weights::SubstrateWeight<Runtime>;
 
@@ -1471,6 +1501,7 @@ parameter_types! {
 	pub const DaoStringLimit: u32 = 50;
 	pub const DaoMetadataLimit: u32 = 500;
 	pub const DaoMaxCouncilMembers: u32 = 100; // TODO
+	pub const DaoMaxTechnicalCommitteeMembers: u32 = 100; // TODO
 	pub const DaoTokenMinBalanceLimit: u128 = 1_000;
 	pub const DaoTokenBalanceLimit: u128 = 1_000_000_000;
 	pub const DaoTokenVotingMinThreshold: u128 = 1_000;
@@ -1483,14 +1514,17 @@ impl pallet_dao::Config for Runtime {
 	type DaoStringLimit = DaoStringLimit;
 	type DaoMetadataLimit = DaoMetadataLimit;
 	type DaoMaxCouncilMembers = DaoMaxCouncilMembers;
+	type DaoMaxTechnicalCommitteeMembers = DaoMaxTechnicalCommitteeMembers;
 	type DaoTokenMinBalanceLimit = DaoTokenMinBalanceLimit;
 	type DaoTokenBalanceLimit = DaoTokenBalanceLimit;
 	type DaoTokenVotingMinThreshold = DaoTokenVotingMinThreshold;
 	type AssetId = u32;
 	type Balance = Balance;
 	type ExpectedBlockTime = ExpectedBlockTime;
-	type CouncilProvider = DaoCouncilMemberships;
+	type CouncilProvider = DaoCouncilMembers;
 	type CouncilApproveProvider = DaoCouncil;
+	type TechnicalCommitteeProvider = DaoTechnicalCommitteeMembers;
+	type TechnicalCommitteeApproveProvider = DaoTechnicalCommittee;
 	type ApproveTreasuryPropose = DaoTreasury;
 	type AssetProvider = Assets;
 	type AuthorityId = pallet_dao::crypto::TestAuthId;
@@ -1599,7 +1633,9 @@ construct_runtime!(
 		BaseFee: pallet_base_fee,
 		HotfixSufficients: pallet_hotfix_sufficients,
 		DaoCouncil: pallet_dao_collective::<Instance1>,
-		DaoCouncilMemberships: pallet_dao_membership::<Instance1>, //TODO: rename
+		DaoTechnicalCommittee: pallet_dao_collective::<Instance2>,
+		DaoCouncilMembers: pallet_dao_membership::<Instance1>,
+		DaoTechnicalCommitteeMembers: pallet_dao_membership::<Instance2>,
 		Preimage: pallet_preimage,
 	}
 );
