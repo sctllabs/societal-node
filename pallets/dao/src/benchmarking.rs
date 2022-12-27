@@ -14,9 +14,15 @@ const SEED: u32 = 0;
 // Create the pre-requisite information needed to create a dao.
 fn setup_dao<T: Config>(
 	u: u32,
-) -> (T::AccountId, Vec<<T::Lookup as StaticLookup>::Source>, Vec<u8>) {
+) -> (
+	T::AccountId,
+	Vec<<T::Lookup as StaticLookup>::Source>,
+	Vec<<T::Lookup as StaticLookup>::Source>,
+	Vec<u8>,
+) {
 	let caller = account("caller", u, SEED);
 	let council_account = account("account", u, SEED);
+	let technical_committee_account = account("account", u, SEED);
 	let value: BalanceOf<T> = 100u32.into();
 	let _ = T::Currency::make_free_balance_be(&caller, value);
 
@@ -48,13 +54,18 @@ fn setup_dao<T: Config>(
 		}
 	});
 
-	(caller, vec![council_account], serde_json::to_vec(&dao_json).ok().unwrap())
+	(
+		caller,
+		vec![council_account],
+		vec![technical_committee_account],
+		serde_json::to_vec(&dao_json).ok().unwrap(),
+	)
 }
 
 benchmarks! {
 	create_dao {
-		let (caller, council, data) = setup_dao::<T>(0);
-	}: _(RawOrigin::Signed(caller), council, data)
+		let (caller, council, technical_committee, data) = setup_dao::<T>(0);
+	}: _(RawOrigin::Signed(caller), council, technical_committee, data)
 	verify {
 		assert_eq!(NextDaoId::<T>::get(), 1);
 	}

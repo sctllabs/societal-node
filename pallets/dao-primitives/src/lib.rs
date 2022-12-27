@@ -128,10 +128,18 @@ pub struct Dao<AccountId, TokenId, BoundedString, BoundedMetadata> {
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
-pub struct PendingDao<AccountId, TokenId, BoundedString, BoundedMetadata, BoundedCouncilMembers> {
+pub struct PendingDao<
+	AccountId,
+	TokenId,
+	BoundedString,
+	BoundedMetadata,
+	BoundedCouncilMembers,
+	BoundedTechnicalCommittee,
+> {
 	pub dao: Dao<AccountId, TokenId, BoundedString, BoundedMetadata>,
 	pub policy: DaoPolicy,
 	pub council: BoundedCouncilMembers,
+	pub technical_committee: BoundedTechnicalCommittee,
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
