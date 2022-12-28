@@ -1,5 +1,7 @@
 use crate as pallet_dao;
-use dao_primitives::InitializeDaoMembers;
+use dao_primitives::{
+	ApprovePropose, ApproveTreasuryPropose, ApproveVote, ContainsDaoMember, InitializeDaoMembers,
+};
 use frame_support::{
 	dispatch::{DispatchError, DispatchResult},
 	parameter_types,
@@ -16,14 +18,19 @@ use frame_support::{
 	PalletId,
 };
 use frame_system as system;
-use sp_core::H256;
+use sp_core::{ConstU128, H256};
 use sp_runtime::{
 	testing::Header,
-	traits::{BlakeTwo256, IdentityLookup},
+	traits::{BlakeTwo256, IdentityLookup, Extrinsic as ExtrinsicT},
 };
 
+use frame_support::traits::fungibles::Transfer;
 use serde_json::{json, Value};
+use sp_core::sr25519::Signature;
+use sp_runtime::{testing::TestXt, traits::Verify};
 use std::collections::HashMap;
+use sp_runtime::traits::IdentifyAccount;
+use crate::crypto;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -41,21 +48,68 @@ frame_support::construct_runtime!(
 	}
 );
 
+// impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Test
+// where
+// 	RuntimeCall: From<LocalCall>,
+// {
+// 	fn create_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
+// 		call: RuntimeCall,
+// 		_public: <Signature as Verify>::Signer,
+// 		_account: u64,
+// 		nonce: u64,
+// 	) -> Option<(
+// 		RuntimeCall,
+// 		<UncheckedExtrinsic as sp_runtime::traits::Extrinsic>::SignaturePayload,
+// 	)> {
+// 		Some((call, (nonce, ())))
+// 	}
+// }
+
+impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Test
+	where
+		RuntimeCall: From<LocalCall>,
+{
+	fn create_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
+		call: RuntimeCall,
+		_public: <Signature as Verify>::Signer,
+		_account: u64,
+		nonce: u64,
+	) -> Option<(RuntimeCall, <Extrinsic as ExtrinsicT>::SignaturePayload)> {
+		Some((call, (nonce, ())))
+	}
+}
+
+impl frame_system::offchain::SigningTypes for Test {
+	type Public = <Signature as Verify>::Signer;
+	type Signature = Signature;
+}
+
+type Extrinsic = TestXt<RuntimeCall, ()>;
+
+impl<C> frame_system::offchain::SendTransactionTypes<C> for Test
+where
+	RuntimeCall: From<C>,
+{
+	type OverarchingCall = RuntimeCall;
+	type Extrinsic = Extrinsic;
+}
+
 impl frame_system::Config for Test {
 	type BaseCallFilter = frame_support::traits::Everything;
 	type BlockWeights = ();
 	type BlockLength = ();
 	type DbWeight = ();
-	type Origin = Origin;
-	type Call = Call;
+	type RuntimeOrigin = RuntimeOrigin;
+	type RuntimeCall = RuntimeCall;
 	type Index = u64;
 	type BlockNumber = u64;
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
-	type AccountId = u64;
+	// type AccountId = u64;
+	type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
-	type Event = Event;
+	type RuntimeEvent = RuntimeEvent;
 	type BlockHashCount = ConstU64<250>;
 	type Version = ();
 	type PalletInfo = PalletInfo;
@@ -73,7 +127,7 @@ impl pallet_balances::Config for Test {
 	type MaxReserves = ();
 	type ReserveIdentifier = [u8; 8];
 	type Balance = u64;
-	type Event = Event;
+	type RuntimeEvent = RuntimeEvent;
 	type DustRemoval = ();
 	type ExistentialDeposit = ConstU64<1>;
 	type AccountStore = System;
@@ -103,6 +157,24 @@ impl InitializeDaoMembers<u32, u64> for TestCouncilProvider {
 
 		Members::set(members);
 
+		Ok(())
+	}
+}
+
+impl ContainsDaoMember<u32, u64> for TestCouncilProvider {
+	fn contains(dao_id: u32, who: &u64) -> Result<bool, DispatchError> {
+		Ok(true)
+	}
+}
+
+impl ApproveVote<u32, u64, H256> for TestCouncilProvider {
+	fn approve_vote(dao_id: u32, hash: H256, approve: bool) -> Result<(), DispatchError> {
+		Ok(())
+	}
+}
+
+impl ApprovePropose<u32, u64, H256> for TestCouncilProvider {
+	fn approve_propose(dao_id: u32, hash: H256, approve: bool) -> Result<(), DispatchError> {
 		Ok(())
 	}
 }
@@ -212,8 +284,31 @@ impl MetadataMutate<u64> for TestAssetProvider {
 	}
 }
 
+impl Transfer<u64> for TestAssetProvider {
+	fn transfer(
+		asset: u32,
+		source: &u64,
+		dest: &u64,
+		amount: u128,
+		keep_alive: bool,
+	) -> Result<Self::Balance, DispatchError> {
+		Ok(amount)
+	}
+}
+
+pub struct TestTreasuryProvider;
+impl ApproveTreasuryPropose<u32, u64, H256> for TestTreasuryProvider {
+	fn approve_treasury_propose(
+		dao_id: u32,
+		hash: H256,
+		approve: bool,
+	) -> Result<(), DispatchError> {
+		Ok(())
+	}
+}
+
 impl pallet_dao::Config for Test {
-	type Event = Event;
+	type RuntimeEvent = RuntimeEvent;
 	type PalletId = DaoPalletId;
 	type Currency = pallet_balances::Pallet<Test>;
 	type DaoStringLimit = ConstU32<20>;
@@ -223,6 +318,13 @@ impl pallet_dao::Config for Test {
 	type Balance = u128;
 	type CouncilProvider = TestCouncilProvider;
 	type AssetProvider = TestAssetProvider;
+	type DaoTokenMinBalanceLimit = ConstU128<200>;
+	type DaoTokenBalanceLimit = ConstU128<20>;
+	type DaoTokenVotingMinThreshold = ConstU128<20>;
+	type CouncilApproveProvider = TestCouncilProvider;
+	type AuthorityId = crypto::TestAuthId;
+	type DaoMaxCouncilMembers = ConstU32<20>;
+	type ApproveTreasuryPropose = TestTreasuryProvider;
 }
 
 // Build genesis storage according to the mock runtime.

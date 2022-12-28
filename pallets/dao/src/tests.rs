@@ -1,4 +1,5 @@
 use crate::{mock::*, BoundedVec, Config, Dao, DaoConfig, DaoPolicy, Error};
+use dao_primitives::DaoStatus;
 use frame_support::{
 	assert_noop, assert_ok,
 	traits::tokens::fungibles::{metadata::Inspect as MetadataInspect, Inspect},
@@ -10,7 +11,7 @@ fn create_dao_invalid_input() {
 	new_test_ext().execute_with(|| {
 		assert_noop!(
 			DaoFactory::create_dao(
-				Origin::signed(1),
+				RuntimeOrigin::signed(1),
 				vec![1, 2],
 				r"invalid input".as_bytes().to_vec()
 			),
@@ -27,7 +28,7 @@ fn create_dao_fails_on_string_limits() {
 		dao_json["name"] = Value::String("very long name above the limits".to_string());
 		assert_noop!(
 			DaoFactory::create_dao(
-				Origin::signed(1),
+				RuntimeOrigin::signed(1),
 				vec![1, 2],
 				serde_json::to_vec(&dao_json).ok().unwrap()
 			),
@@ -38,7 +39,7 @@ fn create_dao_fails_on_string_limits() {
 		dao_json["purpose"] = Value::String("very long purpose above the limits".to_string());
 		assert_noop!(
 			DaoFactory::create_dao(
-				Origin::signed(1),
+				RuntimeOrigin::signed(1),
 				vec![1, 2],
 				serde_json::to_vec(&dao_json).ok().unwrap()
 			),
@@ -49,7 +50,7 @@ fn create_dao_fails_on_string_limits() {
 		dao_json["metadata"] = Value::String("very long metadata above the limits".to_string());
 		assert_noop!(
 			DaoFactory::create_dao(
-				Origin::signed(1),
+				RuntimeOrigin::signed(1),
 				vec![1, 2],
 				serde_json::to_vec(&dao_json).ok().unwrap()
 			),
@@ -67,7 +68,7 @@ fn create_dao_token_failure() {
 		dao_json["token_id"] = Value::Null;
 		assert_noop!(
 			DaoFactory::create_dao(
-				Origin::signed(1),
+				RuntimeOrigin::signed(1),
 				vec![1, 2],
 				serde_json::to_vec(&dao_json).ok().unwrap()
 			),
@@ -79,7 +80,7 @@ fn create_dao_token_failure() {
 		dao_json["token_id"] = json!(1);
 		assert_noop!(
 			DaoFactory::create_dao(
-				Origin::signed(1),
+				RuntimeOrigin::signed(1),
 				vec![1, 2],
 				serde_json::to_vec(&dao_json).ok().unwrap()
 			),
@@ -90,7 +91,7 @@ fn create_dao_token_failure() {
 		dao_json["token"]["token_id"] = json!(2);
 		assert_noop!(
 			DaoFactory::create_dao(
-				Origin::signed(1),
+				RuntimeOrigin::signed(1),
 				vec![1, 2],
 				serde_json::to_vec(&dao_json).ok().unwrap()
 			),
@@ -104,7 +105,7 @@ fn create_dao_works() {
 	new_test_ext().execute_with(|| {
 		let dao = serde_json::to_vec(&get_dao_json()).ok().unwrap();
 
-		assert_ok!(DaoFactory::create_dao(Origin::signed(1), vec![1, 2], dao));
+		assert_ok!(DaoFactory::create_dao(RuntimeOrigin::signed(1), vec![1, 2], dao));
 
 		assert_eq!(DaoFactory::next_dao_id(), 1);
 
@@ -129,7 +130,7 @@ fn create_dao_works() {
 			DaoFactory::daos(0).unwrap(),
 			Dao {
 				founder: 1,
-				token_id: 0,
+				token_id: Some(0),
 				account_id: 8299986162028932973,
 				config: DaoConfig {
 					name: BoundedVec::<u8, <Test as Config>::DaoStringLimit>::try_from(
@@ -144,7 +145,9 @@ fn create_dao_works() {
 						DaoMetadata::get().as_bytes().to_vec()
 					)
 					.unwrap(),
-				}
+				},
+				status: DaoStatus::Success,
+				token_address: None
 			}
 		);
 
@@ -157,7 +160,8 @@ fn create_dao_works() {
 				proposal_bond_max: None,
 				proposal_period: 100,
 				approve_origin: (1, 2),
-				reject_origin: (1, 2)
+				reject_origin: (1, 2),
+				token_voting_min_threshold: 1
 			}
 		);
 	});
