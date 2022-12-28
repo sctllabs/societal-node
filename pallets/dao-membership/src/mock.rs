@@ -9,9 +9,11 @@ use sp_runtime::{
 	traits::{AccountIdConversion, BlakeTwo256, IdentityLookup},
 };
 
+use dao_primitives::AccountTokenBalance;
 use frame_support::{
 	ord_parameter_types, parameter_types,
 	traits::{AsEnsureOriginWithArg, ConstU32, ConstU64},
+	weights::Weight,
 	PalletId,
 };
 use frame_system::EnsureSignedBy;
@@ -32,7 +34,7 @@ frame_support::construct_runtime!(
 
 parameter_types! {
 	pub BlockWeights: frame_system::limits::BlockWeights =
-		frame_system::limits::BlockWeights::simple_max(1024);
+		frame_system::limits::BlockWeights::simple_max(Weight::from_ref_time(1024));
 	pub static Members: HashMap<u32, Vec<u64>> = HashMap::new();
 }
 
@@ -41,16 +43,16 @@ impl frame_system::Config for Test {
 	type BlockWeights = ();
 	type BlockLength = ();
 	type DbWeight = ();
-	type Origin = Origin;
+	type RuntimeOrigin = RuntimeOrigin;
 	type Index = u64;
 	type BlockNumber = u64;
 	type Hash = H256;
-	type Call = Call;
+	type RuntimeCall = RuntimeCall;
 	type Hashing = BlakeTwo256;
 	type AccountId = u64;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
-	type Event = Event;
+	type RuntimeEvent = RuntimeEvent;
 	type BlockHashCount = ConstU64<250>;
 	type Version = ();
 	type PalletInfo = PalletInfo;
@@ -100,9 +102,10 @@ impl InitializeDaoMembers<u32, u64> for TestChangeMembers {
 }
 
 pub struct TestDaoProvider;
-impl DaoProvider for TestDaoProvider {
+impl DaoProvider<H256> for TestDaoProvider {
 	type Id = u32;
 	type AccountId = u64;
+	type AssetId = u32;
 	type Policy = DaoPolicy;
 
 	fn exists(_id: Self::Id) -> Result<(), DispatchError> {
@@ -121,16 +124,54 @@ impl DaoProvider for TestDaoProvider {
 			proposal_period: 100,
 			approve_origin: (3, 5),
 			reject_origin: (1, 2),
+			token_voting_min_threshold: 0,
 		})
 	}
 
 	fn dao_account_id(id: Self::Id) -> Self::AccountId {
 		PalletId(*b"py/sctld").into_sub_account_truncating(id)
 	}
+
+	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError> {
+		Ok(true)
+	}
+
+	fn ensure_treasury_proposal_allowed(
+		id: Self::Id,
+		who: &Self::AccountId,
+		hash: H256,
+	) -> Result<AccountTokenBalance, DispatchError> {
+		Ok(AccountTokenBalance::Sufficient)
+	}
+
+	fn ensure_proposal_allowed(
+		id: Self::Id,
+		who: &Self::AccountId,
+		threshold: u32,
+		hash: H256,
+		length_bound: u32,
+	) -> Result<AccountTokenBalance, DispatchError> {
+		Ok(AccountTokenBalance::Sufficient)
+	}
+
+	fn ensure_voting_allowed(
+		id: Self::Id,
+		who: &Self::AccountId,
+		hash: H256,
+	) -> Result<AccountTokenBalance, DispatchError> {
+		Ok(AccountTokenBalance::Sufficient)
+	}
+
+	fn ensure_token_balance(
+		id: Self::Id,
+		who: &Self::AccountId,
+	) -> Result<AccountTokenBalance, DispatchError> {
+		Ok(AccountTokenBalance::Sufficient)
+	}
 }
 
 impl Config for Test {
-	type Event = Event;
+	type RuntimeEvent = RuntimeEvent;
 	type ApproveOrigin = AsEnsureOriginWithArg<EnsureSignedBy<One, u64>>;
 	type MembershipInitialized = TestChangeMembers;
 	type MembershipChanged = TestChangeMembers;
