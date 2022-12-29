@@ -597,6 +597,7 @@ pub mod pallet {
 					}
 				}
 
+				dao.token_id = has_token_id;
 				dao.status = DaoStatus::Success;
 			}
 
@@ -612,6 +613,7 @@ pub mod pallet {
 						return Err(Error::<T>::TokenNotExists.into())
 					}
 
+					dao.token_id = has_token_id;
 					dao.status = DaoStatus::Success;
 				} else if let Some(token_address) = dao_payload.token_address {
 					let address =
