@@ -56,6 +56,9 @@ pub struct DaoPayload {
 	pub metadata: Vec<u8>,
 	pub token: Option<DaoGovernanceToken>,
 	pub token_id: Option<u32>,
+	#[serde(default)]
+	#[serde(deserialize_with = "de_option_string_to_bytes")]
+	pub token_address: Option<Vec<u8>>,
 	pub policy: DaoPolicyPayload,
 }
 
@@ -99,15 +102,82 @@ pub struct DaoPolicy {
 	pub token_voting_min_threshold: u128,
 }
 
+// TODO: add token enum
+
+#[derive(
+	Encode, Decode, Copy, Clone, Default, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen,
+)]
+pub enum DaoStatus {
+	// Pending approval from off-chain
+	#[default]
+	Pending,
+	// DAO approved on-chain
+	Success,
+	// An error occurred while approving DAO
+	Error,
+}
+
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct Dao<AccountId, TokenId, BoundedString, BoundedMetadata> {
 	pub founder: AccountId,
 	pub account_id: AccountId,
-	pub token_id: TokenId,
+	pub token_id: Option<TokenId>,
+	pub token_address: Option<BoundedString>,
+	pub status: DaoStatus,
 	pub config: DaoConfig<BoundedString, BoundedMetadata>,
 }
 
-pub trait DaoProvider {
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+pub struct PendingDao<AccountId, TokenId, BoundedString, BoundedMetadata, BoundedCouncilMembers> {
+	pub dao: Dao<AccountId, TokenId, BoundedString, BoundedMetadata>,
+	pub policy: DaoPolicy,
+	pub council: BoundedCouncilMembers,
+}
+
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+pub struct PendingProposal<AccountId> {
+	pub who: AccountId,
+	pub threshold: u32,
+	pub length_bound: u32,
+}
+
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+pub struct PendingVote<AccountId, Hash> {
+	pub who: AccountId,
+	pub proposal_hash: Hash,
+	pub proposal_index: u32,
+	pub vote: bool,
+}
+
+#[derive(
+	Encode,
+	Decode,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	RuntimeDebug,
+	MaxEncodedLen,
+	Deserialize,
+)]
+pub struct DaoApprovalPayload<DaoId, BoundedString> {
+	pub dao_id: DaoId,
+	pub token_address: BoundedString,
+}
+
+#[derive(Clone, Default, PartialEq, Eq, TypeInfo, RuntimeDebug)]
+pub enum AccountTokenBalance {
+	#[default]
+	Insufficient,
+	Sufficient,
+	// An off-chain action should be performed
+	Offchain {
+		token_address: Vec<u8>,
+	},
+}
+
+pub trait DaoProvider<Hash> {
 	type Id;
 	type AccountId;
 	type AssetId;
@@ -118,7 +188,27 @@ pub trait DaoProvider {
 	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError>;
 	fn count() -> u32;
 	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError>;
-	fn ensure_token_balance(id: Self::Id, who: &Self::AccountId) -> Result<(), DispatchError>;
+	fn ensure_treasury_proposal_allowed(
+		id: Self::Id,
+		who: &Self::AccountId,
+		hash: Hash,
+	) -> Result<AccountTokenBalance, DispatchError>;
+	fn ensure_proposal_allowed(
+		id: Self::Id,
+		who: &Self::AccountId,
+		threshold: u32,
+		hash: Hash,
+		length_bound: u32,
+	) -> Result<AccountTokenBalance, DispatchError>;
+	fn ensure_voting_allowed(
+		id: Self::Id,
+		who: &Self::AccountId,
+		hash: Hash,
+	) -> Result<AccountTokenBalance, DispatchError>;
+	fn ensure_token_balance(
+		id: Self::Id,
+		who: &Self::AccountId,
+	) -> Result<AccountTokenBalance, DispatchError>;
 }
 
 pub trait InitializeDaoMembers<DaoId, AccountId> {
@@ -127,6 +217,22 @@ pub trait InitializeDaoMembers<DaoId, AccountId> {
 
 pub trait ContainsDaoMember<DaoId, AccountId> {
 	fn contains(dao_id: DaoId, who: &AccountId) -> Result<bool, DispatchError>;
+}
+
+pub trait ApprovePropose<DaoId, AccountId, Hash> {
+	fn approve_propose(dao_id: DaoId, hash: Hash, approve: bool) -> Result<(), DispatchError>;
+}
+
+pub trait ApproveVote<DaoId, AccountId, Hash> {
+	fn approve_vote(dao_id: DaoId, hash: Hash, approve: bool) -> Result<(), DispatchError>;
+}
+
+pub trait ApproveTreasuryPropose<DaoId, AccountId, Hash> {
+	fn approve_treasury_propose(
+		dao_id: DaoId,
+		hash: Hash,
+		approve: bool,
+	) -> Result<(), DispatchError>;
 }
 
 /// Trait for type that can handle incremental changes to a set of account IDs.
@@ -205,6 +311,16 @@ where
 {
 	let s: &str = Deserialize::deserialize(de)?;
 	Ok(s.as_bytes().to_vec())
+}
+
+pub fn de_option_string_to_bytes<'de, D>(de: D) -> Result<Option<Vec<u8>>, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	match Option::<&str>::deserialize(de)? {
+		None => Ok(None),
+		Some(s) => Ok(Some(s.as_bytes().to_vec())),
+	}
 }
 
 pub fn de_string_to_u128<'de, D>(de: D) -> Result<u128, D::Error>

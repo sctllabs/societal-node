@@ -71,11 +71,12 @@ use scale_info::TypeInfo;
 
 use sp_runtime::{
 	traits::{AccountIdConversion, Saturating, StaticLookup, Zero},
-	Permill, RuntimeDebug,
+	DispatchError, Permill, RuntimeDebug,
 };
 use sp_std::prelude::*;
 
 use frame_support::{
+	pallet_prelude::DispatchResult,
 	print,
 	traits::{
 		Currency, EnsureOriginWithArg, ExistenceRequirement::KeepAlive, Get, Imbalance,
@@ -85,10 +86,12 @@ use frame_support::{
 	BoundedVec, PalletId,
 };
 
-use dao_primitives::{DaoPolicy, DaoProvider};
+use dao_primitives::{ApproveTreasuryPropose, DaoPolicy, DaoProvider};
 
 pub use pallet::*;
 pub use weights::WeightInfo;
+
+use sp_runtime::traits::Hash;
 
 pub type BalanceOf<T, I = ()> =
 	<<T as Config<I>>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -148,6 +151,7 @@ pub struct Proposal<AccountId, Balance> {
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
+	use dao_primitives::AccountTokenBalance;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
@@ -205,7 +209,12 @@ pub mod pallet {
 		/// spend at a time.
 		type SpendOrigin: EnsureOrigin<Self::RuntimeOrigin, Success = BalanceOf<Self, I>>;
 
-		type DaoProvider: DaoProvider<Id = u32, AccountId = Self::AccountId, Policy = DaoPolicy>;
+		type DaoProvider: DaoProvider<
+			<Self as frame_system::Config>::Hash,
+			Id = u32,
+			AccountId = Self::AccountId,
+			Policy = DaoPolicy,
+		>;
 	}
 
 	/// Number of proposals that have been made.
@@ -227,6 +236,19 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
+	/// Proposals pending approval.
+	#[pallet::storage]
+	#[pallet::getter(fn pending_proposals)]
+	pub type PendingProposals<T: Config<I>, I: 'static = ()> = StorageDoubleMap<
+		_,
+		Twox64Concat,
+		DaoId,
+		Identity,
+		T::Hash,
+		Proposal<T::AccountId, BalanceOf<T, I>>,
+		OptionQuery,
+	>;
+
 	/// Proposal indices that have been approved but not yet awarded.
 	#[pallet::storage]
 	#[pallet::getter(fn approvals)]
@@ -236,10 +258,21 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config<I>, I: 'static = ()> {
+		// Proposal pending approval
+		ProposalPendingApproval {
+			dao_id: DaoId,
+			proposal_hash: T::Hash,
+		},
 		/// New proposal.
-		Proposed { dao_id: DaoId, proposal_index: ProposalIndex },
+		Proposed {
+			dao_id: DaoId,
+			proposal_index: ProposalIndex,
+		},
 		/// We have ended a spend period and will now allocate funds.
-		Spending { dao_id: DaoId, budget_remaining: BalanceOf<T, I> },
+		Spending {
+			dao_id: DaoId,
+			budget_remaining: BalanceOf<T, I>,
+		},
 		/// Some funds have been allocated.
 		Awarded {
 			dao_id: DaoId,
@@ -248,13 +281,25 @@ pub mod pallet {
 			account: T::AccountId,
 		},
 		/// A proposal was rejected; funds were slashed.
-		Rejected { dao_id: DaoId, proposal_index: ProposalIndex, slashed: BalanceOf<T, I> },
+		Rejected {
+			dao_id: DaoId,
+			proposal_index: ProposalIndex,
+			slashed: BalanceOf<T, I>,
+		},
 		/// Some of our funds have been burnt.
-		Burnt { dao_id: DaoId, burnt_funds: BalanceOf<T, I> },
+		Burnt {
+			dao_id: DaoId,
+			burnt_funds: BalanceOf<T, I>,
+		},
 		/// Spending has finished; this is the amount that rolls over until next spend.
-		Rollover { dao_id: DaoId, rollover_balance: BalanceOf<T, I> },
+		Rollover {
+			dao_id: DaoId,
+			rollover_balance: BalanceOf<T, I>,
+		},
 		/// Some funds have been deposited.
-		Deposit { value: BalanceOf<T, I> },
+		Deposit {
+			value: BalanceOf<T, I>,
+		},
 		/// A new spend proposal has been approved.
 		SpendApproved {
 			dao_id: DaoId,
@@ -329,24 +374,27 @@ pub mod pallet {
 
 			T::DaoProvider::ensure_member(dao_id, &proposer)?;
 
-			T::DaoProvider::ensure_token_balance(dao_id, &proposer)?;
-
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
 
 			let bond = Self::calculate_bond(T::DaoProvider::policy(dao_id)?, value);
-			T::Currency::reserve(&proposer, bond)
-				.map_err(|_| Error::<T, I>::InsufficientProposersBalance)?;
+			let proposal =
+				Proposal { dao_id, proposer: proposer.clone(), value, beneficiary, bond };
+			let proposal_hash = T::Hashing::hash_of(&proposal);
 
-			let c = Self::proposal_count(dao_id);
-			<ProposalCount<T, I>>::insert(dao_id, c + 1);
-			<Proposals<T, I>>::insert(
-				dao_id,
-				c,
-				Proposal { dao_id, proposer, value, beneficiary, bond },
-			);
+			let account_token_balance =
+				T::DaoProvider::ensure_treasury_proposal_allowed(dao_id, &proposer, proposal_hash)?;
 
-			Self::deposit_event(Event::Proposed { dao_id, proposal_index: c });
-			Ok(())
+			if let AccountTokenBalance::Offchain { .. } = account_token_balance {
+				// TODO: add checks for vec size limits
+
+				<PendingProposals<T, I>>::insert(dao_id, proposal_hash, proposal);
+
+				Self::deposit_event(Event::ProposalPendingApproval { dao_id, proposal_hash });
+
+				return Ok(())
+			}
+
+			Self::do_propose_spend(proposal)
 		}
 
 		/// Reject a proposed spend. The original deposit will be slashed.
@@ -518,6 +566,21 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		r
 	}
 
+	pub fn do_propose_spend(proposal: Proposal<T::AccountId, BalanceOf<T, I>>) -> DispatchResult {
+		let Proposal { proposer, dao_id, bond, .. } = proposal.clone();
+
+		T::Currency::reserve(&proposer, bond)
+			.map_err(|_| Error::<T, I>::InsufficientProposersBalance)?;
+
+		let c = Self::proposal_count(dao_id);
+		<ProposalCount<T, I>>::insert(dao_id, c + 1);
+		<Proposals<T, I>>::insert(dao_id, c, proposal);
+
+		Self::deposit_event(Event::Proposed { dao_id, proposal_index: c });
+
+		Ok(())
+	}
+
 	/// Spend some money! returns number of approvals before spend.
 	pub fn spend_funds(dao_id: DaoId) -> Weight {
 		let mut total_weight: Weight = Zero::zero();
@@ -595,6 +658,24 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		T::Currency::free_balance(&T::DaoProvider::dao_account_id(dao_id))
 			// Must never be less than 0 but better be safe.
 			.saturating_sub(T::Currency::minimum_balance())
+	}
+}
+
+impl<T: Config<I>, I: 'static> ApproveTreasuryPropose<DaoId, T::AccountId, T::Hash>
+	for Pallet<T, I>
+{
+	fn approve_treasury_propose(
+		dao_id: DaoId,
+		hash: T::Hash,
+		approve: bool,
+	) -> Result<(), DispatchError> {
+		let proposal = <PendingProposals<T, I>>::take(dao_id, hash).expect("Proposal not found");
+
+		if approve {
+			return Self::do_propose_spend(proposal)
+		}
+
+		Ok(())
 	}
 }
 

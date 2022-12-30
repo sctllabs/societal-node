@@ -350,6 +350,14 @@ pub fn new_full_base(
 	));
 
 	if config.offchain_worker.enabled {
+		// TODO: use custom key here
+		sp_keystore::SyncCryptoStore::sr25519_generate_new(
+			&*keystore,
+			societal_node_runtime::pallet_dao::KEY_TYPE,
+			Some("//Alice"),
+		)
+		.expect("Creating key with account Alice should succeed.");
+
 		sc_service::build_offchain_workers(
 			&config,
 			task_manager.spawn_handle(),
