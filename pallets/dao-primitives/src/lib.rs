@@ -13,7 +13,7 @@ use sp_runtime::RuntimeDebug;
 use sp_std::prelude::*;
 
 #[derive(
-	Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
 pub struct DaoTokenMetadata {
 	#[serde(deserialize_with = "de_string_to_bytes")]
@@ -24,7 +24,7 @@ pub struct DaoTokenMetadata {
 }
 
 #[derive(
-	Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
 pub struct DaoGovernanceToken {
 	pub token_id: u32,
@@ -34,7 +34,7 @@ pub struct DaoGovernanceToken {
 }
 
 #[derive(
-	Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
 pub struct DaoPolicyPayload {
 	pub proposal_bond: u32,
@@ -42,10 +42,28 @@ pub struct DaoPolicyPayload {
 	pub proposal_period: u32,
 	pub approve_origin: (u32, u32),
 	pub reject_origin: (u32, u32),
+
+	/// Governance
+	pub enactment_period: u32,
+	pub launch_period: u32,
+	pub voting_period: u32,
+	pub vote_locking_period: u32,
+	pub fast_track_voting_period: u32,
+	pub cooloff_period: u32,
+	pub external_origin: DaoPolicyProportion,
+	pub external_majority_origin: DaoPolicyProportion,
+	pub external_default_origin: DaoPolicyProportion,
+	pub fast_track_origin: DaoPolicyProportion,
+	pub instant_origin: DaoPolicyProportion,
+	pub instant_allowed: bool,
+	pub cancellation_origin: DaoPolicyProportion,
+	pub blacklist_origin: DaoPolicyProportion,
+	pub cancel_proposal_origin: DaoPolicyProportion,
+	pub veto_origin: DaoPolicyProportion,
 }
 
 #[derive(
-	Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
 pub struct DaoPayload {
 	#[serde(deserialize_with = "de_string_to_bytes")]
@@ -62,7 +80,7 @@ pub struct DaoPayload {
 	pub policy: DaoPolicyPayload,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct DaoConfig<BoundedString, BoundedMetadata> {
 	/// Name of the DAO.
 	pub name: BoundedString,
@@ -79,7 +97,6 @@ pub struct DaoConfig<BoundedString, BoundedMetadata> {
 	Default,
 	Clone,
 	PartialEq,
-	Eq,
 	TypeInfo,
 	RuntimeDebug,
 	Serialize,
@@ -100,12 +117,67 @@ pub struct DaoPolicy {
 	pub approve_origin: (u32, u32),
 	pub reject_origin: (u32, u32),
 	pub token_voting_min_threshold: u128,
+
+	/// Governance settings
+
+	/// The period between a proposal being approved and enacted.
+	///
+	/// It should generally be a little more than the unstake period to ensure that
+	/// voting stakers have an opportunity to remove themselves from the system in the case
+	/// where they are on the losing side of a vote.
+	pub enactment_period: u32,
+	/// How often (in blocks) new public referenda are launched.
+	pub launch_period: u32,
+	/// How often (in blocks) to check for new votes.
+	pub voting_period: u32,
+	/// The minimum period of vote locking.
+	///
+	/// It should be no shorter than enactment period to ensure that in the case of an approval,
+	/// those successful voters are locked into the consequences that their votes entail.
+	pub vote_locking_period: u32,
+	/// Minimum voting period allowed for a fast-track referendum.
+	pub fast_track_voting_period: u32,
+	/// Period in blocks where an external proposal may not be re-submitted after being vetoed.
+	pub cooloff_period: u32,
+	/// Origin from which the next tabled referendum may be forced. This is a normal
+	/// "super-majority-required" referendum.
+	pub external_origin: DaoPolicyProportion,
+	/// Origin from which the next tabled referendum may be forced; this allows for the tabling
+	/// of a majority-carries referendum.
+	pub external_majority_origin: DaoPolicyProportion,
+	/// Origin from which the next tabled referendum may be forced; this allows for the tabling
+	/// of a negative-turnout-bias (default-carries) referendum.
+	pub external_default_origin: DaoPolicyProportion,
+	/// Origin from which the next majority-carries (or more permissive) referendum may be
+	/// tabled to vote according to the `FastTrackVotingPeriod` asynchronously in a similar
+	/// manner to the emergency origin. It retains its threshold method.
+	pub fast_track_origin: DaoPolicyProportion,
+	/// Origin from which the next majority-carries (or more permissive) referendum may be
+	/// tabled to vote immediately and asynchronously in a similar manner to the emergency
+	/// origin. It retains its threshold method.
+	pub instant_origin: DaoPolicyProportion,
+	/// Indicator for whether an emergency origin is even allowed to happen. Some chains may
+	/// want to set this permanently to `false`, others may want to condition it on things such
+	/// as an upgrade having happened recently.
+	pub instant_allowed: bool,
+	/// Origin from which any referendum may be cancelled in an emergency.
+	pub cancellation_origin: DaoPolicyProportion,
+	/// Origin from which proposals may be blacklisted.
+	pub blacklist_origin: DaoPolicyProportion,
+	/// Origin from which a proposal may be cancelled and its backers slashed.
+	pub cancel_proposal_origin: DaoPolicyProportion,
+	/// Origin for anyone able to veto proposals.
+	///
+	/// # Warning
+	///
+	/// The number of Vetoers for a proposal must be small, extrinsics are weighted according to
+	pub veto_origin: DaoPolicyProportion,
 }
 
 // TODO: add token enum
 
 #[derive(
-	Encode, Decode, Copy, Clone, Default, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen,
+	Encode, Decode, Copy, Clone, Default, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen,
 )]
 pub enum DaoStatus {
 	// Pending approval from off-chain
@@ -117,7 +189,7 @@ pub enum DaoStatus {
 	Error,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct Dao<AccountId, TokenId, BoundedString, BoundedMetadata> {
 	pub founder: AccountId,
 	pub account_id: AccountId,
@@ -127,7 +199,7 @@ pub struct Dao<AccountId, TokenId, BoundedString, BoundedMetadata> {
 	pub config: DaoConfig<BoundedString, BoundedMetadata>,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct PendingDao<
 	AccountId,
 	TokenId,
@@ -142,14 +214,14 @@ pub struct PendingDao<
 	pub technical_committee: BoundedTechnicalCommittee,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct PendingProposal<AccountId> {
 	pub who: AccountId,
 	pub threshold: u32,
 	pub length_bound: u32,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct PendingVote<AccountId, Hash> {
 	pub who: AccountId,
 	pub proposal_hash: Hash,
@@ -174,7 +246,7 @@ pub struct DaoApprovalPayload<DaoId, BoundedString> {
 	pub token_address: BoundedString,
 }
 
-#[derive(Clone, Default, PartialEq, Eq, TypeInfo, RuntimeDebug)]
+#[derive(Clone, Default, PartialEq, TypeInfo, RuntimeDebug)]
 pub enum AccountTokenBalance {
 	#[default]
 	Insufficient,
@@ -183,6 +255,23 @@ pub enum AccountTokenBalance {
 	Offchain {
 		token_address: Vec<u8>,
 	},
+}
+
+pub type Proportion = (u32, u32);
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize, MaxEncodedLen,
+)]
+#[serde(tag = "type", content = "proportion")]
+pub enum DaoPolicyProportion {
+	AtLeast(Proportion),
+	MoreThan(Proportion),
+}
+
+impl Default for DaoPolicyProportion {
+	fn default() -> Self {
+		Self::AtLeast((1, 2))
+	}
 }
 
 pub trait DaoProvider<Hash> {

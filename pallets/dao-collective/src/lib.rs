@@ -50,8 +50,8 @@ use sp_runtime::{traits::Hash, RuntimeDebug};
 use sp_std::{marker::PhantomData, prelude::*, result, str};
 
 use dao_primitives::{
-	ApprovePropose, ApproveVote, ChangeDaoMembers, DaoPolicy, DaoProvider, InitializeDaoMembers,
-	PendingProposal, PendingVote,
+	ApprovePropose, ApproveVote, ChangeDaoMembers, DaoPolicy, DaoPolicyProportion, DaoProvider,
+	InitializeDaoMembers, PendingProposal, PendingVote,
 };
 
 use frame_support::{
@@ -1262,6 +1262,34 @@ impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>
 	#[cfg(feature = "runtime-benchmarks")]
 	fn try_successful_origin(_arg: &(u32, u32)) -> Result<O, ()> {
 		Ok(O::from(RawOrigin::Members(0u32, 0u32)))
+	}
+}
+
+pub struct EnsureProportionWithArg<AccountId, I: 'static = ()>(PhantomData<(AccountId, I)>);
+impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>, AccountId, I>
+	EnsureOriginWithArg<O, DaoPolicyProportion> for EnsureProportionWithArg<AccountId, I>
+{
+	type Success = ();
+
+	fn try_origin(o: O, arg: &DaoPolicyProportion) -> Result<Self::Success, O> {
+		o.into().and_then(|o| match o {
+			RawOrigin::Members(n, m) => {
+				if match arg {
+					DaoPolicyProportion::AtLeast((N, D)) => n * D >= N * m,
+					DaoPolicyProportion::MoreThan((N, D)) => n * D > N * m,
+				} {
+					return Ok(())
+				}
+
+				Err(O::from(o))
+			},
+			r => Err(O::from(r)),
+		})
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin() -> Result<O, ()> {
+		Ok(O::from(RawOrigin::Members(1u32, 0u32)))
 	}
 }
 

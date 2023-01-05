@@ -563,6 +563,28 @@ pub mod pallet {
 				approve_origin: dao_payload.policy.approve_origin,
 				reject_origin: dao_payload.policy.reject_origin,
 				token_voting_min_threshold: T::DaoTokenVotingMinThreshold::get(),
+				enactment_period: dao_payload.policy.enactment_period /
+					T::ExpectedBlockTime::get() as BlockNumber,
+				launch_period: dao_payload.policy.launch_period /
+					T::ExpectedBlockTime::get() as BlockNumber,
+				voting_period: dao_payload.policy.voting_period /
+					T::ExpectedBlockTime::get() as BlockNumber,
+				vote_locking_period: dao_payload.policy.vote_locking_period /
+					T::ExpectedBlockTime::get() as BlockNumber,
+				fast_track_voting_period: dao_payload.policy.fast_track_voting_period /
+					T::ExpectedBlockTime::get() as BlockNumber,
+				cooloff_period: dao_payload.policy.cooloff_period /
+					T::ExpectedBlockTime::get() as BlockNumber,
+				external_origin: dao_payload.policy.external_origin,
+				external_majority_origin: dao_payload.policy.external_majority_origin,
+				external_default_origin: dao_payload.policy.external_default_origin,
+				fast_track_origin: dao_payload.policy.fast_track_origin,
+				instant_origin: dao_payload.policy.instant_origin,
+				instant_allowed: dao_payload.policy.instant_allowed,
+				cancellation_origin: dao_payload.policy.cancellation_origin,
+				blacklist_origin: dao_payload.policy.blacklist_origin,
+				cancel_proposal_origin: dao_payload.policy.cancel_proposal_origin,
+				veto_origin: dao_payload.policy.veto_origin,
 			};
 
 			let mut has_token_id: Option<AssetId<T>> = None;
