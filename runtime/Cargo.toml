@@ -114,6 +114,7 @@ pallet-dao = { version = "4.0.0-dev", default-features = false, path = "../palle
 pallet-dao-assets = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-assets" }
 pallet-dao-collective = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-collective" }
 pallet-dao-collective-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao-collective" }
+pallet-dao-democracy = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-democracy" }
 pallet-dao-membership = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-membership" }
 pallet-dao-membership-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao-membership" }
 pallet-dao-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao" }

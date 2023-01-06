@@ -1,5 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-// `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
+// `construct_runtime!` does a lot of recursion and requires us to increase the limit to 384.
 #![recursion_limit = "384"]
 
 // Make the WASM binary available.
@@ -587,6 +587,18 @@ impl pallet_dao_collective::Config<DaoCouncilCollective> for Runtime {
 	type DaoProvider = Dao;
 }
 
+type DaoTechnicalCommitteeCollective = pallet_dao_collective::Instance2;
+impl pallet_dao_collective::Config<DaoTechnicalCommitteeCollective> for Runtime {
+	type RuntimeOrigin = RuntimeOrigin;
+	type Proposal = RuntimeCall;
+	type RuntimeEvent = RuntimeEvent;
+	type MaxProposals = TechnicalMaxProposals;
+	type MaxMembers = TechnicalMaxMembers;
+	type DefaultVote = pallet_dao_collective::MoreThanMajorityVote;
+	type WeightInfo = pallet_dao_collective::weights::SubstrateWeight<Runtime>;
+	type DaoProvider = Dao;
+}
+
 parameter_types! {
 	pub const ImOnlineUnsignedPriority: TransactionPriority = TransactionPriority::max_value();
 	/// We prioritize im-online heartbeats over election solution submission.
@@ -873,7 +885,6 @@ impl pallet_membership::Config<pallet_membership::Instance1> for Runtime {
 	type WeightInfo = pallet_membership::weights::SubstrateWeight<Runtime>;
 }
 
-// TODO - Update settings
 type DaoCouncilMembership = pallet_dao_membership::Instance1;
 impl pallet_dao_membership::Config<DaoCouncilMembership> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
@@ -883,6 +894,23 @@ impl pallet_dao_membership::Config<DaoCouncilMembership> for Runtime {
 		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
 	type MembershipInitialized = DaoCouncil;
 	type MembershipChanged = DaoCouncil;
+	type MaxMembers = TechnicalMaxMembers;
+	type WeightInfo = pallet_dao_membership::weights::SubstrateWeight<Runtime>;
+	type DaoProvider = Dao;
+}
+
+// TODO - Update settings
+type DaoTechnicalCommitteeMembership = pallet_dao_membership::Instance2;
+impl pallet_dao_membership::Config<DaoTechnicalCommitteeMembership> for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+
+	// TODO: dynamic properties - move to dao-primitives for generic types
+	type ApproveOrigin = pallet_dao_collective::EnsureProportionAtLeastWithArg<
+		AccountId,
+		DaoTechnicalCommitteeCollective,
+	>;
+	type MembershipInitialized = DaoTechnicalCommittee;
+	type MembershipChanged = DaoTechnicalCommittee;
 	type MaxMembers = TechnicalMaxMembers;
 	type WeightInfo = pallet_dao_membership::weights::SubstrateWeight<Runtime>;
 
@@ -1126,6 +1154,59 @@ impl pallet_preimage::Config for Runtime {
 	type ManagerOrigin = EnsureRoot<AccountId>;
 	type BaseDeposit = PreimageBaseDeposit;
 	type ByteDeposit = PreimageByteDeposit;
+}
+
+impl pallet_dao_democracy::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type EnactmentPeriod = EnactmentPeriod;
+	type LaunchPeriod = LaunchPeriod;
+	type VotingPeriod = VotingPeriod;
+	type VoteLockingPeriod = EnactmentPeriod; // Same as EnactmentPeriod
+	type MinimumDeposit = MinimumDeposit;
+
+	/// A straight majority of the council can decide what their next motion is.
+	type ExternalOrigin =
+		pallet_dao_collective::EnsureProportionWithArg<AccountId, CouncilCollective>;
+	/// A super-majority can have the next scheduled referendum be a straight majority-carries vote.
+	type ExternalMajorityOrigin =
+		pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 3, 4>;
+	/// A unanimous council can have the next scheduled referendum be a straight default-carries
+	/// (NTB) vote.
+	type ExternalDefaultOrigin =
+		pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 1, 1>;
+	/// Two thirds of the technical committee can have an ExternalMajority/ExternalDefault vote
+	/// be tabled immediately and with a shorter voting/enactment period.
+	type FastTrackOrigin =
+		pallet_collective::EnsureProportionAtLeast<AccountId, TechnicalCollective, 2, 3>;
+	type InstantOrigin =
+		pallet_collective::EnsureProportionAtLeast<AccountId, TechnicalCollective, 1, 1>;
+	type InstantAllowed = frame_support::traits::ConstBool<true>;
+	type FastTrackVotingPeriod = FastTrackVotingPeriod;
+	// To cancel a proposal which has been passed, 2/3 of the council must agree to it.
+	type CancellationOrigin =
+		pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 2, 3>;
+	// To cancel a proposal before it has been passed, the technical committee must be unanimous or
+	// Root must agree.
+	type CancelProposalOrigin = EitherOfDiverse<
+		EnsureRoot<AccountId>,
+		pallet_collective::EnsureProportionAtLeast<AccountId, TechnicalCollective, 1, 1>,
+	>;
+	type BlacklistOrigin = EnsureRoot<AccountId>;
+	// Any single technical committee member may veto a coming council proposal, however they can
+	// only do it once and it lasts only for the cool-off period.
+	type VetoOrigin = pallet_collective::EnsureMember<AccountId, TechnicalCollective>;
+	type CooloffPeriod = CooloffPeriod;
+	type Slash = Treasury;
+	type Scheduler = Scheduler;
+	type PalletsOrigin = OriginCaller;
+	type MaxVotes = ConstU32<100>;
+	type WeightInfo = pallet_dao_democracy::weights::SubstrateWeight<Runtime>;
+	type MaxProposals = MaxProposals;
+	// type Preimages = Preimage;
+	type MaxDeposits = ConstU32<100>;
+	type MaxBlacklisted = ConstU32<100>;
+	type DaoProvider = Dao;
 }
 
 parameter_types! {
@@ -1473,6 +1554,7 @@ parameter_types! {
 	pub const DaoStringLimit: u32 = 50;
 	pub const DaoMetadataLimit: u32 = 500;
 	pub const DaoMaxCouncilMembers: u32 = 100; // TODO
+	pub const DaoMaxTechnicalCommitteeMembers: u32 = 100; // TODO
 	pub const DaoTokenMinBalanceLimit: u128 = 1_000;
 	pub const DaoTokenBalanceLimit: u128 = 1_000_000_000;
 	pub const DaoTokenVotingMinThreshold: u128 = 1_000;
@@ -1485,14 +1567,17 @@ impl pallet_dao::Config for Runtime {
 	type DaoStringLimit = DaoStringLimit;
 	type DaoMetadataLimit = DaoMetadataLimit;
 	type DaoMaxCouncilMembers = DaoMaxCouncilMembers;
+	type DaoMaxTechnicalCommitteeMembers = DaoMaxTechnicalCommitteeMembers;
 	type DaoTokenMinBalanceLimit = DaoTokenMinBalanceLimit;
 	type DaoTokenBalanceLimit = DaoTokenBalanceLimit;
 	type DaoTokenVotingMinThreshold = DaoTokenVotingMinThreshold;
 	type AssetId = u32;
 	type Balance = Balance;
 	type ExpectedBlockTime = ExpectedBlockTime;
-	type CouncilProvider = DaoCouncilMemberships;
+	type CouncilProvider = DaoCouncilMembers;
 	type CouncilApproveProvider = DaoCouncil;
+	type TechnicalCommitteeProvider = DaoTechnicalCommitteeMembers;
+	type TechnicalCommitteeApproveProvider = DaoTechnicalCommittee;
 	type ApproveTreasuryPropose = DaoTreasury;
 	type AssetProvider = Assets;
 	type AuthorityId = pallet_dao::crypto::TestAuthId;
@@ -1608,7 +1693,10 @@ construct_runtime!(
 		BaseFee: pallet_base_fee,
 		HotfixSufficients: pallet_hotfix_sufficients,
 		DaoCouncil: pallet_dao_collective::<Instance1>,
-		DaoCouncilMemberships: pallet_dao_membership::<Instance1>, //TODO: rename
+		DaoTechnicalCommittee: pallet_dao_collective::<Instance2>,
+		DaoCouncilMembers: pallet_dao_membership::<Instance1>,
+		DaoTechnicalCommitteeMembers: pallet_dao_membership::<Instance2>,
+		DaoDemocracy: pallet_dao_democracy,
 		Preimage: pallet_preimage,
 		Utility: pallet_utility,
 	}

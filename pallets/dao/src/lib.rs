@@ -52,6 +52,10 @@ type PendingDaoOf<T> = PendingDao<
 	BoundedVec<u8, <T as Config>::DaoStringLimit>,
 	BoundedVec<u8, <T as Config>::DaoStringLimit>,
 	BoundedVec<<T as frame_system::Config>::AccountId, <T as Config>::DaoMaxCouncilMembers>,
+	BoundedVec<
+		<T as frame_system::Config>::AccountId,
+		<T as Config>::DaoMaxTechnicalCommitteeMembers,
+	>,
 >;
 
 type AssetId<T> = <T as Config>::AssetId;
@@ -208,6 +212,9 @@ pub mod pallet {
 		type DaoMaxCouncilMembers: Get<u32>;
 
 		#[pallet::constant]
+		type DaoMaxTechnicalCommitteeMembers: Get<u32>;
+
+		#[pallet::constant]
 		type DaoTokenMinBalanceLimit: Get<u128>;
 
 		#[pallet::constant]
@@ -223,6 +230,12 @@ pub mod pallet {
 			+ ContainsDaoMember<u32, Self::AccountId>;
 
 		type CouncilApproveProvider: ApprovePropose<u32, Self::AccountId, Self::Hash>
+			+ ApproveVote<u32, Self::AccountId, Self::Hash>;
+
+		type TechnicalCommitteeProvider: InitializeDaoMembers<u32, Self::AccountId>
+			+ ContainsDaoMember<u32, Self::AccountId>;
+
+		type TechnicalCommitteeApproveProvider: ApprovePropose<u32, Self::AccountId, Self::Hash>
 			+ ApproveVote<u32, Self::AccountId, Self::Hash>;
 
 		type ApproveTreasuryPropose: ApproveTreasuryPropose<u32, Self::AccountId, Self::Hash>;
@@ -465,6 +478,7 @@ pub mod pallet {
 		PurposeTooLong,
 		MetadataTooLong,
 		CouncilMembersOverflow,
+		TechnicalCommitteeMembersOverflow,
 		TokenNotProvided,
 		TokenAlreadyExists,
 		TokenNotExists,
@@ -487,6 +501,7 @@ pub mod pallet {
 		pub fn create_dao(
 			origin: OriginFor<T>,
 			council: Vec<<T::Lookup as StaticLookup>::Source>,
+			technical_committee: Vec<<T::Lookup as StaticLookup>::Source>,
 			data: Vec<u8>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin.clone())?;
@@ -522,6 +537,13 @@ pub mod pallet {
 				council_members.push(account);
 			}
 
+			let mut technical_committee_members: Vec<T::AccountId> = vec![];
+			for member in technical_committee.into_iter() {
+				let account = T::Lookup::lookup(member)?;
+
+				technical_committee_members.push(account);
+			}
+
 			let mut dao = Dao {
 				founder: who.clone(),
 				account_id: dao_account_id.clone(),
@@ -541,6 +563,28 @@ pub mod pallet {
 				approve_origin: dao_payload.policy.approve_origin,
 				reject_origin: dao_payload.policy.reject_origin,
 				token_voting_min_threshold: T::DaoTokenVotingMinThreshold::get(),
+				enactment_period: dao_payload.policy.enactment_period /
+					T::ExpectedBlockTime::get() as BlockNumber,
+				launch_period: dao_payload.policy.launch_period /
+					T::ExpectedBlockTime::get() as BlockNumber,
+				voting_period: dao_payload.policy.voting_period /
+					T::ExpectedBlockTime::get() as BlockNumber,
+				vote_locking_period: dao_payload.policy.vote_locking_period /
+					T::ExpectedBlockTime::get() as BlockNumber,
+				fast_track_voting_period: dao_payload.policy.fast_track_voting_period /
+					T::ExpectedBlockTime::get() as BlockNumber,
+				cooloff_period: dao_payload.policy.cooloff_period /
+					T::ExpectedBlockTime::get() as BlockNumber,
+				external_origin: dao_payload.policy.external_origin,
+				external_majority_origin: dao_payload.policy.external_majority_origin,
+				external_default_origin: dao_payload.policy.external_default_origin,
+				fast_track_origin: dao_payload.policy.fast_track_origin,
+				instant_origin: dao_payload.policy.instant_origin,
+				instant_allowed: dao_payload.policy.instant_allowed,
+				cancellation_origin: dao_payload.policy.cancellation_origin,
+				blacklist_origin: dao_payload.policy.blacklist_origin,
+				cancel_proposal_origin: dao_payload.policy.cancel_proposal_origin,
+				veto_origin: dao_payload.policy.veto_origin,
 			};
 
 			let mut has_token_id: Option<AssetId<T>> = None;
@@ -638,7 +682,16 @@ pub mod pallet {
 					)
 					.map_err(|_| Error::<T>::CouncilMembersOverflow)?;
 
-					PendingDaos::<T>::insert(dao_hash, PendingDao { dao, policy, council });
+					let technical_committee = BoundedVec::<
+						T::AccountId,
+						T::DaoMaxTechnicalCommitteeMembers,
+					>::try_from(technical_committee_members.clone())
+					.map_err(|_| Error::<T>::CouncilMembersOverflow)?;
+
+					PendingDaos::<T>::insert(
+						dao_hash,
+						PendingDao { dao, policy, council, technical_committee },
+					);
 
 					Self::deposit_event(Event::DaoPendingApproval(dao_id, who));
 
@@ -650,7 +703,7 @@ pub mod pallet {
 				return Err(Error::<T>::TokenNotProvided.into())
 			}
 
-			Self::do_register_dao(dao, policy, council_members)
+			Self::do_register_dao(dao, policy, council_members, technical_committee_members)
 		}
 
 		#[pallet::weight(10_000)]
@@ -661,13 +714,19 @@ pub mod pallet {
 		) -> DispatchResult {
 			ensure_none(origin)?;
 
-			let PendingDao { dao, policy, council } = match <PendingDaos<T>>::take(dao_hash) {
-				None => return Err(Error::<T>::DaoNotExist.into()),
-				Some(dao) => dao,
-			};
+			let PendingDao { dao, policy, council, technical_committee } =
+				match <PendingDaos<T>>::take(dao_hash) {
+					None => return Err(Error::<T>::DaoNotExist.into()),
+					Some(dao) => dao,
+				};
 
 			if approve {
-				return Self::do_register_dao(dao, policy, council.to_vec())
+				return Self::do_register_dao(
+					dao,
+					policy,
+					council.to_vec(),
+					technical_committee.to_vec(),
+				)
 			}
 
 			Ok(())
@@ -737,6 +796,7 @@ pub mod pallet {
 			mut dao: DaoOf<T>,
 			policy: PolicyOf,
 			council: Vec<T::AccountId>,
+			technical_committee: Vec<T::AccountId>,
 		) -> DispatchResult {
 			let dao_id = <NextDaoId<T>>::get();
 
@@ -749,6 +809,8 @@ pub mod pallet {
 			Daos::<T>::insert(dao_id, dao);
 
 			T::CouncilProvider::initialize_members(dao_id, council)?;
+
+			T::TechnicalCommitteeProvider::initialize_members(dao_id, technical_committee)?;
 
 			<NextDaoId<T>>::put(dao_id.checked_add(1).unwrap());
 

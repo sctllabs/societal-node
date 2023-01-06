@@ -52,6 +52,7 @@ where
 	fn create_dao(
 		handle: &mut impl PrecompileHandle,
 		council: BoundedVec<Address, GetArrayLimit>,
+		technical_committee: BoundedVec<Address, GetArrayLimit>,
 		data: BoundedBytes<GetEncodedProposalSizeLimit>,
 	) -> EvmResult {
 		let origin = Runtime::AddressMapping::into_account_id(handle.context().caller);
@@ -67,7 +68,18 @@ where
 			})
 			.collect();
 
-		let call = pallet_dao::Call::<Runtime>::create_dao { council, data: data.into() };
+		let technical_committee = Vec::from(technical_committee)
+			.into_iter()
+			.map(|address| {
+				Runtime::Lookup::unlookup(Runtime::AddressMapping::into_account_id(address.into()))
+			})
+			.collect();
+
+		let call = pallet_dao::Call::<Runtime>::create_dao {
+			council,
+			technical_committee,
+			data: data.into(),
+		};
 
 		<RuntimeHelper<Runtime>>::try_dispatch(handle, Some(origin).into(), call)?;
 
