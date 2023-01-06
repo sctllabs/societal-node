@@ -19,6 +19,7 @@
 
 use super::*;
 use frame_support::{traits::Get, BoundedVec};
+use sp_core::bounded::WeakBoundedVec;
 
 #[must_use]
 pub(super) enum DeadConsequence {
@@ -308,6 +309,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			&who,
 			AssetAccountOf::<T, I> {
 				balance: Zero::zero(),
+				frozen_balance: Zero::zero(),
 				is_frozen: false,
 				reason,
 				extra: T::Extra::default(),
@@ -388,6 +390,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		}
 
 		Self::can_increase(id, beneficiary, amount, true).into_result()?;
+		Self::ensure_not_frozen(id, beneficiary)?;
 		Asset::<T, I>::try_mutate(id, |maybe_details| -> DispatchResult {
 			let details = maybe_details.as_mut().ok_or(Error::<T, I>::Unknown)?;
 
@@ -403,6 +406,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 						ensure!(amount >= details.min_balance, TokenError::BelowMinimum);
 						*maybe_account = Some(AssetAccountOf::<T, I> {
 							balance: amount,
+							frozen_balance: Zero::zero(),
 							reason: Self::new_account(beneficiary, details, None)?,
 							is_frozen: false,
 							extra: T::Extra::default(),
@@ -588,6 +592,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 					maybe_account @ None => {
 						*maybe_account = Some(AssetAccountOf::<T, I> {
 							balance: credit,
+							frozen_balance: Zero::zero(),
 							is_frozen: false,
 							reason: Self::new_account(dest, details, None)?,
 							extra: T::Extra::default(),
@@ -859,5 +864,65 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			});
 			Ok(())
 		})
+	}
+
+	/// Makes sure the asset-account is not locked
+	pub(super) fn ensure_not_frozen(id: T::AssetId, who: &T::AccountId) -> DispatchResult {
+		ensure!(
+			T::Freezer::frozen_balance(id, who).is_none(),
+			Error::<T, I>::LiquidityRestrictions
+		);
+
+		Ok(())
+	}
+
+	/// Update the account entry for `who`, given the locks.
+	pub(crate) fn update_locks(
+		id: &T::AssetId,
+		who: &T::AccountId,
+		locks: &[AssetBalanceLock<T::Balance>],
+	) {
+		let bounded_locks = WeakBoundedVec::<_, T::MaxLocks>::force_from(
+			locks.to_vec(),
+			Some("Balances Update Locks"),
+		);
+
+		if locks.len() as u32 > T::MaxLocks::get() {
+			log::warn!(
+				target: "runtime::assets",
+				"Warning: An asset has more currency locks than expected. \
+				A runtime configuration adjustment may be needed."
+			);
+		}
+
+		Account::<T, I>::mutate(id, who, |maybe_details| {
+			if let Some(details) = maybe_details {
+				for l in locks.iter() {
+					details.frozen_balance = details.frozen_balance.max(l.amount);
+				}
+			}
+		});
+
+		let existed = Locks::<T, I>::contains_key(id, who);
+		if locks.is_empty() {
+			Locks::<T, I>::remove(id, who);
+			if existed {
+				// TODO: use Locks::<T, I>::hashed_key
+				// https://github.com/paritytech/substrate/issues/4969
+				frame_system::Pallet::<T>::dec_consumers(who);
+			}
+		} else {
+			Locks::<T, I>::insert(id, who, bounded_locks);
+			if !existed && frame_system::Pallet::<T>::inc_consumers_without_limit(who).is_err() {
+				// No providers for the locks. This is impossible under normal circumstances
+				// since the funds that are under the lock should themselves be stored in the
+				// asset account and therefore will need a reference.
+				log::warn!(
+					target: "runtime::assets",
+					"Warning: Attempt to introduce lock consumer reference, yet no providers. \
+					This is unexpected but should be safe."
+				);
+			}
+		}
 	}
 }

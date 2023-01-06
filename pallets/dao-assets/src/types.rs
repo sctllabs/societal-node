@@ -20,7 +20,7 @@
 use super::*;
 use frame_support::{
 	pallet_prelude::*,
-	traits::{fungible, tokens::BalanceConversion},
+	traits::{fungible, fungibles::Inspect, tokens::BalanceConversion, LockIdentifier},
 };
 use sp_runtime::{traits::Convert, FixedPointNumber, FixedPointOperand, FixedU128};
 
@@ -115,6 +115,8 @@ impl<Balance> ExistenceReason<Balance> {
 pub struct AssetAccount<Balance, DepositBalance, Extra> {
 	/// The balance.
 	pub(super) balance: Balance,
+	/// The amount that `balance` may not drop below when withdrawing for *anything
+	pub(super) frozen_balance: Balance,
 	/// Whether the account is frozen.
 	pub(super) is_frozen: bool,
 	/// The reason for the existence of the account.
@@ -271,4 +273,50 @@ where
 		Ok(FixedU128::saturating_from_rational(asset.min_balance, min_balance)
 			.saturating_mul_int(balance))
 	}
+}
+
+/// A single lock on a balance. There can be many of these on an account and they "overlap", so the
+/// same balance is frozen by multiple locks.
+#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, MaxEncodedLen, TypeInfo)]
+pub struct AssetBalanceLock<Balance> {
+	/// An identifier for this lock. Only one lock may be in existence for each identifier.
+	pub id: LockIdentifier,
+	/// The amount which the asset-account balance may not drop below when this lock is in effect.
+	pub amount: Balance,
+	// If true, then the lock remains in effect.
+	// pub reasons: Reasons,
+}
+
+/// An asset whose accounts can have liquidity restrictions.
+pub trait LockableAsset<AccountId>: Inspect<AccountId> {
+	/// The quantity used to denote time; usually just a `BlockNumber`.
+	type Moment;
+
+	/// The maximum number of locks a user should have on their account.
+	type MaxLocks: Get<u32>;
+
+	/// Create a new asset balance lock on account `who`.
+	///
+	/// If the new lock is valid (i.e. not already expired), it will push the struct to
+	/// the `Locks` vec in storage. Note that you can lock more funds than a user has.
+	///
+	/// If the lock `id` already exists, this will update it.
+	fn set_lock(id: LockIdentifier, asset: &Self::AssetId, who: &AccountId, amount: Self::Balance);
+
+	/// Changes an asset balance lock (selected by `id`) so that it becomes less liquid in all
+	/// parameters or creates a new one if it does not exist.
+	///
+	/// Calling `extend_lock` on an existing lock `id` differs from `set_lock` in that it
+	/// applies the most severe constraints of the two, while `set_lock` replaces the lock
+	/// with the new parameters. As in, `extend_lock` will set:
+	/// - maximum `amount`
+	fn extend_lock(
+		id: LockIdentifier,
+		asset: &Self::AssetId,
+		who: &AccountId,
+		amount: Self::Balance,
+	);
+
+	/// Remove an existing lock.
+	fn remove_lock(id: LockIdentifier, asset: &Self::AssetId, who: &AccountId);
 }
