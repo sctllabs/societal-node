@@ -135,6 +135,7 @@ mod extra_mutator;
 pub use extra_mutator::*;
 mod functions;
 mod impl_fungibles;
+mod impl_lockable;
 mod impl_stored_map;
 mod types;
 pub use types::*;
@@ -171,6 +172,7 @@ pub mod pallet {
 	use super::*;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
+	use sp_core::bounded::WeakBoundedVec;
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
@@ -245,6 +247,11 @@ pub mod pallet {
 
 		/// Weight information for extrinsics in this pallet.
 		type WeightInfo: WeightInfo;
+
+		/// The maximum number of locks that should exist on an asset.
+		/// Not strictly enforced, but used for weight estimation.
+		#[pallet::constant]
+		type MaxLocks: Get<u32>;
 	}
 
 	#[pallet::storage]
@@ -288,6 +295,20 @@ pub mod pallet {
 		Blake2_128Concat,
 		T::AssetId,
 		AssetMetadata<DepositBalanceOf<T, I>, BoundedVec<u8, T::StringLimit>>,
+		ValueQuery,
+	>;
+
+	/// Any liquidity locks on some asset-account balances.
+	/// NOTE: Should only be accessed when setting, changing and freeing a lock.
+	#[pallet::storage]
+	#[pallet::getter(fn locks)]
+	pub type Locks<T: Config<I>, I: 'static = ()> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		T::AssetId,
+		Blake2_128Concat,
+		T::AccountId,
+		WeakBoundedVec<AssetBalanceLock<T::Balance>, T::MaxLocks>,
 		ValueQuery,
 	>;
 
@@ -477,6 +498,8 @@ pub mod pallet {
 		NoDeposit,
 		/// The operation would result in funds being burned.
 		WouldBurn,
+		/// The asset-account liquidity restrictions prevent withdrawal
+		LiquidityRestrictions,
 	}
 
 	#[pallet::call]
