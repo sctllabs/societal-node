@@ -117,6 +117,13 @@ pub struct AssetAccount<Balance, DepositBalance, Extra> {
 	pub(super) balance: Balance,
 	/// The amount that `balance` may not drop below when withdrawing for *anything
 	pub(super) frozen_balance: Balance,
+	/// Balance which is reserved and may not be used at all.
+	///
+	/// This can still get slashed, but gets slashed last of all.
+	///
+	/// This balance is a 'reserve' balance that other subsystems use in order to set aside tokens
+	/// that are still 'owned' by the account holder, but which are suspendable.
+	pub(super) reserved_balance: Balance,
 	/// Whether the account is frozen.
 	pub(super) is_frozen: bool,
 	/// The reason for the existence of the account.
