@@ -136,6 +136,7 @@ pub use extra_mutator::*;
 mod functions;
 mod impl_fungibles;
 mod impl_lockable;
+mod impl_reservable;
 mod impl_stored_map;
 mod types;
 pub use types::*;

@@ -198,6 +198,37 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		}
 	}
 
+	/// Return the consequence of a reserved balance withdraw.
+	pub(super) fn can_release(
+		id: T::AssetId,
+		who: &T::AccountId,
+		amount: T::Balance,
+	) -> WithdrawConsequence<T::Balance> {
+		use WithdrawConsequence::*;
+		let details = match Asset::<T, I>::get(id) {
+			Some(details) => details,
+			None => return UnknownAsset,
+		};
+		if details.is_frozen {
+			return Frozen
+		}
+		if amount.is_zero() {
+			return Success
+		}
+		let account = match Account::<T, I>::get(id, who) {
+			Some(a) => a,
+			None => return NoFunds,
+		};
+		if account.is_frozen {
+			return Frozen
+		}
+		if let Some(_) = account.reserved_balance.checked_sub(&amount) {
+			Success
+		} else {
+			NoFunds
+		}
+	}
+
 	// Maximum `amount` that can be passed into `can_withdraw` to result in a `WithdrawConsequence`
 	// of `Success`.
 	pub(super) fn reducible_balance(
@@ -310,6 +341,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			AssetAccountOf::<T, I> {
 				balance: Zero::zero(),
 				frozen_balance: Zero::zero(),
+				reserved_balance: Zero::zero(),
 				is_frozen: false,
 				reason,
 				extra: T::Extra::default(),
@@ -406,6 +438,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 						ensure!(amount >= details.min_balance, TokenError::BelowMinimum);
 						*maybe_account = Some(AssetAccountOf::<T, I> {
 							balance: amount,
+							reserved_balance: Zero::zero(),
 							frozen_balance: Zero::zero(),
 							reason: Self::new_account(beneficiary, details, None)?,
 							is_frozen: false,
@@ -592,6 +625,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 					maybe_account @ None => {
 						*maybe_account = Some(AssetAccountOf::<T, I> {
 							balance: credit,
+							reserved_balance: Zero::zero(),
 							frozen_balance: Zero::zero(),
 							is_frozen: false,
 							reason: Self::new_account(dest, details, None)?,
