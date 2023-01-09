@@ -282,6 +282,7 @@ pub trait DaoProvider<Hash> {
 
 	fn exists(id: Self::Id) -> Result<(), DispatchError>;
 	fn dao_account_id(id: Self::Id) -> Self::AccountId;
+	fn dao_token(id: Self::Id) -> Result<(Option<Self::AssetId>, Option<Vec<u8>>), DispatchError>;
 	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError>;
 	fn count() -> u32;
 	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError>;

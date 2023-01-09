@@ -129,9 +129,6 @@ pub type DaoId = u32;
 /// An index of a proposal. Just a `u32`.
 pub type ProposalIndex = u32;
 
-// TODO: revise this
-pub type AssetId = u32;
-
 /// A spending proposal.
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]

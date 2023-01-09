@@ -1095,6 +1095,16 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 	fn dao_account_id(id: Self::Id) -> Self::AccountId {
 		Self::account_id(id)
 	}
+
+	fn dao_token(id: Self::Id) -> Result<(Option<Self::AssetId>, Option<Vec<u8>>), DispatchError> {
+		match Daos::<T>::get(&id) {
+			None => Err(Error::<T>::DaoNotExist.into()),
+			Some(dao) => Ok((
+				dao.token_id,
+				dao.token_address.map_or_else(|| None, |addr| Some(addr.to_vec())),
+			)),
+		}
+	}
 }
 
 impl<T: Config> BlockNumberProvider for Pallet<T> {
