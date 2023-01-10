@@ -403,6 +403,18 @@ pub trait ChangeDaoMembers<DaoId, AccountId: Clone + Ord> {
 	}
 }
 
+/// Origin for the collective module.
+#[derive(PartialEq, Eq, Clone, RuntimeDebug, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[codec(mel_bound(AccountId: MaxEncodedLen))]
+pub enum RawOrigin<AccountId> {
+	Dao(AccountId),
+}
+
+pub struct DaoOrigin<AccountId> {
+	pub dao_account_id: AccountId,
+	pub proportion: DaoPolicyProportion,
+}
+
 pub fn de_string_to_bytes<'de, D>(de: D) -> Result<Vec<u8>, D::Error>
 where
 	D: Deserializer<'de>,

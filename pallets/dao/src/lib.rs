@@ -6,7 +6,7 @@ use frame_support::{
 	pallet_prelude::*,
 	traits::{
 		tokens::fungibles::{metadata::Mutate as MetadataMutate, Create, Inspect, Mutate},
-		Currency, Get, ReservableCurrency,
+		Currency, EnsureOriginWithArg, Get, ReservableCurrency,
 	},
 	BoundedVec, PalletId,
 };
@@ -175,6 +175,9 @@ pub mod pallet {
 	#[pallet::config]
 	pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		/// The outer origin type.
+		type RuntimeOrigin: From<RawOrigin<Self::AccountId>>;
+
 		type Currency: ReservableCurrency<Self::AccountId>;
 
 		type AssetId: Member
@@ -265,6 +268,10 @@ pub mod pallet {
 		/// The identifier type for an offchain worker.
 		type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
 	}
+
+	/// Origin for the dao pallet.
+	#[pallet::origin]
+	pub type Origin<T> = RawOrigin<<T as frame_system::Config>::AccountId>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn next_dao_id)]
@@ -1111,5 +1118,31 @@ impl<T: Config> BlockNumberProvider for Pallet<T> {
 	type BlockNumber = T::BlockNumber;
 	fn current_block_number() -> Self::BlockNumber {
 		<frame_system::Pallet<T>>::block_number()
+	}
+}
+
+pub struct EnsureDao<AccountId>(PhantomData<AccountId>);
+impl<
+		O: Into<Result<RawOrigin<AccountId>, O>> + From<RawOrigin<AccountId>>,
+		AccountId: PartialEq<AccountId>,
+	> EnsureOriginWithArg<O, DaoOrigin<AccountId>> for EnsureDao<AccountId>
+{
+	type Success = ();
+	fn try_origin(o: O, dao_origin: &DaoOrigin<AccountId>) -> Result<Self::Success, O> {
+		o.into().and_then(|o| match o {
+			RawOrigin::Dao(ref dao_account_id) => {
+				if dao_account_id == &dao_origin.dao_account_id {
+					return Ok(())
+				}
+
+				Err(O::from(o))
+			},
+			r => Err(O::from(r)),
+		})
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin() -> Result<O, ()> {
+		Ok(O::from(RawOrigin::Dao(0_u32)))
 	}
 }

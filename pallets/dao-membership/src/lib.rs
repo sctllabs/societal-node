@@ -63,6 +63,7 @@ pub type DaoId = u32;
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
+	use dao_primitives::{DaoOrigin, DaoPolicyProportion};
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
@@ -81,7 +82,7 @@ pub mod pallet {
 			+ IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		/// Required origin for adding a member (though can always be Root).
-		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, (u32, u32)>;
+		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
 
 		/// The receiver of the signal for when the membership has been initialized. This happens
 		/// pre-genesis and will usually be the same as `MembershipChanged`. If you need to do
@@ -154,9 +155,14 @@ pub mod pallet {
 			dao_id: DaoId,
 			who: T::AccountId,
 		) -> DispatchResult {
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let approve_origin = T::DaoProvider::policy(dao_id)?.approve_origin;
 			T::ApproveOrigin::ensure_origin(
 				origin,
-				&T::DaoProvider::policy(dao_id)?.approve_origin,
+				&DaoOrigin {
+					dao_account_id,
+					proportion: DaoPolicyProportion::AtLeast(approve_origin),
+				},
 			)?;
 
 			let mut members = <Members<T, I>>::get(dao_id);
@@ -182,9 +188,14 @@ pub mod pallet {
 			dao_id: DaoId,
 			who: T::AccountId,
 		) -> DispatchResult {
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let approve_origin = T::DaoProvider::policy(dao_id)?.approve_origin;
 			T::ApproveOrigin::ensure_origin(
 				origin,
-				&T::DaoProvider::policy(dao_id)?.approve_origin,
+				&DaoOrigin {
+					dao_account_id,
+					proportion: DaoPolicyProportion::AtLeast(approve_origin),
+				},
 			)?;
 
 			let mut members = <Members<T, I>>::get(dao_id);
@@ -209,9 +220,14 @@ pub mod pallet {
 			remove: T::AccountId,
 			add: T::AccountId,
 		) -> DispatchResult {
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let approve_origin = T::DaoProvider::policy(dao_id)?.approve_origin;
 			T::ApproveOrigin::ensure_origin(
 				origin,
-				&T::DaoProvider::policy(dao_id)?.approve_origin,
+				&DaoOrigin {
+					dao_account_id,
+					proportion: DaoPolicyProportion::AtLeast(approve_origin),
+				},
 			)?;
 
 			if remove == add {
@@ -242,9 +258,14 @@ pub mod pallet {
 			dao_id: DaoId,
 			members: Vec<T::AccountId>,
 		) -> DispatchResult {
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let approve_origin = T::DaoProvider::policy(dao_id)?.approve_origin;
 			T::ApproveOrigin::ensure_origin(
 				origin,
-				&T::DaoProvider::policy(dao_id)?.approve_origin,
+				&DaoOrigin {
+					dao_account_id,
+					proportion: DaoPolicyProportion::AtLeast(approve_origin),
+				},
 			)?;
 
 			let mut members: BoundedVec<T::AccountId, T::MaxMembers> =

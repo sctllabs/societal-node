@@ -675,10 +675,14 @@ impl pallet_treasury::Config for Runtime {
 impl pallet_dao_treasury::Config for Runtime {
 	type PalletId = DaoTreasuryPalletId;
 	type Currency = Balances;
-	type ApproveOrigin =
-		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
-	type RejectOrigin =
-		pallet_dao_collective::EnsureProportionMoreThanWithArg<AccountId, DaoCouncilCollective>;
+	type ApproveOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
+	type RejectOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
 	type SpendPeriod = SpendPeriod;
@@ -717,6 +721,8 @@ parameter_types! {
 	pub const MaxPointsToBalance: u8 = 10;
 }
 
+use pallet_dao::EnsureDao;
+use pallet_dao_collective::EitherOfDiverseWithArg;
 use sp_runtime::{
 	traits::{Convert, DispatchInfoOf, PostDispatchInfoOf, UniqueSaturatedInto},
 	transaction_validity::TransactionValidityError,
@@ -890,8 +896,10 @@ impl pallet_dao_membership::Config<DaoCouncilMembership> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 
 	// TODO: dynamic properties - move to dao-primitives for generic types
-	type ApproveOrigin =
-		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
+	type ApproveOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	type MembershipInitialized = DaoCouncil;
 	type MembershipChanged = DaoCouncil;
 	type MaxMembers = TechnicalMaxMembers;
@@ -905,9 +913,9 @@ impl pallet_dao_membership::Config<DaoTechnicalCommitteeMembership> for Runtime 
 	type RuntimeEvent = RuntimeEvent;
 
 	// TODO: dynamic properties - move to dao-primitives for generic types
-	type ApproveOrigin = pallet_dao_collective::EnsureProportionAtLeastWithArg<
-		AccountId,
-		DaoTechnicalCommitteeCollective,
+	type ApproveOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
 	>;
 	type MembershipInitialized = DaoTechnicalCommittee;
 	type MembershipChanged = DaoTechnicalCommittee;
@@ -1086,11 +1094,11 @@ parameter_types! {
 }
 
 parameter_types! {
-	pub const LaunchPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
-	pub const VotingPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
+	pub const LaunchPeriod: BlockNumber = 1 * MINUTES;
+	pub const VotingPeriod: BlockNumber = 2 * MINUTES;
 	pub const FastTrackVotingPeriod: BlockNumber = 3 * 24 * 60 * MINUTES;
-	pub const MinimumDeposit: Balance = 100 * DOLLARS;
-	pub const EnactmentPeriod: BlockNumber = 30 * 24 * 60 * MINUTES;
+	pub const MinimumDeposit: Balance = 1;
+	pub const EnactmentPeriod: BlockNumber = 1 * MINUTES;
 	pub const CooloffPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
 	pub const MaxProposals: u32 = 100;
 }
@@ -1168,7 +1176,7 @@ impl pallet_dao_democracy::Config for Runtime {
 
 	/// A straight majority of the council can decide what their next motion is.
 	type ExternalOrigin =
-		pallet_dao_collective::EnsureProportionWithArg<AccountId, CouncilCollective>;
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, CouncilCollective>;
 	/// A super-majority can have the next scheduled referendum be a straight majority-carries vote.
 	type ExternalMajorityOrigin =
 		pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 3, 4>;
@@ -1558,11 +1566,12 @@ parameter_types! {
 	pub const DaoMaxTechnicalCommitteeMembers: u32 = 100; // TODO
 	pub const DaoTokenMinBalanceLimit: u128 = 1_000;
 	pub const DaoTokenBalanceLimit: u128 = 1_000_000_000;
-	pub const DaoTokenVotingMinThreshold: u128 = 1_000;
+	pub const DaoTokenVotingMinThreshold: u128 = 10;
 }
 
 impl pallet_dao::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type RuntimeOrigin = RuntimeOrigin;
 	type Currency = Balances;
 	type PalletId = DaoPalletId;
 	type DaoStringLimit = DaoStringLimit;

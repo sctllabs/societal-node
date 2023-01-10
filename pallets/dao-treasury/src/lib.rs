@@ -148,7 +148,7 @@ pub struct Proposal<AccountId, Balance> {
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use dao_primitives::AccountTokenBalance;
+	use dao_primitives::{AccountTokenBalance, DaoOrigin, DaoPolicyProportion};
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
@@ -162,10 +162,10 @@ pub mod pallet {
 		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
 
 		/// Origin from which approvals must come.
-		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, (u32, u32)>;
+		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
 
 		/// Origin from which rejections must come.
-		type RejectOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, (u32, u32)>;
+		type RejectOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
 
 		/// The overarching event type.
 		type RuntimeEvent: From<Event<Self, I>>
@@ -409,7 +409,15 @@ pub mod pallet {
 			#[pallet::compact] dao_id: DaoId,
 			#[pallet::compact] proposal_id: ProposalIndex,
 		) -> DispatchResult {
-			T::RejectOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.reject_origin)?;
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let reject_origin = T::DaoProvider::policy(dao_id)?.reject_origin;
+			T::RejectOrigin::ensure_origin(
+				origin,
+				&DaoOrigin {
+					dao_account_id,
+					proportion: DaoPolicyProportion::AtLeast(reject_origin),
+				},
+			)?;
 
 			let proposal = <Proposals<T, I>>::take(&dao_id, &proposal_id)
 				.ok_or(Error::<T, I>::InvalidIndex)?;
@@ -441,9 +449,14 @@ pub mod pallet {
 			#[pallet::compact] dao_id: DaoId,
 			#[pallet::compact] proposal_id: ProposalIndex,
 		) -> DispatchResult {
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let approve_origin = T::DaoProvider::policy(dao_id)?.approve_origin;
 			T::ApproveOrigin::ensure_origin(
 				origin,
-				&T::DaoProvider::policy(dao_id)?.approve_origin,
+				&DaoOrigin {
+					dao_account_id,
+					proportion: DaoPolicyProportion::AtLeast(approve_origin),
+				},
 			)?;
 
 			ensure!(
@@ -521,7 +534,15 @@ pub mod pallet {
 			#[pallet::compact] dao_id: DaoId,
 			#[pallet::compact] proposal_id: ProposalIndex,
 		) -> DispatchResult {
-			T::RejectOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.reject_origin)?;
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let reject_origin = T::DaoProvider::policy(dao_id)?.reject_origin;
+			T::RejectOrigin::ensure_origin(
+				origin,
+				&DaoOrigin {
+					dao_account_id,
+					proportion: DaoPolicyProportion::AtLeast(reject_origin),
+				},
+			)?;
 
 			Approvals::<T, I>::try_mutate(dao_id, |v| -> DispatchResult {
 				if let Some(index) = v.iter().position(|x| x == &proposal_id) {

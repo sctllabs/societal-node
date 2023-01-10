@@ -46,12 +46,12 @@
 
 use scale_info::TypeInfo;
 use sp_io::storage;
-use sp_runtime::{traits::Hash, RuntimeDebug};
+use sp_runtime::{traits::Hash, Either, RuntimeDebug};
 use sp_std::{marker::PhantomData, prelude::*, result, str};
 
 use dao_primitives::{
-	ApprovePropose, ApproveVote, ChangeDaoMembers, DaoPolicy, DaoPolicyProportion, DaoProvider,
-	InitializeDaoMembers, PendingProposal, PendingVote,
+	ApprovePropose, ApproveVote, ChangeDaoMembers, DaoOrigin, DaoPolicy, DaoPolicyProportion,
+	DaoProvider, InitializeDaoMembers, PendingProposal, PendingVote,
 };
 
 use frame_support::{
@@ -61,7 +61,10 @@ use frame_support::{
 		PostDispatchInfo,
 	},
 	ensure,
-	traits::{Backing, EnsureOrigin, EnsureOriginWithArg, Get, GetBacking, StorageVersion},
+	traits::{
+		Backing, EitherOfDiverse, EnsureOrigin, EnsureOriginWithArg, Get, GetBacking,
+		StorageVersion,
+	},
 	weights::Weight,
 	Parameter,
 };
@@ -1265,16 +1268,16 @@ impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>
 	}
 }
 
-pub struct EnsureProportionWithArg<AccountId, I: 'static = ()>(PhantomData<(AccountId, I)>);
+pub struct EnsureDaoOriginWithArg<AccountId, I: 'static = ()>(PhantomData<(AccountId, I)>);
 impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>, AccountId, I>
-	EnsureOriginWithArg<O, DaoPolicyProportion> for EnsureProportionWithArg<AccountId, I>
+	EnsureOriginWithArg<O, DaoOrigin<AccountId>> for EnsureDaoOriginWithArg<AccountId, I>
 {
 	type Success = ();
 
-	fn try_origin(o: O, arg: &DaoPolicyProportion) -> Result<Self::Success, O> {
+	fn try_origin(o: O, arg: &DaoOrigin<AccountId>) -> Result<Self::Success, O> {
 		o.into().and_then(|o| match o {
 			RawOrigin::Members(n, m) => {
-				if match arg {
+				if match arg.proportion {
 					DaoPolicyProportion::AtLeast((N, D)) => n * D >= N * m,
 					DaoPolicyProportion::MoreThan((N, D)) => n * D > N * m,
 				} {
@@ -1290,6 +1293,26 @@ impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>
 	#[cfg(feature = "runtime-benchmarks")]
 	fn try_successful_origin() -> Result<O, ()> {
 		Ok(O::from(RawOrigin::Members(1u32, 0u32)))
+	}
+}
+
+pub struct EitherOfDiverseWithArg<L, R>(PhantomData<(L, R)>);
+impl<
+		OuterOrigin,
+		L: EnsureOriginWithArg<OuterOrigin, Argument>,
+		R: EnsureOriginWithArg<OuterOrigin, Argument>,
+		Argument,
+	> EnsureOriginWithArg<OuterOrigin, Argument> for EitherOfDiverseWithArg<L, R>
+{
+	type Success = Either<L::Success, R::Success>;
+	fn try_origin(o: OuterOrigin, arg: &Argument) -> Result<Self::Success, OuterOrigin> {
+		L::try_origin(o, arg)
+			.map_or_else(|o| R::try_origin(o, arg).map(Either::Right), |o| Ok(Either::Left(o)))
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin() -> Result<OuterOrigin, ()> {
+		L::try_successful_origin().or_else(|()| R::try_successful_origin())
 	}
 }
 

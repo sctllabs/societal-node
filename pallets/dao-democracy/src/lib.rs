@@ -175,7 +175,7 @@ mod vote;
 mod vote_threshold;
 pub mod weights;
 pub use conviction::Conviction;
-use dao_primitives::{DaoPolicy, DaoProvider};
+use dao_primitives::{DaoPolicy, DaoProvider, RawOrigin};
 use frame_support::traits::fungibles::{BalancedHold, Inspect, InspectHold, MutateHold};
 pub use pallet::*;
 use pallet_dao_assets::LockableAsset;
@@ -213,7 +213,7 @@ type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup
 #[frame_support::pallet]
 pub mod pallet {
 	use super::{DispatchResult, *};
-	use dao_primitives::{Balance, DaoPolicyProportion};
+	use dao_primitives::{Balance, DaoOrigin, DaoPolicyProportion};
 	use frame_support::{
 		pallet_prelude::*,
 		traits::{fungibles::CreditOf, tokens::AssetId, EnsureOriginWithArg},
@@ -315,7 +315,7 @@ pub mod pallet {
 
 		/// Origin from which the next tabled referendum may be forced. This is a normal
 		/// "super-majority-required" referendum.
-		type ExternalOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoPolicyProportion>;
+		type ExternalOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
 
 		/// Origin from which the next tabled referendum may be forced; this allows for the tabling
 		/// of a majority-carries referendum.
@@ -348,7 +348,7 @@ pub mod pallet {
 		type VetoOrigin: EnsureOrigin<Self::RuntimeOrigin, Success = Self::AccountId>;
 
 		/// Overarching type of all pallets origins.
-		type PalletsOrigin: From<frame_system::RawOrigin<Self::AccountId>>;
+		type PalletsOrigin: From<RawOrigin<Self::AccountId>>;
 
 		/// Handler for the unbalanced reduction when slashing a preimage deposit.
 		type Slash: OnUnbalanced<NegativeImbalanceOf<Self>>;
@@ -728,9 +728,11 @@ pub mod pallet {
 			dao_id: DaoId,
 			proposal: BoundedCallOf<T>,
 		) -> DispatchResult {
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let external_origin = T::DaoProvider::policy(dao_id)?.external_origin;
 			T::ExternalOrigin::ensure_origin(
 				origin,
-				&T::DaoProvider::policy(dao_id)?.external_origin,
+				&DaoOrigin { dao_account_id, proportion: external_origin },
 			)?;
 
 			ensure!(!<NextExternal<T>>::contains_key(dao_id), Error::<T>::DuplicateProposal);
@@ -1664,6 +1666,7 @@ impl<T: Config> Pallet<T> {
 		status: ReferendumStatus<T::BlockNumber, BoundedCallOf<T>, BalanceOf<T>>,
 	) -> bool {
 		// TODO
+		let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
 		let (token_id, token_address) = T::DaoProvider::dao_token(dao_id).unwrap();
 		let total_issuance = match token_id {
 			None => Zero::zero(),
@@ -1686,7 +1689,7 @@ impl<T: Config> Pallet<T> {
 				DispatchTime::At(when),
 				None,
 				63,
-				frame_system::RawOrigin::Root.into(),
+				RawOrigin::Dao(dao_account_id).into(),
 				status.proposal,
 			)
 			.is_err()
