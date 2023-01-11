@@ -43,7 +43,7 @@ fn funded_account<T: Config>(name: &'static str, index: u32) -> T::AccountId {
 
 fn make_proposal<T: Config>(n: u32) -> BoundedCallOf<T> {
 	let call: CallOf<T> = frame_system::Call::remark { remark: n.encode() }.into();
-	<T as Config>::Preimages::bound(call).unwrap()
+	// <T as Config>::Preimages::bound(call).unwrap()
 }
 
 fn add_proposal<T: Config>(n: u32) -> Result<H256, &'static str> {

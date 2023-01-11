@@ -1291,8 +1291,14 @@ impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin() -> Result<O, ()> {
-		Ok(O::from(RawOrigin::Members(1u32, 0u32)))
+	fn try_successful_origin(dao_origin: &DaoOrigin<AccountId>) -> Result<O, ()> {
+		let proportion = &dao_origin.proportion;
+		match proportion {
+			DaoPolicyProportion::AtLeast(at_least) =>
+				Ok(O::from(RawOrigin::Members(at_least.0, at_least.1))),
+			DaoPolicyProportion::MoreThan(more_than) =>
+				Ok(O::from(RawOrigin::Members(more_than.0, more_than.1))),
+		}
 	}
 }
 
@@ -1311,8 +1317,8 @@ impl<
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin() -> Result<OuterOrigin, ()> {
-		L::try_successful_origin().or_else(|()| R::try_successful_origin())
+	fn try_successful_origin(dao_origin: &Argument) -> Result<OuterOrigin, ()> {
+		L::try_successful_origin(dao_origin).or_else(|()| R::try_successful_origin(dao_origin))
 	}
 }
 

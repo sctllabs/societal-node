@@ -1142,7 +1142,7 @@ impl<
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin() -> Result<O, ()> {
-		Ok(O::from(RawOrigin::Dao(0_u32)))
+	fn try_successful_origin(dao_origin: &DaoOrigin<AccountId>) -> Result<O, ()> {
+		Ok(O::from(RawOrigin::Dao(dao_origin.dao_account_id)))
 	}
 }
