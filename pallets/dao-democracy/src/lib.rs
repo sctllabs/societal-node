@@ -158,8 +158,7 @@ use frame_support::{
 	traits::{
 		defensive_prelude::*,
 		schedule::{v3::Named as ScheduleNamed, DispatchTime},
-		Bounded, Currency, Get, LockIdentifier, LockableCurrency, OnUnbalanced, QueryPreimage,
-		ReservableCurrency, StorePreimage, WithdrawReasons,
+		Bounded, Currency, Get, LockIdentifier, OnUnbalanced, ReservableCurrency,
 	},
 	weights::Weight,
 };
@@ -213,14 +212,10 @@ type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup
 #[frame_support::pallet]
 pub mod pallet {
 	use super::{DispatchResult, *};
-	use dao_primitives::{Balance, DaoOrigin, DaoPolicyProportion};
-	use frame_support::{
-		pallet_prelude::*,
-		traits::{fungibles::CreditOf, tokens::AssetId, EnsureOriginWithArg},
-	};
+	use dao_primitives::DaoOrigin;
+	use frame_support::{pallet_prelude::*, traits::EnsureOriginWithArg};
 	use frame_system::pallet_prelude::*;
 	use sp_core::H256;
-	use sp_runtime::traits::AtLeast32BitUnsigned;
 
 	/// The current storage version.
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
@@ -253,47 +248,6 @@ pub mod pallet {
 			+ MutateHold<Self::AccountId>
 			+ BalancedHold<Self::AccountId>;
 
-		/// The period between a proposal being approved and enacted.
-		///
-		/// It should generally be a little more than the unstake period to ensure that
-		/// voting stakers have an opportunity to remove themselves from the system in the case
-		/// where they are on the losing side of a vote.
-		#[pallet::constant]
-		type EnactmentPeriod: Get<Self::BlockNumber>;
-
-		/// How often (in blocks) new public referenda are launched.
-		#[pallet::constant]
-		type LaunchPeriod: Get<Self::BlockNumber>;
-
-		/// How often (in blocks) to check for new votes.
-		#[pallet::constant]
-		type VotingPeriod: Get<Self::BlockNumber>;
-
-		/// The minimum period of vote locking.
-		///
-		/// It should be no shorter than enactment period to ensure that in the case of an approval,
-		/// those successful voters are locked into the consequences that their votes entail.
-		#[pallet::constant]
-		type VoteLockingPeriod: Get<Self::BlockNumber>;
-
-		/// The minimum amount to be used as a deposit for a public referendum proposal.
-		#[pallet::constant]
-		type MinimumDeposit: Get<BalanceOf<Self>>;
-
-		/// Indicator for whether an emergency origin is even allowed to happen. Some chains may
-		/// want to set this permanently to `false`, others may want to condition it on things such
-		/// as an upgrade having happened recently.
-		#[pallet::constant]
-		type InstantAllowed: Get<bool>;
-
-		/// Minimum voting period allowed for a fast-track referendum.
-		#[pallet::constant]
-		type FastTrackVotingPeriod: Get<Self::BlockNumber>;
-
-		/// Period in blocks where an external proposal may not be re-submitted after being vetoed.
-		#[pallet::constant]
-		type CooloffPeriod: Get<Self::BlockNumber>;
-
 		/// The maximum number of votes for an account.
 		///
 		/// Also used to compute weight, an overly big value can
@@ -319,30 +273,42 @@ pub mod pallet {
 
 		/// Origin from which the next tabled referendum may be forced; this allows for the tabling
 		/// of a majority-carries referendum.
-		type ExternalMajorityOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+		type ExternalMajorityOrigin: EnsureOriginWithArg<
+			Self::RuntimeOrigin,
+			DaoOrigin<Self::AccountId>,
+		>;
 
 		/// Origin from which the next tabled referendum may be forced; this allows for the tabling
 		/// of a negative-turnout-bias (default-carries) referendum.
-		type ExternalDefaultOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+		type ExternalDefaultOrigin: EnsureOriginWithArg<
+			Self::RuntimeOrigin,
+			DaoOrigin<Self::AccountId>,
+		>;
 
 		/// Origin from which the next majority-carries (or more permissive) referendum may be
 		/// tabled to vote according to the `FastTrackVotingPeriod` asynchronously in a similar
 		/// manner to the emergency origin. It retains its threshold method.
-		type FastTrackOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+		type FastTrackOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
 
 		/// Origin from which the next majority-carries (or more permissive) referendum may be
 		/// tabled to vote immediately and asynchronously in a similar manner to the emergency
 		/// origin. It retains its threshold method.
-		type InstantOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+		type InstantOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
 
 		/// Origin from which any referendum may be cancelled in an emergency.
-		type CancellationOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+		type CancellationOrigin: EnsureOriginWithArg<
+			Self::RuntimeOrigin,
+			DaoOrigin<Self::AccountId>,
+		>;
 
 		/// Origin from which proposals may be blacklisted.
-		type BlacklistOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+		type BlacklistOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
 
 		/// Origin from which a proposal may be cancelled and its backers slashed.
-		type CancelProposalOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+		type CancelProposalOrigin: EnsureOriginWithArg<
+			Self::RuntimeOrigin,
+			DaoOrigin<Self::AccountId>,
+		>;
 
 		/// Origin for anyone able to veto proposals.
 		type VetoOrigin: EnsureOrigin<Self::RuntimeOrigin, Success = Self::AccountId>;
@@ -462,27 +428,6 @@ pub mod pallet {
 	pub type Cancellations<T: Config> =
 		StorageDoubleMap<_, Twox64Concat, DaoId, Identity, H256, bool, ValueQuery>;
 
-	// #[pallet::genesis_config]
-	// pub struct GenesisConfig<T: Config> {
-	// 	_phantom: sp_std::marker::PhantomData<T>,
-	// }
-	//
-	// #[cfg(feature = "std")]
-	// impl<T: Config> Default for GenesisConfig<T> {
-	// 	fn default() -> Self {
-	// 		GenesisConfig { _phantom: Default::default() }
-	// 	}
-	// }
-	//
-	// #[pallet::genesis_build]
-	// impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
-	// 	fn build(&self) {
-	// 		PublicPropCount::<T>::put(0 as PropIndex);
-	// 		ReferendumCount::<T>::put(0 as ReferendumIndex);
-	// 		LowestUnbaked::<T>::put(0 as ReferendumIndex);
-	// 	}
-	// }
-
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -599,7 +544,12 @@ pub mod pallet {
 			#[pallet::compact] value: BalanceOf<T>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			ensure!(value >= T::MinimumDeposit::get(), Error::<T>::ValueLow);
+
+			let policy = T::DaoProvider::policy(dao_id)?;
+			ensure!(
+				value >= Self::u128_to_balance_of(policy.minimum_deposit),
+				Error::<T>::ValueLow
+			);
 
 			let index = Self::public_prop_count(dao_id);
 			let real_prop_count = PublicProps::<T>::decode_len(dao_id).unwrap_or(0) as u32;
@@ -705,7 +655,12 @@ pub mod pallet {
 			dao_id: DaoId,
 			ref_index: ReferendumIndex,
 		) -> DispatchResult {
-			T::CancellationOrigin::ensure_origin(origin)?;
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let cancellation_origin = T::DaoProvider::policy(dao_id)?.cancellation_origin;
+			T::CancellationOrigin::ensure_origin(
+				origin,
+				&DaoOrigin { dao_account_id, proportion: cancellation_origin },
+			)?;
 
 			let status = Self::referendum_status(dao_id, ref_index)?;
 			let h = status.proposal.hash();
@@ -763,7 +718,12 @@ pub mod pallet {
 			dao_id: DaoId,
 			proposal: BoundedCallOf<T>,
 		) -> DispatchResult {
-			T::ExternalMajorityOrigin::ensure_origin(origin)?;
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let external_majority_origin = T::DaoProvider::policy(dao_id)?.external_majority_origin;
+			T::ExternalMajorityOrigin::ensure_origin(
+				origin,
+				&DaoOrigin { dao_account_id, proportion: external_majority_origin },
+			)?;
 			<NextExternal<T>>::insert(dao_id, (proposal, VoteThreshold::SimpleMajority));
 			Ok(())
 		}
@@ -785,7 +745,12 @@ pub mod pallet {
 			dao_id: DaoId,
 			proposal: BoundedCallOf<T>,
 		) -> DispatchResult {
-			T::ExternalDefaultOrigin::ensure_origin(origin)?;
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let external_default_origin = T::DaoProvider::policy(dao_id)?.external_default_origin;
+			T::ExternalDefaultOrigin::ensure_origin(
+				origin,
+				&DaoOrigin { dao_account_id, proportion: external_default_origin },
+			)?;
 			<NextExternal<T>>::insert(dao_id, (proposal, VoteThreshold::SuperMajorityAgainst));
 			Ok(())
 		}
@@ -814,20 +779,26 @@ pub mod pallet {
 			voting_period: T::BlockNumber,
 			delay: T::BlockNumber,
 		) -> DispatchResult {
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let policy = T::DaoProvider::policy(dao_id)?;
+			let mut dao_origin = DaoOrigin { dao_account_id, proportion: policy.fast_track_origin };
+
 			// Rather complicated bit of code to ensure that either:
 			// - `voting_period` is at least `FastTrackVotingPeriod` and `origin` is
 			//   `FastTrackOrigin`; or
 			// - `InstantAllowed` is `true` and `origin` is `InstantOrigin`.
-			let maybe_ensure_instant = if voting_period < T::FastTrackVotingPeriod::get() {
-				Some(origin)
-			} else if let Err(origin) = T::FastTrackOrigin::try_origin(origin) {
-				Some(origin)
-			} else {
-				None
-			};
+			let maybe_ensure_instant =
+				if voting_period < Self::u32_to_block_number(policy.fast_track_voting_period) {
+					Some(origin)
+				} else if let Err(origin) = T::FastTrackOrigin::try_origin(origin, &dao_origin) {
+					Some(origin)
+				} else {
+					None
+				};
 			if let Some(ensure_instant) = maybe_ensure_instant {
-				T::InstantOrigin::ensure_origin(ensure_instant)?;
-				ensure!(T::InstantAllowed::get(), Error::<T>::InstantNotAllowed);
+				dao_origin.proportion = policy.instant_origin;
+				T::InstantOrigin::ensure_origin(ensure_instant, &dao_origin)?;
+				ensure!(policy.instant_allowed, Error::<T>::InstantNotAllowed);
 			}
 
 			ensure!(voting_period > T::BlockNumber::zero(), Error::<T>::VotingPeriodLow);
@@ -868,6 +839,8 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = T::VetoOrigin::ensure_origin(origin)?;
 
+			let policy = T::DaoProvider::policy(dao_id)?;
+
 			if let Some((ext_proposal, _)) = NextExternal::<T>::get(dao_id) {
 				ensure!(proposal_hash == ext_proposal.hash(), Error::<T>::ProposalMissing);
 			} else {
@@ -883,8 +856,8 @@ pub mod pallet {
 				.try_insert(insert_position, who.clone())
 				.map_err(|_| Error::<T>::TooMany)?;
 
-			let until =
-				<frame_system::Pallet<T>>::block_number().saturating_add(T::CooloffPeriod::get());
+			let until = <frame_system::Pallet<T>>::block_number()
+				.saturating_add(Self::u32_to_block_number(policy.cooloff_period));
 			<Blacklist<T>>::insert(dao_id, &proposal_hash, (until, existing_vetoers));
 
 			Self::deposit_event(Event::<T>::Vetoed { dao_id, who, proposal_hash, until });
@@ -1089,7 +1062,12 @@ pub mod pallet {
 			proposal_hash: H256,
 			maybe_ref_index: Option<ReferendumIndex>,
 		) -> DispatchResult {
-			T::BlacklistOrigin::ensure_origin(origin)?;
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let blacklist_origin = T::DaoProvider::policy(dao_id)?.blacklist_origin;
+			T::BlacklistOrigin::ensure_origin(
+				origin,
+				&DaoOrigin { dao_account_id, proportion: blacklist_origin },
+			)?;
 
 			let (token_id, token_address) = T::DaoProvider::dao_token(dao_id)?;
 
@@ -1146,7 +1124,12 @@ pub mod pallet {
 			dao_id: DaoId,
 			#[pallet::compact] prop_index: PropIndex,
 		) -> DispatchResult {
-			T::CancelProposalOrigin::ensure_origin(origin)?;
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let cancel_proposal_origin = T::DaoProvider::policy(dao_id)?.cancel_proposal_origin;
+			T::CancelProposalOrigin::ensure_origin(
+				origin,
+				&DaoOrigin { dao_account_id, proportion: cancel_proposal_origin },
+			)?;
 
 			let (token_id, token_address) = T::DaoProvider::dao_token(dao_id)?;
 
@@ -1223,22 +1206,6 @@ impl<T: Config> Pallet<T> {
 	}
 
 	// Exposed mutables.
-
-	/// Start a referendum.
-	pub fn internal_start_referendum(
-		dao_id: DaoId,
-		proposal: BoundedCallOf<T>,
-		threshold: VoteThreshold,
-		delay: T::BlockNumber,
-	) -> ReferendumIndex {
-		<Pallet<T>>::inject_referendum(
-			dao_id,
-			<frame_system::Pallet<T>>::block_number().saturating_add(T::VotingPeriod::get()),
-			proposal,
-			threshold,
-			delay,
-		)
-	}
 
 	/// Remove a referendum.
 	pub fn internal_cancel_referendum(dao_id: DaoId, ref_index: ReferendumIndex) {
@@ -1341,6 +1308,7 @@ impl<T: Config> Pallet<T> {
 		ref_index: ReferendumIndex,
 		scope: UnvoteScope,
 	) -> DispatchResult {
+		let policy = T::DaoProvider::policy(dao_id)?;
 		let info = ReferendumInfoOf::<T>::get(dao_id, ref_index);
 		VotingOf::<T>::try_mutate(dao_id, who, |voting| -> DispatchResult {
 			if let Voting::Direct { ref mut votes, delegations, ref mut prior } = voting {
@@ -1364,7 +1332,8 @@ impl<T: Config> Pallet<T> {
 					Some(ReferendumInfo::Finished { end, approved }) => {
 						if let Some((lock_periods, balance)) = votes[i].1.locked_if(approved) {
 							let unlock_at = end.saturating_add(
-								T::VoteLockingPeriod::get().saturating_mul(lock_periods.into()),
+								Self::u32_to_block_number(policy.vote_locking_period)
+									.saturating_mul(lock_periods.into()),
 							);
 							let now = frame_system::Pallet::<T>::block_number();
 							if now < unlock_at {
@@ -1453,6 +1422,8 @@ impl<T: Config> Pallet<T> {
 	) -> Result<u32, DispatchError> {
 		ensure!(who != target, Error::<T>::Nonsense);
 
+		let policy = T::DaoProvider::policy(dao_id)?;
+
 		let (token_id, token_address) = T::DaoProvider::dao_token(dao_id)?;
 		match token_id {
 			None => {},
@@ -1490,7 +1461,8 @@ impl<T: Config> Pallet<T> {
 						let now = frame_system::Pallet::<T>::block_number();
 						let lock_periods = conviction.lock_periods().into();
 						let unlock_block = now.saturating_add(
-							T::VoteLockingPeriod::get().saturating_mul(lock_periods),
+							Self::u32_to_block_number(policy.vote_locking_period)
+								.saturating_mul(lock_periods),
 						);
 						prior.accumulate(unlock_block, balance);
 						voting.set_common(delegations, prior);
@@ -1520,6 +1492,8 @@ impl<T: Config> Pallet<T> {
 	///
 	/// Return the number of votes of upstream.
 	fn try_undelegate(dao_id: DaoId, who: T::AccountId) -> Result<u32, DispatchError> {
+		let policy = T::DaoProvider::policy(dao_id)?;
+
 		let votes =
 			VotingOf::<T>::try_mutate(dao_id, &who, |voting| -> Result<u32, DispatchError> {
 				let mut old = Voting::default();
@@ -1535,7 +1509,8 @@ impl<T: Config> Pallet<T> {
 						let now = frame_system::Pallet::<T>::block_number();
 						let lock_periods = conviction.lock_periods().into();
 						let unlock_block = now.saturating_add(
-							T::VoteLockingPeriod::get().saturating_mul(lock_periods),
+							Self::u32_to_block_number(policy.vote_locking_period)
+								.saturating_mul(lock_periods),
 						);
 						prior.accumulate(unlock_block, balance);
 						voting.set_common(delegations, prior);
@@ -1602,15 +1577,17 @@ impl<T: Config> Pallet<T> {
 
 	/// Table the waiting external proposal for a vote, if there is one.
 	fn launch_external(dao_id: DaoId, now: T::BlockNumber) -> DispatchResult {
+		let policy = T::DaoProvider::policy(dao_id)?;
+
 		if let Some((proposal, threshold)) = <NextExternal<T>>::take(dao_id) {
 			LastTabledWasExternal::<T>::insert(dao_id, true);
 			Self::deposit_event(Event::<T>::ExternalTabled);
 			Self::inject_referendum(
 				dao_id,
-				now.saturating_add(T::VotingPeriod::get()),
+				now.saturating_add(Self::u32_to_block_number(policy.voting_period)),
 				proposal,
 				threshold,
-				T::EnactmentPeriod::get(),
+				Self::u32_to_block_number(policy.enactment_period),
 			);
 			Ok(())
 		} else {
@@ -1625,6 +1602,8 @@ impl<T: Config> Pallet<T> {
 			// defensive only: All current public proposals have an amount locked
 			|x| Self::backing_for(dao_id, (x.1).0).defensive_unwrap_or_else(Zero::zero),
 		) {
+			let policy = T::DaoProvider::policy(dao_id)?;
+
 			let (prop_index, proposal, _) = public_props.swap_remove(winner_index);
 			<PublicProps<T>>::insert(dao_id, public_props);
 
@@ -1636,7 +1615,7 @@ impl<T: Config> Pallet<T> {
 					match token_id {
 						None => {},
 						Some(token_id) => {
-							T::Assets::release(token_id, d, deposit, false);
+							T::Assets::release(token_id, d, deposit, false)?;
 						},
 					};
 				}
@@ -1647,10 +1626,10 @@ impl<T: Config> Pallet<T> {
 				});
 				Self::inject_referendum(
 					dao_id,
-					now.saturating_add(T::VotingPeriod::get()),
+					now.saturating_add(Self::u32_to_block_number(policy.voting_period)),
 					proposal,
 					VoteThreshold::SuperMajorityApprove,
-					T::EnactmentPeriod::get(),
+					Self::u32_to_block_number(policy.enactment_period),
 				);
 			}
 			Ok(())
@@ -1723,12 +1702,21 @@ impl<T: Config> Pallet<T> {
 		let dao_count = T::DaoProvider::count();
 
 		for dao_id in 0..dao_count {
+			let maybe_policy = T::DaoProvider::policy(dao_id);
+
+			// TODO
+			if maybe_policy.is_err() {
+				continue
+			}
+
+			let policy = maybe_policy.unwrap();
+
 			let next = Self::lowest_unbaked(dao_id);
 			let last = Self::referendum_count(dao_id);
 			let r = last.saturating_sub(next);
 
 			// pick out another public referendum if it's time.
-			if (now % T::LaunchPeriod::get()).is_zero() {
+			if (now % Self::u32_to_block_number(policy.launch_period)).is_zero() {
 				// Errors come from the queue being empty. If the queue is not empty, it will take
 				// full block weight.
 				if Self::launch_next(dao_id, now).is_ok() {
@@ -1741,38 +1729,36 @@ impl<T: Config> Pallet<T> {
 				weight.saturating_accrue(T::WeightInfo::on_initialize_base(r));
 			}
 
-			for dao_id in 0..dao_count {
-				// tally up votes for any expiring referenda.
-				for (index, info) in
-					Self::maturing_referenda_at_inner(dao_id, now, next..last).into_iter()
-				{
-					let approved = Self::bake_referendum(dao_id, now, index, info);
-					ReferendumInfoOf::<T>::insert(
-						dao_id,
-						index,
-						ReferendumInfo::Finished { end: now, approved },
-					);
-					weight = max_block_weight;
-				}
-
-				// Notes:
-				// * We don't consider the lowest unbaked to be the last maturing in case some
-				//   referenda have a longer voting period than others.
-				// * The iteration here shouldn't trigger any storage read that are not in cache,
-				//   due to `maturing_referenda_at_inner` having already read them.
-				// * We shouldn't iterate more than `LaunchPeriod/VotingPeriod + 1` times because
-				//   the number of unbaked referendum is bounded by this number. In case those
-				//   number have changed in a runtime upgrade the formula should be adjusted but the
-				//   bound should still be sensible.
-				<LowestUnbaked<T>>::mutate(dao_id, |ref_index| {
-					while *ref_index < last &&
-						Self::referendum_info(dao_id, *ref_index)
-							.map_or(true, |info| matches!(info, ReferendumInfo::Finished { .. }))
-					{
-						*ref_index += 1
-					}
-				});
+			// tally up votes for any expiring referenda.
+			for (index, info) in
+				Self::maturing_referenda_at_inner(dao_id, now, next..last).into_iter()
+			{
+				let approved = Self::bake_referendum(dao_id, now, index, info);
+				ReferendumInfoOf::<T>::insert(
+					dao_id,
+					index,
+					ReferendumInfo::Finished { end: now, approved },
+				);
+				weight = max_block_weight;
 			}
+
+			// Notes:
+			// * We don't consider the lowest unbaked to be the last maturing in case some referenda
+			//   have a longer voting period than others.
+			// * The iteration here shouldn't trigger any storage read that are not in cache, due to
+			//   `maturing_referenda_at_inner` having already read them.
+			// * We shouldn't iterate more than `LaunchPeriod/VotingPeriod + 1` times because the
+			//   number of unbaked referendum is bounded by this number. In case those number have
+			//   changed in a runtime upgrade the formula should be adjusted but the bound should
+			//   still be sensible.
+			<LowestUnbaked<T>>::mutate(dao_id, |ref_index| {
+				while *ref_index < last &&
+					Self::referendum_info(dao_id, *ref_index)
+						.map_or(true, |info| matches!(info, ReferendumInfo::Finished { .. }))
+				{
+					*ref_index += 1
+				}
+			});
 		}
 
 		weight
@@ -1785,6 +1771,16 @@ impl<T: Config> Pallet<T> {
 		// DepositOf first tuple element is a vec, decoding its len is equivalent to decode a
 		// `Compact<u32>`.
 		decode_compact_u32_at(&<DepositOf<T>>::hashed_key_for(dao_id, proposal))
+	}
+
+	fn u128_to_balance_of(cost: u128) -> BalanceOf<T> {
+		TryInto::<BalanceOf<T>>::try_into(cost).ok().unwrap()
+	}
+
+	fn u32_to_block_number(block: u32) -> <T as frame_system::Config>::BlockNumber {
+		TryInto::<<T as frame_system::Config>::BlockNumber>::try_into(block)
+			.ok()
+			.unwrap()
 	}
 }
 

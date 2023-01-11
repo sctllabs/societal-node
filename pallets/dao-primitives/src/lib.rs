@@ -47,9 +47,9 @@ pub struct DaoPolicyPayload {
 	pub enactment_period: u32,
 	pub launch_period: u32,
 	pub voting_period: u32,
-	pub vote_locking_period: u32,
 	pub fast_track_voting_period: u32,
 	pub cooloff_period: u32,
+	pub minimum_deposit: u128,
 	pub external_origin: DaoPolicyProportion,
 	pub external_majority_origin: DaoPolicyProportion,
 	pub external_default_origin: DaoPolicyProportion,
@@ -134,11 +134,13 @@ pub struct DaoPolicy {
 	///
 	/// It should be no shorter than enactment period to ensure that in the case of an approval,
 	/// those successful voters are locked into the consequences that their votes entail.
-	pub vote_locking_period: u32,
+	pub vote_locking_period: u32, // Same as EnactmentPeriod
 	/// Minimum voting period allowed for a fast-track referendum.
 	pub fast_track_voting_period: u32,
 	/// Period in blocks where an external proposal may not be re-submitted after being vetoed.
 	pub cooloff_period: u32,
+	/// The minimum amount to be used as a deposit for a public referendum proposal.
+	pub minimum_deposit: u128,
 	/// Origin from which the next tabled referendum may be forced. This is a normal
 	/// "super-majority-required" referendum.
 	pub external_origin: DaoPolicyProportion,

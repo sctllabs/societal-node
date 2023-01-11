@@ -567,6 +567,7 @@ pub mod pallet {
 				proposal_bond_max: None,
 				proposal_period: dao_payload.policy.proposal_period /
 					T::ExpectedBlockTime::get() as BlockNumber,
+				minimum_deposit: dao_payload.policy.minimum_deposit,
 				approve_origin: dao_payload.policy.approve_origin,
 				reject_origin: dao_payload.policy.reject_origin,
 				token_voting_min_threshold: T::DaoTokenVotingMinThreshold::get(),
@@ -576,7 +577,7 @@ pub mod pallet {
 					T::ExpectedBlockTime::get() as BlockNumber,
 				voting_period: dao_payload.policy.voting_period /
 					T::ExpectedBlockTime::get() as BlockNumber,
-				vote_locking_period: dao_payload.policy.vote_locking_period /
+				vote_locking_period: dao_payload.policy.enactment_period /
 					T::ExpectedBlockTime::get() as BlockNumber,
 				fast_track_voting_period: dao_payload.policy.fast_track_voting_period /
 					T::ExpectedBlockTime::get() as BlockNumber,
