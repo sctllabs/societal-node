@@ -58,6 +58,9 @@ type PendingDaoOf<T> = PendingDao<
 	>,
 >;
 
+/// Dao ID. Just a `u32`.
+pub type DaoId = u32;
+
 type AssetId<T> = <T as Config>::AssetId;
 type Balance<T> = <T as Config>::Balance;
 
@@ -267,6 +270,11 @@ pub mod pallet {
 
 		/// The identifier type for an offchain worker.
 		type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
+
+		type ApproveOrigin: EnsureOriginWithArg<
+			<Self as frame_system::Config>::RuntimeOrigin,
+			DaoOrigin<Self::AccountId>,
+		>;
 	}
 
 	/// Origin for the dao pallet.
@@ -475,6 +483,12 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		DaoRegistered(u32, T::AccountId),
 		DaoPendingApproval(u32, T::AccountId),
+		DaoTokenTransferred {
+			dao_id: DaoId,
+			token_id: T::AssetId,
+			beneficiary: T::AccountId,
+			amount: Balance<T>,
+		},
 	}
 
 	#[pallet::error]
@@ -628,12 +642,12 @@ pub mod pallet {
 					)
 					.map_err(|_| Error::<T>::TokenCreateFailed)?;
 
+					let minted = T::DaoTokenBalanceLimit::get().min(token.min_balance);
+
 					T::AssetProvider::mint_into(
 						token_id,
 						&dao_account_id,
-						Self::u128_to_balance(
-							T::DaoTokenBalanceLimit::get().min(token.min_balance),
-						),
+						Self::u128_to_balance(minted),
 					)
 					.map_err(|_| Error::<T>::TokenCreateFailed)?;
 
@@ -642,7 +656,9 @@ pub mod pallet {
 							token_id,
 							&dao_account_id,
 							&member,
-							Self::u128_to_balance(T::DaoTokenVotingMinThreshold::get()),
+							Self::u128_to_balance(
+								minted / 2 / u128::try_from(council_members.len()).unwrap(),
+							),
 							true,
 						)
 						.map_err(|_| Error::<T>::TokenTransferFailed)?;
@@ -712,6 +728,52 @@ pub mod pallet {
 			}
 
 			Self::do_register_dao(dao, policy, council_members, technical_committee_members)
+		}
+
+		#[pallet::weight(10_000)]
+		pub fn transfer_token(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			#[pallet::compact] amount: Balance<T>,
+			beneficiary: <T::Lookup as StaticLookup>::Source,
+		) -> DispatchResult {
+			let dao_account_id = Self::dao_account_id(dao_id);
+			let approve_origin = Self::policy(dao_id)?.approve_origin;
+			T::ApproveOrigin::ensure_origin(
+				origin,
+				&DaoOrigin {
+					dao_account_id: dao_account_id.clone(),
+					proportion: DaoPolicyProportion::AtLeast(approve_origin),
+				},
+			)?;
+
+			let (token_id, token_address) = Self::dao_token(dao_id)?;
+
+			let beneficiary = T::Lookup::lookup(beneficiary)?;
+
+			match token_id {
+				None => {},
+				Some(token_id) => {
+					T::AssetProvider::transfer(
+						token_id,
+						&dao_account_id,
+						&beneficiary,
+						amount,
+						true,
+					)?;
+
+					Self::deposit_event(Event::DaoTokenTransferred {
+						dao_id,
+						token_id,
+						beneficiary,
+						amount,
+					});
+				},
+			}
+
+			// TODO: handle token_address
+
+			Ok(())
 		}
 
 		#[pallet::weight(10_000)]
