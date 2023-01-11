@@ -4,8 +4,8 @@ use sc_service::ChainType;
 use serde::{Deserialize, Serialize};
 use societal_node_runtime::{
 	opaque::Block, wasm_binary_unwrap, AccountId, AuthorityDiscoveryConfig, BabeConfig, Balance,
-	BalancesConfig, CouncilConfig, DemocracyConfig, EVMChainIdConfig, EVMConfig, ElectionsConfig,
-	GenesisConfig, GrandpaConfig, ImOnlineConfig, IndicesConfig, MaxNominations,
+	BalancesConfig, CouncilConfig, DaoConfig, DemocracyConfig, EVMChainIdConfig, EVMConfig,
+	ElectionsConfig, GenesisConfig, GrandpaConfig, ImOnlineConfig, IndicesConfig, MaxNominations,
 	NominationPoolsConfig, SessionConfig, SessionKeys, Signature, SocietyConfig, StakerStatus,
 	StakingConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, DOLLARS,
 };
@@ -18,6 +18,8 @@ use sp_runtime::{
 	Perbill,
 };
 use std::{collections::BTreeMap, str::FromStr};
+
+const ETH_RPC_URL_TESTNET: &str = "https://goerli.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161";
 
 /// Node `ChainSpec` extensions.
 ///
@@ -83,6 +85,7 @@ fn development_config_genesis() -> GenesisConfig {
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
 		None,
 		1516,
+		ETH_RPC_URL_TESTNET,
 	)
 }
 
@@ -145,7 +148,14 @@ fn local_testnet_genesis() -> GenesisConfig {
 
 	let endowed_accounts: Vec<AccountId> = vec![root_key.clone()];
 
-	testnet_genesis(initial_authorities, vec![], root_key, Some(endowed_accounts), 1516)
+	testnet_genesis(
+		initial_authorities,
+		vec![],
+		root_key,
+		Some(endowed_accounts),
+		1516,
+		ETH_RPC_URL_TESTNET,
+	)
 }
 
 /// Local testnet config (multivalidator Alice + Bob)
@@ -187,6 +197,7 @@ pub fn testnet_genesis(
 	root_key: AccountId,
 	endowed_accounts: Option<Vec<AccountId>>,
 	chain_id: u64,
+	eth_rpc_url: &str,
 ) -> GenesisConfig {
 	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
 	const STASH: Balance = ENDOWMENT / 1000;
@@ -367,5 +378,8 @@ pub fn testnet_genesis(
 		ethereum: Default::default(),
 		dynamic_fee: Default::default(),
 		base_fee: Default::default(),
+		dao: {
+			DaoConfig { eth_rpc_url: eth_rpc_url.as_bytes().to_vec(), _phantom: Default::default() }
+		},
 	}
 }

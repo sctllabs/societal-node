@@ -63,8 +63,6 @@ pub const KEY_TYPE: KeyTypeId = KeyTypeId(*b"sctl");
 
 const UNSIGNED_TXS_PRIORITY: u64 = 100;
 
-const HTTP_REMOTE_REQUEST: &str = "https://ethereum.publicnode.com";
-
 const ERC20_TOKEN_TOTAL_SUPPLY_SIGNATURE: &str =
 	"0x18160ddd0000000000000000000000000000000000000000000000000000000000000000";
 const ERC20_TOKEN_BALANCE_OF_SIGNATURE_PREFIX: &str = "0x70a08231000000000000000000000000";
@@ -270,6 +268,34 @@ pub mod pallet {
 	#[pallet::getter(fn policies)]
 	pub(super) type Policies<T: Config> =
 		StorageMap<_, Blake2_128Concat, u32, PolicyOf, OptionQuery>;
+
+	/// The ideal number of staking participants.
+	#[pallet::storage]
+	#[pallet::getter(fn eth_rpc_url)]
+	pub type EthRpcUrl<T> =
+		StorageValue<_, BoundedVec<u8, <T as Config>::DaoStringLimit>, ValueQuery>;
+
+	#[pallet::genesis_config]
+	pub struct GenesisConfig<T: Config> {
+		pub eth_rpc_url: Vec<u8>,
+		pub _phantom: PhantomData<T>,
+	}
+
+	#[cfg(feature = "std")]
+	impl<T: Config> Default for GenesisConfig<T> {
+		fn default() -> Self {
+			GenesisConfig { eth_rpc_url: Default::default(), _phantom: Default::default() }
+		}
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
+		fn build(&self) {
+			EthRpcUrl::<T>::put(
+				BoundedVec::<u8, T::DaoStringLimit>::try_from(self.eth_rpc_url.clone()).unwrap(),
+			);
+		}
+	}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
@@ -478,6 +504,7 @@ pub mod pallet {
 		// Error returned when fetching http
 		HttpFetchingError,
 		OffchainUnsignedTxError,
+		RpcUrlTooLong,
 	}
 
 	#[pallet::call]
@@ -576,21 +603,24 @@ pub mod pallet {
 					)
 					.map_err(|_| Error::<T>::TokenCreateFailed)?;
 
+					let minted = T::DaoTokenBalanceLimit::get().min(token.min_balance);
+
 					T::AssetProvider::mint_into(
 						token_id,
 						&dao_account_id,
-						Self::u128_to_balance(
-							T::DaoTokenBalanceLimit::get().min(token.min_balance),
-						),
+						Self::u128_to_balance(minted),
 					)
 					.map_err(|_| Error::<T>::TokenCreateFailed)?;
 
+					// TODO: temp solution - should be re-worked via DAO proposals
 					for member in council_members.clone() {
 						T::AssetProvider::transfer(
 							token_id,
 							&dao_account_id,
 							&member,
-							Self::u128_to_balance(T::DaoTokenVotingMinThreshold::get()),
+							Self::u128_to_balance(
+								minted / 2 / u128::try_from(council_members.len()).unwrap(),
+							),
 							true,
 						)
 						.map_err(|_| Error::<T>::TokenTransferFailed)?;
@@ -869,7 +899,8 @@ pub mod pallet {
 		}
 
 		fn fetch_from_remote(body: Vec<&[u8]>) -> Result<Vec<u8>, Error<T>> {
-			let request = offchain::http::Request::post(HTTP_REMOTE_REQUEST, body);
+			let eth_rpc_url = &EthRpcUrl::<T>::get().to_vec()[..];
+			let request = offchain::http::Request::post(str::from_utf8(eth_rpc_url).unwrap(), body);
 
 			// Keeping the offchain worker execution time reasonable, so limiting the call to be
 			// within 3s.
