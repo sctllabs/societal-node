@@ -641,20 +641,8 @@ pub mod pallet {
 						Self::u128_to_balance(minted),
 					)
 					.map_err(|_| Error::<T>::TokenCreateFailed)?;
-
-					for member in council_members.clone() {
-						T::AssetProvider::transfer(
-							token_id,
-							&dao_account_id,
-							&member,
-							Self::u128_to_balance(
-								minted / 2 / u128::try_from(council_members.len()).unwrap(),
-							),
-							true,
-						)
-						.map_err(|_| Error::<T>::TokenTransferFailed)?;
-					}
 				}
+			}
 
 			if has_token_id.is_none() {
 				if let Some(id) = dao_payload.token_id {
