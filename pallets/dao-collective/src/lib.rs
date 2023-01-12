@@ -61,10 +61,7 @@ use frame_support::{
 		PostDispatchInfo,
 	},
 	ensure,
-	traits::{
-		Backing, EitherOfDiverse, EnsureOrigin, EnsureOriginWithArg, Get, GetBacking,
-		StorageVersion,
-	},
+	traits::{Backing, EnsureOrigin, EnsureOriginWithArg, Get, GetBacking, StorageVersion},
 	weights::Weight,
 	Parameter,
 };

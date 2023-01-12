@@ -174,7 +174,7 @@ mod vote;
 mod vote_threshold;
 pub mod weights;
 pub use conviction::Conviction;
-use dao_primitives::{DaoPolicy, DaoProvider, RawOrigin};
+use dao_primitives::{DaoPolicy, DaoProvider, DaoToken, RawOrigin};
 use frame_support::traits::fungibles::{BalancedHold, Inspect, InspectHold, MutateHold};
 pub use pallet::*;
 use pallet_dao_assets::LockableAsset;
@@ -212,7 +212,7 @@ type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup
 #[frame_support::pallet]
 pub mod pallet {
 	use super::{DispatchResult, *};
-	use dao_primitives::DaoOrigin;
+	use dao_primitives::{DaoOrigin, DaoToken};
 	use frame_support::{pallet_prelude::*, traits::EnsureOriginWithArg};
 	use frame_system::pallet_prelude::*;
 	use sp_core::H256;
@@ -564,10 +564,10 @@ pub mod pallet {
 				);
 			}
 
-			let (token_id, token_address) = T::DaoProvider::dao_token(dao_id)?;
-			match token_id {
-				None => {},
-				Some(token_id) => T::Assets::hold(token_id, &who, value)?,
+			let dao_token = T::DaoProvider::dao_token(dao_id)?;
+			match dao_token {
+				DaoToken::FungibleToken(token_id) => T::Assets::hold(token_id, &who, value)?,
+				DaoToken::EthTokenAddress(_) => {},
 			}
 
 			let depositors = BoundedVec::<_, T::MaxDeposits>::truncate_from(vec![who.clone()]);
@@ -606,10 +606,10 @@ pub mod pallet {
 			let mut deposit =
 				Self::deposit_of(dao_id, proposal).ok_or(Error::<T>::ProposalMissing)?;
 
-			let (token_id, token_address) = T::DaoProvider::dao_token(dao_id)?;
-			match token_id {
-				None => {},
-				Some(token_id) => T::Assets::hold(token_id, &who, deposit.1)?,
+			let dao_token = T::DaoProvider::dao_token(dao_id)?;
+			match dao_token {
+				DaoToken::FungibleToken(token_id) => T::Assets::hold(token_id, &who, deposit.1)?,
+				DaoToken::EthTokenAddress(_) => {},
 			}
 
 			let ok = deposit.0.try_push(who.clone()).is_ok();
@@ -1069,7 +1069,7 @@ pub mod pallet {
 				&DaoOrigin { dao_account_id, proportion: blacklist_origin },
 			)?;
 
-			let (token_id, token_address) = T::DaoProvider::dao_token(dao_id)?;
+			let _dao_token = T::DaoProvider::dao_token(dao_id)?;
 
 			// Insert the proposal into the blacklist.
 			let permanent = (T::BlockNumber::max_value(), BoundedVec::<T::AccountId, _>::default());
@@ -1131,7 +1131,7 @@ pub mod pallet {
 				&DaoOrigin { dao_account_id, proportion: cancel_proposal_origin },
 			)?;
 
-			let (token_id, token_address) = T::DaoProvider::dao_token(dao_id)?;
+			let _dao_token = T::DaoProvider::dao_token(dao_id)?;
 
 			PublicProps::<T>::mutate(dao_id, |props| props.retain(|p| p.0 != prop_index));
 			if let Some((whos, amount)) = DepositOf::<T>::take(dao_id, prop_index) {
@@ -1243,14 +1243,16 @@ impl<T: Config> Pallet<T> {
 	) -> DispatchResult {
 		let mut status = Self::referendum_status(dao_id, ref_index)?;
 
-		let (token_id, token_address) = T::DaoProvider::dao_token(dao_id)?;
-		match token_id {
-			None => {},
-			Some(token_id) => ensure!(
-				vote.balance() <= T::Assets::balance(token_id, who),
-				Error::<T>::InsufficientFunds
-			),
-		};
+		let dao_token = T::DaoProvider::dao_token(dao_id)?;
+		match dao_token {
+			DaoToken::FungibleToken(token_id) => {
+				ensure!(
+					vote.balance() <= T::Assets::balance(token_id, who),
+					Error::<T>::InsufficientFunds
+				)
+			},
+			DaoToken::EthTokenAddress(_) => {},
+		}
 
 		VotingOf::<T>::try_mutate(dao_id, who, |voting| -> DispatchResult {
 			if let Voting::Direct { ref mut votes, delegations, .. } = voting {
@@ -1287,10 +1289,11 @@ impl<T: Config> Pallet<T> {
 		})?;
 		// Extend the lock to `balance` (rather than setting it) since we don't know what other
 		// votes are in place.
-		match token_id {
-			None => {},
-			Some(token_id) => T::Assets::extend_lock(DEMOCRACY_ID, &token_id, who, vote.balance()),
-		};
+		match dao_token {
+			DaoToken::FungibleToken(token_id) =>
+				T::Assets::extend_lock(DEMOCRACY_ID, &token_id, who, vote.balance()),
+			DaoToken::EthTokenAddress(_) => {},
+		}
 
 		ReferendumInfoOf::<T>::insert(dao_id, ref_index, ReferendumInfo::Ongoing(status));
 		Ok(())
@@ -1424,14 +1427,16 @@ impl<T: Config> Pallet<T> {
 
 		let policy = T::DaoProvider::policy(dao_id)?;
 
-		let (token_id, token_address) = T::DaoProvider::dao_token(dao_id)?;
-		match token_id {
-			None => {},
-			Some(token_id) => ensure!(
-				balance <= T::Assets::balance(token_id, &who),
-				Error::<T>::InsufficientFunds
-			),
-		};
+		let dao_token = T::DaoProvider::dao_token(dao_id)?;
+		match dao_token {
+			DaoToken::FungibleToken(token_id) => {
+				ensure!(
+					balance <= T::Assets::balance(token_id, &who),
+					Error::<T>::InsufficientFunds
+				);
+			},
+			DaoToken::EthTokenAddress(_) => {},
+		}
 
 		let votes =
 			VotingOf::<T>::try_mutate(dao_id, &who, |voting| -> Result<u32, DispatchError> {
@@ -1477,11 +1482,12 @@ impl<T: Config> Pallet<T> {
 					Self::increase_upstream_delegation(dao_id, &target, conviction.votes(balance));
 				// Extend the lock to `balance` (rather than setting it) since we don't know what
 				// other votes are in place.
-				match token_id {
-					None => {},
-					Some(token_id) =>
+				match dao_token {
+					DaoToken::FungibleToken(token_id) =>
 						T::Assets::extend_lock(DEMOCRACY_ID, &token_id, &who, balance),
-				};
+					DaoToken::EthTokenAddress(_) => {},
+				}
+
 				Ok(votes)
 			})?;
 		Self::deposit_event(Event::<T>::Delegated { dao_id, who, target });
@@ -1526,25 +1532,21 @@ impl<T: Config> Pallet<T> {
 
 	/// Rejig the lock on an account. It will never get more stringent (since that would indicate
 	/// a security hole) but may be reduced from what they are currently.
-	fn update_lock(
-		dao_id: DaoId,
-		who: &T::AccountId,
-		(token_id, token_address): (Option<u32>, Option<Vec<u8>>),
-	) {
+	fn update_lock(dao_id: DaoId, who: &T::AccountId, dao_token: DaoToken<u32, Vec<u8>>) {
 		let lock_needed = VotingOf::<T>::mutate(dao_id, who, |voting| {
 			voting.rejig(frame_system::Pallet::<T>::block_number());
 			voting.locked_balance()
 		});
 
-		match token_id {
-			None => {},
-			Some(token_id) =>
+		match dao_token {
+			DaoToken::FungibleToken(token_id) =>
 				if lock_needed.is_zero() {
 					T::Assets::remove_lock(DEMOCRACY_ID, &token_id, who);
 				} else {
 					T::Assets::set_lock(DEMOCRACY_ID, &token_id, who, lock_needed);
 				},
-		};
+			DaoToken::EthTokenAddress(_) => {},
+		}
 	}
 
 	/// Start a referendum
@@ -1591,7 +1593,7 @@ impl<T: Config> Pallet<T> {
 			);
 			Ok(())
 		} else {
-			return Err(Error::<T>::NoneWaiting.into())
+			Err(Error::<T>::NoneWaiting.into())
 		}
 	}
 
@@ -1607,16 +1609,15 @@ impl<T: Config> Pallet<T> {
 			let (prop_index, proposal, _) = public_props.swap_remove(winner_index);
 			<PublicProps<T>>::insert(dao_id, public_props);
 
-			let (token_id, token_address) = T::DaoProvider::dao_token(dao_id)?;
+			let dao_token = T::DaoProvider::dao_token(dao_id)?;
 
 			if let Some((depositors, deposit)) = <DepositOf<T>>::take(dao_id, prop_index) {
 				// refund depositors
 				for d in depositors.iter() {
-					match token_id {
-						None => {},
-						Some(token_id) => {
-							T::Assets::release(token_id, d, deposit, false)?;
-						},
+					match dao_token {
+						DaoToken::FungibleToken(token_id) =>
+							T::Assets::release(token_id, d, deposit, false)?,
+						DaoToken::EthTokenAddress(_) => continue,
 					};
 				}
 				Self::deposit_event(Event::<T>::Tabled {
@@ -1634,7 +1635,7 @@ impl<T: Config> Pallet<T> {
 			}
 			Ok(())
 		} else {
-			return Err(Error::<T>::NoneWaiting.into())
+			Err(Error::<T>::NoneWaiting.into())
 		}
 	}
 
@@ -1646,7 +1647,13 @@ impl<T: Config> Pallet<T> {
 	) -> bool {
 		// TODO
 		let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
-		let (token_id, token_address) = T::DaoProvider::dao_token(dao_id).unwrap();
+		let dao_token = T::DaoProvider::dao_token(dao_id).unwrap();
+
+		let token_id = match dao_token {
+			DaoToken::FungibleToken(token_id) => Some(token_id),
+			DaoToken::EthTokenAddress(_) => None,
+		};
+
 		let total_issuance = match token_id {
 			None => Zero::zero(),
 			Some(token_id) => T::Assets::total_issuance(token_id),

@@ -565,14 +565,8 @@ pub mod pallet {
 				technical_committee_members.push(account);
 			}
 
-			let mut dao = Dao {
-				founder: who.clone(),
-				account_id: dao_account_id.clone(),
-				token_id: None,
-				token_address: None,
-				status: DaoStatus::Pending,
-				config: DaoConfig { name: dao_name, purpose: dao_purpose, metadata: dao_metadata },
-			};
+			let founder = who.clone();
+			let config = DaoConfig { name: dao_name, purpose: dao_purpose, metadata: dao_metadata };
 
 			// TODO
 			let policy = DaoPolicy {
@@ -610,8 +604,6 @@ pub mod pallet {
 			};
 
 			let mut has_token_id: Option<AssetId<T>> = None;
-			let mut has_token_address: Option<BoundedVec<u8, <T as Config>::DaoStringLimit>> = None;
-
 			if let Some(token) = dao_payload.token {
 				let token_id = Self::u32_to_asset_id(token.token_id);
 				has_token_id = Some(token_id);
@@ -665,10 +657,6 @@ pub mod pallet {
 					}
 				}
 
-				dao.token_id = has_token_id;
-				dao.status = DaoStatus::Success;
-			}
-
 			if has_token_id.is_none() {
 				if let Some(id) = dao_payload.token_id {
 					let token_id = Self::u32_to_asset_id(id);
@@ -680,14 +668,18 @@ pub mod pallet {
 					if issuance == 0 {
 						return Err(Error::<T>::TokenNotExists.into())
 					}
-
-					dao.token_id = has_token_id;
-					dao.status = DaoStatus::Success;
 				} else if let Some(token_address) = dao_payload.token_address {
 					let address =
 						BoundedVec::<u8, T::DaoStringLimit>::try_from(token_address.clone())
 							.map_err(|_| Error::<T>::TokenAddressInvalid)?;
-					has_token_address = Some(address);
+
+					let dao = Dao {
+						founder,
+						config,
+						account_id: dao_account_id,
+						token: DaoToken::EthTokenAddress(address),
+						status: DaoStatus::Pending,
+					};
 
 					let dao_hash = T::Hashing::hash_of(&dao);
 
@@ -698,8 +690,6 @@ pub mod pallet {
 					);
 
 					offchain_index::set(&key, &data.encode());
-
-					dao.token_address = has_token_address;
 
 					let council = BoundedVec::<T::AccountId, T::DaoMaxCouncilMembers>::try_from(
 						council_members.clone(),
@@ -721,11 +711,17 @@ pub mod pallet {
 
 					return Ok(())
 				}
-			}
-
-			if has_token_id.is_none() && has_token_address.is_none() {
+			} else {
 				return Err(Error::<T>::TokenNotProvided.into())
 			}
+
+			let dao = Dao {
+				founder,
+				config,
+				account_id: dao_account_id,
+				token: DaoToken::FungibleToken(has_token_id.unwrap()),
+				status: DaoStatus::Success,
+			};
 
 			Self::do_register_dao(dao, policy, council_members, technical_committee_members)
 		}
@@ -747,13 +743,12 @@ pub mod pallet {
 				},
 			)?;
 
-			let (token_id, token_address) = Self::dao_token(dao_id)?;
+			let dao_token = Self::dao_token(dao_id)?;
 
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
 
-			match token_id {
-				None => {},
-				Some(token_id) => {
+			match dao_token {
+				DaoToken::FungibleToken(token_id) => {
 					T::AssetProvider::transfer(
 						token_id,
 						&dao_account_id,
@@ -769,9 +764,10 @@ pub mod pallet {
 						amount,
 					});
 				},
+				DaoToken::EthTokenAddress(_) => {
+					// TODO: handle token_address
+				},
 			}
-
-			// TODO: handle token_address
 
 			Ok(())
 		}
@@ -1140,39 +1136,33 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 	) -> Result<AccountTokenBalance, DispatchError> {
 		let dao = Daos::<T>::get(id).ok_or(Error::<T>::DaoNotExist)?;
 
-		match dao.token_id {
-			None => {},
-			Some(token_id) => {
+		match dao.token {
+			DaoToken::FungibleToken(token_id) => {
 				if T::AssetProvider::balance(token_id, who) <
-					Self::u128_to_balance(T::DaoTokenVotingMinThreshold::get())
+						Self::u128_to_balance(T::DaoTokenVotingMinThreshold::get())
 				{
 					return Err(Error::<T>::TokenBalanceLow.into())
 				}
 
-				return Ok(AccountTokenBalance::Sufficient)
+				Ok(AccountTokenBalance::Sufficient)
 			},
+			DaoToken::EthTokenAddress(token_address) =>
+				Ok(AccountTokenBalance::Offchain { token_address: token_address.to_vec() }),
 		}
-
-		match dao.token_address {
-			None => {},
-			Some(token_address) =>
-				return Ok(AccountTokenBalance::Offchain { token_address: token_address.to_vec() }),
-		}
-
-		Ok(AccountTokenBalance::default())
 	}
 
 	fn dao_account_id(id: Self::Id) -> Self::AccountId {
 		Self::account_id(id)
 	}
 
-	fn dao_token(id: Self::Id) -> Result<(Option<Self::AssetId>, Option<Vec<u8>>), DispatchError> {
+	fn dao_token(id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
 		match Daos::<T>::get(&id) {
 			None => Err(Error::<T>::DaoNotExist.into()),
-			Some(dao) => Ok((
-				dao.token_id,
-				dao.token_address.map_or_else(|| None, |addr| Some(addr.to_vec())),
-			)),
+			Some(dao) => Ok(match dao.token {
+				DaoToken::FungibleToken(token_id) => DaoToken::FungibleToken(token_id),
+				DaoToken::EthTokenAddress(token_address) =>
+					DaoToken::EthTokenAddress(token_address.to_vec()),
+			}),
 		}
 	}
 }
