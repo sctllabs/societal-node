@@ -807,7 +807,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		<ProposalCount<T, I>>::mutate(dao_id, |i| *i += 1);
 		<ProposalOf<T, I>>::insert(dao_id, proposal_hash, proposal);
 		let votes = {
-			let end = frame_system::Pallet::<T>::block_number() + policy.proposal_period.into();
+			let end = frame_system::Pallet::<T>::block_number() + policy.voting_period.into();
 			Votes { index, threshold, ayes: vec![], nays: vec![], end }
 		};
 		<Voting<T, I>>::insert(dao_id, proposal_hash, votes);
