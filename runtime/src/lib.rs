@@ -679,10 +679,6 @@ impl pallet_dao_treasury::Config for Runtime {
 		EnsureDao<AccountId>,
 		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
 	>;
-	type RejectOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
-	>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
 	type SpendPeriod = SpendPeriod;

@@ -161,11 +161,8 @@ pub mod pallet {
 		/// The staking balance.
 		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
 
-		/// Origin from which approvals must come.
+		/// Origin from which approvals/rejections must come.
 		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
-
-		/// Origin from which rejections must come.
-		type RejectOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
 
 		/// The overarching event type.
 		type RuntimeEvent: From<Event<Self, I>>
@@ -410,12 +407,12 @@ pub mod pallet {
 			#[pallet::compact] proposal_id: ProposalIndex,
 		) -> DispatchResult {
 			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
-			let reject_origin = T::DaoProvider::policy(dao_id)?.reject_origin;
-			T::RejectOrigin::ensure_origin(
+			let approve_origin = T::DaoProvider::policy(dao_id)?.approve_origin;
+			T::ApproveOrigin::ensure_origin(
 				origin,
 				&DaoOrigin {
 					dao_account_id,
-					proportion: DaoPolicyProportion::AtLeast(reject_origin),
+					proportion: DaoPolicyProportion::AtLeast(approve_origin),
 				},
 			)?;
 
@@ -535,12 +532,12 @@ pub mod pallet {
 			#[pallet::compact] proposal_id: ProposalIndex,
 		) -> DispatchResult {
 			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
-			let reject_origin = T::DaoProvider::policy(dao_id)?.reject_origin;
-			T::RejectOrigin::ensure_origin(
+			let approve_origin = T::DaoProvider::policy(dao_id)?.approve_origin;
+			T::ApproveOrigin::ensure_origin(
 				origin,
 				&DaoOrigin {
 					dao_account_id,
-					proportion: DaoPolicyProportion::AtLeast(reject_origin),
+					proportion: DaoPolicyProportion::AtLeast(approve_origin),
 				},
 			)?;
 

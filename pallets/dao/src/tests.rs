@@ -157,7 +157,6 @@ fn create_dao_works() {
 				proposal_bond_max: None,
 				proposal_period: 100,
 				approve_origin: (1, 2),
-				reject_origin: (1, 2)
 			}
 		);
 	});

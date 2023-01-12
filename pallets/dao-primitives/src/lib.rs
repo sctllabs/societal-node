@@ -41,7 +41,6 @@ pub struct DaoPolicyPayload {
 	pub proposal_bond_min: u128,
 	pub proposal_period: u32,
 	pub approve_origin: (u32, u32),
-	pub reject_origin: (u32, u32),
 
 	/// Governance
 	pub enactment_period: u32,
@@ -115,7 +114,6 @@ pub struct DaoPolicy {
 	pub proposal_period: u32,
 	// TODO: use max members for account length
 	pub approve_origin: (u32, u32),
-	pub reject_origin: (u32, u32),
 	pub token_voting_min_threshold: u128,
 
 	/// Governance settings

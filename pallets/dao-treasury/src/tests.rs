@@ -146,7 +146,6 @@ impl DaoProvider for TestDaoProvider {
 			proposal_bond_max: None,
 			proposal_period: 100,
 			approve_origin: (3, 5),
-			reject_origin: (1, 2),
 		})
 	}
 
