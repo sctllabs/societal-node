@@ -1056,8 +1056,9 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 		id: Self::Id,
 		who: &Self::AccountId,
 		hash: T::Hash,
+		force: bool,
 	) -> Result<AccountTokenBalance, DispatchError> {
-		let token_balance = Self::ensure_token_balance(id, who)?;
+		let token_balance = Self::ensure_token_balance(id, who, force)?;
 
 		if let AccountTokenBalance::Offchain { token_address } = token_balance.clone() {
 			let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
@@ -1084,8 +1085,9 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 		threshold: u32,
 		hash: T::Hash,
 		length_bound: u32,
+		force: bool,
 	) -> Result<AccountTokenBalance, DispatchError> {
-		let token_balance = Self::ensure_token_balance(id, who)?;
+		let token_balance = Self::ensure_token_balance(id, who, force)?;
 
 		if let AccountTokenBalance::Offchain { token_address } = token_balance.clone() {
 			let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
@@ -1112,8 +1114,9 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 		id: Self::Id,
 		who: &Self::AccountId,
 		hash: T::Hash,
+		force: bool,
 	) -> Result<AccountTokenBalance, DispatchError> {
-		let token_balance = Self::ensure_token_balance(id, who)?;
+		let token_balance = Self::ensure_token_balance(id, who, force)?;
 
 		if let AccountTokenBalance::Offchain { token_address } = token_balance.clone() {
 			let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
@@ -1132,12 +1135,14 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 	fn ensure_token_balance(
 		id: Self::Id,
 		who: &Self::AccountId,
+		force: bool,
 	) -> Result<AccountTokenBalance, DispatchError> {
 		let dao = Daos::<T>::get(id).ok_or(Error::<T>::DaoNotExist)?;
 
 		match dao.token {
 			DaoToken::FungibleToken(token_id) => {
-				if T::AssetProvider::balance(token_id, who) <
+				if force &&
+					T::AssetProvider::balance(token_id, who) <
 						Self::u128_to_balance(T::DaoTokenVotingMinThreshold::get())
 				{
 					return Err(Error::<T>::TokenBalanceLow.into())

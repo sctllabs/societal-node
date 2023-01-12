@@ -375,8 +375,12 @@ pub mod pallet {
 				Proposal { dao_id, proposer: proposer.clone(), value, beneficiary, bond };
 			let proposal_hash = T::Hashing::hash_of(&proposal);
 
-			let account_token_balance =
-				T::DaoProvider::ensure_treasury_proposal_allowed(dao_id, &proposer, proposal_hash)?;
+			let account_token_balance = T::DaoProvider::ensure_treasury_proposal_allowed(
+				dao_id,
+				&proposer,
+				proposal_hash,
+				false,
+			)?;
 
 			if let AccountTokenBalance::Offchain { .. } = account_token_balance {
 				// TODO: add checks for vec size limits
