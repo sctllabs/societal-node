@@ -38,12 +38,12 @@ fn query_membership_works() {
 #[test]
 fn add_member_works() {
 	new_test_ext().execute_with(|| {
-		assert_noop!(Membership::add_member(Origin::signed(5), 0, 15), BadOrigin);
+		assert_noop!(Membership::add_member(RuntimeOrigin::signed(5), 0, 15), BadOrigin);
 		assert_noop!(
-			Membership::add_member(Origin::signed(1), 0, 10),
+			Membership::add_member(RuntimeOrigin::signed(1), 0, 10),
 			Error::<Test, _>::AlreadyMember
 		);
-		assert_ok!(Membership::add_member(Origin::signed(1), 0, 15));
+		assert_ok!(Membership::add_member(RuntimeOrigin::signed(1), 0, 15));
 		assert_eq!(Membership::members(0), vec![10, 15, 20, 30]);
 		assert_eq!(
 			MEMBERS.with(|m| m.borrow().clone()).get(&0).unwrap().clone(),
@@ -55,12 +55,12 @@ fn add_member_works() {
 #[test]
 fn remove_member_works() {
 	new_test_ext().execute_with(|| {
-		assert_noop!(Membership::remove_member(Origin::signed(5), 0, 20), BadOrigin);
+		assert_noop!(Membership::remove_member(RuntimeOrigin::signed(5), 0, 20), BadOrigin);
 		assert_noop!(
-			Membership::remove_member(Origin::signed(1), 0, 15),
+			Membership::remove_member(RuntimeOrigin::signed(1), 0, 15),
 			Error::<Test, _>::NotMember
 		);
-		assert_ok!(Membership::remove_member(Origin::signed(1), 0, 20));
+		assert_ok!(Membership::remove_member(RuntimeOrigin::signed(1), 0, 20));
 		assert_eq!(Membership::members(0), vec![10, 30]);
 		assert_eq!(
 			MEMBERS.with(|m| m.borrow().clone()).get(&0).unwrap().clone(),
@@ -72,20 +72,20 @@ fn remove_member_works() {
 #[test]
 fn swap_member_works() {
 	new_test_ext().execute_with(|| {
-		assert_noop!(Membership::swap_member(Origin::signed(5), 0, 10, 25), BadOrigin);
+		assert_noop!(Membership::swap_member(RuntimeOrigin::signed(5), 0, 10, 25), BadOrigin);
 		assert_noop!(
-			Membership::swap_member(Origin::signed(1), 0, 15, 25),
+			Membership::swap_member(RuntimeOrigin::signed(1), 0, 15, 25),
 			Error::<Test, _>::NotMember
 		);
 		assert_noop!(
-			Membership::swap_member(Origin::signed(1), 0, 10, 30),
+			Membership::swap_member(RuntimeOrigin::signed(1), 0, 10, 30),
 			Error::<Test, _>::AlreadyMember
 		);
 
-		assert_ok!(Membership::swap_member(Origin::signed(1), 0, 20, 20));
+		assert_ok!(Membership::swap_member(RuntimeOrigin::signed(1), 0, 20, 20));
 		assert_eq!(Membership::members(0), vec![10, 20, 30]);
 
-		assert_ok!(Membership::swap_member(Origin::signed(1), 0, 10, 25));
+		assert_ok!(Membership::swap_member(RuntimeOrigin::signed(1), 0, 10, 25));
 		assert_eq!(Membership::members(0), vec![20, 25, 30]);
 		assert_eq!(
 			MEMBERS.with(|m| m.borrow().clone()).get(&0).unwrap().clone(),
@@ -97,7 +97,7 @@ fn swap_member_works() {
 #[test]
 fn swap_member_works_that_does_not_change_order() {
 	new_test_ext().execute_with(|| {
-		assert_ok!(Membership::swap_member(Origin::signed(1), 0, 10, 5));
+		assert_ok!(Membership::swap_member(RuntimeOrigin::signed(1), 0, 10, 5));
 		assert_eq!(Membership::members(0), vec![5, 20, 30]);
 		assert_eq!(
 			MEMBERS.with(|m| m.borrow().clone()).get(&0).unwrap().clone(),
@@ -109,12 +109,12 @@ fn swap_member_works_that_does_not_change_order() {
 #[test]
 fn change_key_works() {
 	new_test_ext().execute_with(|| {
-		Membership::add_member(Origin::signed(1), 0, 1).ok();
+		Membership::add_member(RuntimeOrigin::signed(1), 0, 1).ok();
 		assert_noop!(
-			Membership::change_key(Origin::signed(1), 0, 20),
+			Membership::change_key(RuntimeOrigin::signed(1), 0, 20),
 			Error::<Test, _>::AlreadyMember
 		);
-		assert_ok!(Membership::change_key(Origin::signed(1), 0, 40));
+		assert_ok!(Membership::change_key(RuntimeOrigin::signed(1), 0, 40));
 		assert_eq!(Membership::members(0), vec![10, 20, 30, 40]);
 		assert_eq!(
 			MEMBERS.with(|m| m.borrow().clone()).get(&0).unwrap().clone(),
@@ -126,9 +126,9 @@ fn change_key_works() {
 #[test]
 fn change_key_works_that_does_not_change_order() {
 	new_test_ext().execute_with(|| {
-		Membership::add_member(Origin::signed(1), 0, 1).ok();
+		Membership::add_member(RuntimeOrigin::signed(1), 0, 1).ok();
 
-		assert_ok!(Membership::change_key(Origin::signed(1), 0, 5));
+		assert_ok!(Membership::change_key(RuntimeOrigin::signed(1), 0, 5));
 		assert_eq!(
 			MEMBERS.with(|m| m.borrow().clone()).get(&0).unwrap().clone(),
 			Membership::members(0).to_vec()
@@ -140,18 +140,18 @@ fn change_key_works_that_does_not_change_order() {
 fn reset_members_works() {
 	new_test_ext().execute_with(|| {
 		assert_noop!(
-			Membership::reset_members(Origin::signed(10), 0, bounded_vec![20, 40, 30]),
+			Membership::reset_members(RuntimeOrigin::signed(10), 0, bounded_vec![20, 40, 30]),
 			BadOrigin
 		);
 
-		assert_ok!(Membership::reset_members(Origin::signed(1), 0, vec![20, 40, 30]));
+		assert_ok!(Membership::reset_members(RuntimeOrigin::signed(1), 0, vec![20, 40, 30]));
 		assert_eq!(Membership::members(0), vec![20, 30, 40]);
 		assert_eq!(
 			MEMBERS.with(|m| m.borrow().clone()).get(&0).unwrap().clone(),
 			Membership::members(0).to_vec()
 		);
 
-		assert_ok!(Membership::reset_members(Origin::signed(1), 0, vec![10, 40, 30]));
+		assert_ok!(Membership::reset_members(RuntimeOrigin::signed(1), 0, vec![10, 40, 30]));
 		assert_eq!(Membership::members(0), vec![10, 30, 40]);
 		assert_eq!(
 			MEMBERS.with(|m| m.borrow().clone()).get(&0).unwrap().clone(),
