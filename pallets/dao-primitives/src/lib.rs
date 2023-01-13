@@ -105,17 +105,22 @@ pub enum DaoStatus {
 	Error,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+pub enum DaoToken<TokenId, BoundedString> {
+	FungibleToken(TokenId),
+	EthTokenAddress(BoundedString),
+}
+
+#[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct Dao<AccountId, TokenId, BoundedString, BoundedMetadata> {
 	pub founder: AccountId,
 	pub account_id: AccountId,
-	pub token_id: Option<TokenId>,
-	pub token_address: Option<BoundedString>,
+	pub token: DaoToken<TokenId, BoundedString>,
 	pub status: DaoStatus,
 	pub config: DaoConfig<BoundedString, BoundedMetadata>,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct PendingDao<
 	AccountId,
 	TokenId,
@@ -198,6 +203,7 @@ pub trait DaoProvider<Hash> {
 
 	fn exists(id: Self::Id) -> Result<(), DispatchError>;
 	fn dao_account_id(id: Self::Id) -> Self::AccountId;
+	fn dao_token(id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError>;
 	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError>;
 	fn count() -> u32;
 	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError>;
