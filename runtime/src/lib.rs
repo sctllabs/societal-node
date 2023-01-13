@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
-#![recursion_limit = "256"]
+#![recursion_limit = "384"]
 
 // Make the WASM binary available.
 #[cfg(feature = "std")]
@@ -1028,10 +1028,11 @@ parameter_types! {
 	pub const StringLimit: u32 = 50;
 	pub const MetadataDepositBase: Balance = 0;
 	pub const MetadataDepositPerByte: Balance = 0;
+	pub const MaxLocks: u32 = 10;
 }
 
 // TODO - Update settings
-impl pallet_assets::Config for Runtime {
+impl pallet_dao_assets::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Balance = Balance;
 	type AssetId = u32;
@@ -1043,9 +1044,10 @@ impl pallet_assets::Config for Runtime {
 	type MetadataDepositPerByte = MetadataDepositPerByte;
 	type ApprovalDeposit = ApprovalDeposit;
 	type StringLimit = StringLimit;
-	type Freezer = ();
+	type Freezer = Assets;
 	type Extra = ();
-	type WeightInfo = pallet_assets::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = pallet_dao_assets::weights::SubstrateWeight<Runtime>;
+	type MaxLocks = MaxLocks;
 }
 
 parameter_types! {
@@ -1590,7 +1592,7 @@ construct_runtime!(
 		TechnicalMembership: pallet_membership::<Instance1>,
 		Referenda: pallet_referenda,
 		ConvictionVoting: pallet_conviction_voting,
-		Assets: pallet_assets,
+		Assets: pallet_dao_assets,
 		Democracy: pallet_democracy,
 		Indices: pallet_indices,
 		Elections: pallet_elections_phragmen,
