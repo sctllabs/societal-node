@@ -185,6 +185,23 @@ pub enum AccountTokenBalance {
 	},
 }
 
+pub type Proportion = (u32, u32);
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize, MaxEncodedLen,
+)]
+#[serde(tag = "type", content = "proportion")]
+pub enum DaoPolicyProportion {
+	AtLeast(Proportion),
+	MoreThan(Proportion),
+}
+
+impl Default for DaoPolicyProportion {
+	fn default() -> Self {
+		Self::AtLeast((1, 2))
+	}
+}
+
 pub trait DaoProvider<Hash> {
 	type Id;
 	type AccountId;
