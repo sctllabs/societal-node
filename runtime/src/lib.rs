@@ -43,10 +43,13 @@ use sp_runtime::{
 	curve::PiecewiseLinear,
 	generic, impl_opaque_keys,
 	traits::{
-		AccountIdLookup, BlakeTwo256, Block as BlockT, ConvertInto, Dispatchable, NumberFor,
-		OpaqueKeys, SaturatedConversion,
+		AccountIdLookup, BlakeTwo256, Block as BlockT, Convert, ConvertInto, DispatchInfoOf,
+		Dispatchable, NumberFor, OpaqueKeys, PostDispatchInfoOf, SaturatedConversion,
+		UniqueSaturatedInto,
 	},
-	transaction_validity::{TransactionPriority, TransactionSource, TransactionValidity},
+	transaction_validity::{
+		TransactionPriority, TransactionSource, TransactionValidity, TransactionValidityError,
+	},
 	ApplyExtrinsicResult, ConsensusEngineId, FixedU128, Percent,
 };
 use sp_std::{marker::PhantomData, prelude::*};
@@ -56,6 +59,9 @@ use sp_version::RuntimeVersion;
 use static_assertions::const_assert;
 
 use sp_core::crypto::ByteArray;
+
+use pallet_dao::EnsureDao;
+use pallet_dao_collective::EitherOfDiverseWithArg;
 
 // A few exports that help ease life for downstream crates.
 pub use frame_support::{
@@ -675,10 +681,14 @@ impl pallet_treasury::Config for Runtime {
 impl pallet_dao_treasury::Config for Runtime {
 	type PalletId = DaoTreasuryPalletId;
 	type Currency = Balances;
-	type ApproveOrigin =
-		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
-	type RejectOrigin =
-		pallet_dao_collective::EnsureProportionMoreThanWithArg<AccountId, DaoCouncilCollective>;
+	type ApproveOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
+	type RejectOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
 	type SpendPeriod = SpendPeriod;
@@ -716,11 +726,6 @@ parameter_types! {
 	pub const NominationPoolsPalletId: PalletId = PalletId(*b"py/nopls");
 	pub const MaxPointsToBalance: u8 = 10;
 }
-
-use sp_runtime::{
-	traits::{Convert, DispatchInfoOf, PostDispatchInfoOf, UniqueSaturatedInto},
-	transaction_validity::TransactionValidityError,
-};
 
 pub struct BalanceToU256;
 impl Convert<Balance, sp_core::U256> for BalanceToU256 {
@@ -891,8 +896,10 @@ impl pallet_dao_membership::Config<DaoCouncilMembership> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 
 	// TODO: dynamic properties - move to dao-primitives for generic types
-	type ApproveOrigin =
-		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
+	type ApproveOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	type MembershipInitialized = DaoCouncil;
 	type MembershipChanged = DaoCouncil;
 	type MaxMembers = TechnicalMaxMembers;
@@ -1511,6 +1518,7 @@ parameter_types! {
 
 impl pallet_dao::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type RuntimeOrigin = RuntimeOrigin;
 	type Currency = Balances;
 	type PalletId = DaoPalletId;
 	type DaoStringLimit = DaoStringLimit;

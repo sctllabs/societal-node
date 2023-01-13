@@ -34,18 +34,18 @@ pub struct DaoGovernanceToken {
 }
 
 #[derive(
-	Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
 pub struct DaoPolicyPayload {
 	pub proposal_bond: u32,
 	pub proposal_bond_min: u128,
 	pub proposal_period: u32,
-	pub approve_origin: (u32, u32),
-	pub reject_origin: (u32, u32),
+	pub approve_origin: DaoPolicyProportion,
+	pub reject_origin: DaoPolicyProportion,
 }
 
 #[derive(
-	Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
 pub struct DaoPayload {
 	#[serde(deserialize_with = "de_string_to_bytes")]
@@ -79,7 +79,6 @@ pub struct DaoConfig<BoundedString, BoundedMetadata> {
 	Default,
 	Clone,
 	PartialEq,
-	Eq,
 	TypeInfo,
 	RuntimeDebug,
 	Serialize,
@@ -97,8 +96,8 @@ pub struct DaoPolicy {
 	/// In millis
 	pub proposal_period: u32,
 	// TODO: use max members for account length
-	pub approve_origin: (u32, u32),
-	pub reject_origin: (u32, u32),
+	pub approve_origin: DaoPolicyProportion,
+	pub reject_origin: DaoPolicyProportion,
 	pub token_voting_min_threshold: u128,
 }
 
@@ -127,7 +126,7 @@ pub struct Dao<AccountId, TokenId, BoundedString, BoundedMetadata> {
 	pub config: DaoConfig<BoundedString, BoundedMetadata>,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct PendingDao<
 	AccountId,
 	TokenId,
@@ -142,14 +141,14 @@ pub struct PendingDao<
 	pub technical_committee: BoundedTechnicalCommittee,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct PendingProposal<AccountId> {
 	pub who: AccountId,
 	pub threshold: u32,
 	pub length_bound: u32,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct PendingVote<AccountId, Hash> {
 	pub who: AccountId,
 	pub proposal_hash: Hash,
@@ -328,6 +327,18 @@ pub trait ChangeDaoMembers<DaoId, AccountId: Clone + Ord> {
 		}
 		(incoming, outgoing)
 	}
+}
+
+/// Origin for the collective module.
+#[derive(PartialEq, Eq, Clone, RuntimeDebug, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[codec(mel_bound(AccountId: MaxEncodedLen))]
+pub enum RawOrigin<AccountId> {
+	Dao(AccountId),
+}
+
+pub struct DaoOrigin<AccountId> {
+	pub dao_account_id: AccountId,
+	pub proportion: DaoPolicyProportion,
 }
 
 pub fn de_string_to_bytes<'de, D>(de: D) -> Result<Vec<u8>, D::Error>
