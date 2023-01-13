@@ -50,8 +50,8 @@ use sp_runtime::{traits::Hash, Either, RuntimeDebug};
 use sp_std::{marker::PhantomData, prelude::*, result, str};
 
 use dao_primitives::{
-	ApprovePropose, ApproveVote, ChangeDaoMembers, DaoOrigin, DaoPolicy, DaoPolicyProportion,
-	DaoProvider, InitializeDaoMembers, PendingProposal, PendingVote,
+	AccountTokenBalance, ApprovePropose, ApproveVote, ChangeDaoMembers, DaoOrigin, DaoPolicy,
+	DaoPolicyProportion, DaoProvider, InitializeDaoMembers, PendingProposal, PendingVote,
 };
 
 use frame_support::{
@@ -146,7 +146,6 @@ pub struct Votes<AccountId, BlockNumber> {
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use dao_primitives::{AccountTokenBalance, PendingProposal, PendingVote};
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
@@ -782,7 +781,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	pub fn do_propose_proposed(
 		who: T::AccountId,
 		dao_id: DaoId,
-		threshold: MemberCount,
+		_threshold: MemberCount, // deprecated
 		proposal: Box<<T as Config<I>>::Proposal>,
 		length_bound: MemberCount,
 	) -> Result<(u32, u32), DispatchError> {
@@ -796,6 +795,10 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		);
 
 		let policy = T::DaoProvider::policy(dao_id)?;
+		let threshold = match policy.approve_origin {
+			DaoPolicyProportion::AtLeast((threshold, _)) => threshold,
+			DaoPolicyProportion::MoreThan((threshold, _)) => threshold,
+		};
 
 		let active_proposals =
 			<Proposals<T, I>>::try_mutate(dao_id, |proposals| -> Result<usize, DispatchError> {
