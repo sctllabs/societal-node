@@ -168,9 +168,6 @@ pub mod pallet {
 		/// Origin from which approvals must come.
 		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
 
-		/// Origin from which rejections must come.
-		type RejectOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
-
 		/// The overarching event type.
 		type RuntimeEvent: From<Event<Self, I>>
 			+ IsType<<Self as frame_system::Config>::RuntimeEvent>;
@@ -400,7 +397,7 @@ pub mod pallet {
 
 		/// Reject a proposed spend. The original deposit will be slashed.
 		///
-		/// May only be called from `T::RejectOrigin`.
+		/// May only be called from `T::ApproveOrigin`.
 		///
 		/// # <weight>
 		/// - Complexity: O(1)
@@ -413,7 +410,7 @@ pub mod pallet {
 			#[pallet::compact] dao_id: DaoId,
 			#[pallet::compact] proposal_id: ProposalIndex,
 		) -> DispatchResult {
-			Self::ensure_rejected(origin, dao_id)?;
+			Self::ensure_approved(origin, dao_id)?;
 
 			let proposal = <Proposals<T, I>>::take(&dao_id, &proposal_id)
 				.ok_or(Error::<T, I>::InvalidIndex)?;
@@ -504,7 +501,7 @@ pub mod pallet {
 		/// Force a previously approved proposal to be removed from the approval queue.
 		/// The original deposit will no longer be returned.
 		///
-		/// May only be called from `T::RejectOrigin`.
+		/// May only be called from `T::ApproveOrigin`.
 		/// - `proposal_id`: The index of a proposal
 		///
 		/// # <weight>
@@ -522,7 +519,7 @@ pub mod pallet {
 			#[pallet::compact] dao_id: DaoId,
 			#[pallet::compact] proposal_id: ProposalIndex,
 		) -> DispatchResult {
-			Self::ensure_rejected(origin, dao_id)?;
+			Self::ensure_approved(origin, dao_id)?;
 
 			Approvals::<T, I>::try_mutate(dao_id, |v| -> DispatchResult {
 				if let Some(index) = v.iter().position(|x| x == &proposal_id) {
@@ -664,17 +661,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		T::ApproveOrigin::ensure_origin(
 			origin,
 			&DaoOrigin { dao_account_id, proportion: approve_origin },
-		)?;
-
-		Ok(())
-	}
-
-	pub fn ensure_rejected(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
-		let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
-		let reject_origin = T::DaoProvider::policy(dao_id)?.reject_origin;
-		T::RejectOrigin::ensure_origin(
-			origin,
-			&DaoOrigin { dao_account_id, proportion: reject_origin },
 		)?;
 
 		Ok(())

@@ -341,10 +341,6 @@ pub fn get_dao_json() -> Value {
 			"approve_origin": [
 				1,
 				2
-			],
-			"reject_origin": [
-				1,
-				2
 			]
 		},
 		"token": {

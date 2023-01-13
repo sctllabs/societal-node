@@ -31,10 +31,6 @@
     "approve_origin": [
       1,
       2
-    ],
-    "reject_origin": [
-      1,
-      2
     ]
   },
   "token": {

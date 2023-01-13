@@ -37,10 +37,6 @@ fn setup_dao<T: Config>(
 			"approve_origin": [
 				1,
 				2
-			],
-			"reject_origin": [
-				1,
-				2
 			]
 		},
 		"token": {
