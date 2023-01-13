@@ -781,7 +781,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	pub fn do_propose_proposed(
 		who: T::AccountId,
 		dao_id: DaoId,
-		threshold: MemberCount,
+		_threshold: MemberCount, // deprecated
 		proposal: Box<<T as Config<I>>::Proposal>,
 		length_bound: MemberCount,
 	) -> Result<(u32, u32), DispatchError> {
@@ -795,6 +795,10 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		);
 
 		let policy = T::DaoProvider::policy(dao_id)?;
+		let threshold = match policy.approve_origin {
+			DaoPolicyProportion::AtLeast((threshold, _)) => threshold,
+			DaoPolicyProportion::MoreThan((threshold, _)) => threshold,
+		};
 
 		let active_proposals =
 			<Proposals<T, I>>::try_mutate(dao_id, |proposals| -> Result<usize, DispatchError> {
