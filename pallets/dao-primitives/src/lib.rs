@@ -211,6 +211,7 @@ pub trait DaoProvider<Hash> {
 		id: Self::Id,
 		who: &Self::AccountId,
 		hash: Hash,
+		force: bool,
 	) -> Result<AccountTokenBalance, DispatchError>;
 	fn ensure_proposal_allowed(
 		id: Self::Id,
@@ -218,15 +219,18 @@ pub trait DaoProvider<Hash> {
 		threshold: u32,
 		hash: Hash,
 		length_bound: u32,
+		force: bool,
 	) -> Result<AccountTokenBalance, DispatchError>;
 	fn ensure_voting_allowed(
 		id: Self::Id,
 		who: &Self::AccountId,
 		hash: Hash,
+		force: bool,
 	) -> Result<AccountTokenBalance, DispatchError>;
 	fn ensure_token_balance(
 		id: Self::Id,
 		who: &Self::AccountId,
+		force: bool,
 	) -> Result<AccountTokenBalance, DispatchError>;
 }
 

@@ -544,6 +544,7 @@ pub mod pallet {
 				threshold,
 				proposal_hash,
 				length_bound,
+				false,
 			)?;
 
 			if let AccountTokenBalance::Offchain { .. } = account_token_balance {
@@ -632,7 +633,7 @@ pub mod pallet {
 			let pending_vote_hash = T::Hashing::hash_of(&pending_vote);
 
 			let account_token_balance =
-				T::DaoProvider::ensure_voting_allowed(dao_id, &who, pending_vote_hash)?;
+				T::DaoProvider::ensure_voting_allowed(dao_id, &who, pending_vote_hash, false)?;
 
 			if let AccountTokenBalance::Offchain { .. } = account_token_balance {
 				// TODO: add checks for vec size limits
