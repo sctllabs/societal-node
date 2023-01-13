@@ -175,6 +175,19 @@ pub mod pallet {
 		/// Handler for the unbalanced decrease when slashing for a rejected proposal or bounty.
 		type OnSlash: OnUnbalanced<NegativeImbalanceOf<Self, I>>;
 
+		/// Fraction of a proposal's value that should be bonded in order to place the proposal.
+		/// An accepted proposal gets these back. A rejected proposal does not.
+		#[pallet::constant]
+		type ProposalBond: Get<Permill>;
+
+		/// Minimum amount of funds that should be placed in a deposit for making a proposal.
+		#[pallet::constant]
+		type ProposalBondMinimum: Get<BalanceOf<Self, I>>;
+
+		/// Maximum amount of funds that should be placed in a deposit for making a proposal.
+		#[pallet::constant]
+		type ProposalBondMaximum: Get<Option<BalanceOf<Self, I>>>;
+
 		/// Period between successive spends.
 		#[pallet::constant]
 		type SpendPeriod: Get<Self::BlockNumber>;
@@ -551,12 +564,10 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	}
 
 	/// The needed bond for a proposal whose spend is `value`.
-	fn calculate_bond(policy: DaoPolicy, value: BalanceOf<T, I>) -> BalanceOf<T, I> {
-		let proposal_bond = Permill::from_percent(policy.proposal_bond);
-
-		let mut r = Self::u128_to_balance_of(policy.proposal_bond_min).max(proposal_bond * value);
-		if let Some(m) = policy.proposal_bond_max {
-			r = r.min(Self::u128_to_balance_of(m));
+	fn calculate_bond(_policy: DaoPolicy, value: BalanceOf<T, I>) -> BalanceOf<T, I> {
+		let mut r = T::ProposalBondMinimum::get().max(T::ProposalBond::get() * value);
+		if let Some(m) = T::ProposalBondMaximum::get() {
+			r = r.min(m);
 		}
 		r
 	}

@@ -37,8 +37,6 @@ pub struct DaoGovernanceToken {
 	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
 pub struct DaoPolicyPayload {
-	pub proposal_bond: u32,
-	pub proposal_bond_min: u128,
 	pub proposal_period: u32,
 	pub approve_origin: DaoPolicyProportion,
 }
@@ -85,13 +83,6 @@ pub struct DaoConfig<BoundedString, BoundedMetadata> {
 	MaxEncodedLen,
 )]
 pub struct DaoPolicy {
-	/// Fraction of a proposal's value that should be bonded in order to place the proposal.
-	/// An accepted proposal gets these back. A rejected proposal does not.
-	pub proposal_bond: u32, //TODO: static value or percentage???
-	/// Minimum amount of funds that should be placed in a deposit for making a proposal.
-	pub proposal_bond_min: u128,
-	/// Maximum amount of funds that should be placed in a deposit for making a proposal.
-	pub proposal_bond_max: Option<u128>,
 	/// In millis
 	pub proposal_period: u32,
 	// TODO: use max members for account length

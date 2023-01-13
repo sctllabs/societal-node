@@ -589,9 +589,6 @@ pub mod pallet {
 
 			// TODO
 			let policy = DaoPolicy {
-				proposal_bond: dao_payload.policy.proposal_bond,
-				proposal_bond_min: dao_payload.policy.proposal_bond_min,
-				proposal_bond_max: None,
 				proposal_period: dao_payload.policy.proposal_period /
 					T::ExpectedBlockTime::get() as BlockNumber,
 				approve_origin: dao_payload.policy.approve_origin,

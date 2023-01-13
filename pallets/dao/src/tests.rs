@@ -174,14 +174,7 @@ fn create_dao_works() {
 		assert_eq!(DaoFactory::policies(0).is_some(), true);
 		assert_eq!(
 			DaoFactory::policies(0).unwrap(),
-			DaoPolicy {
-				proposal_bond: 1,
-				proposal_bond_min: 1,
-				proposal_bond_max: None,
-				proposal_period: 100,
-				approve_origin: (1, 2),
-				token_voting_min_threshold: 20
-			}
+			DaoPolicy { proposal_period: 100, approve_origin: (1, 2) }
 		);
 	});
 }
