@@ -1542,6 +1542,8 @@ impl pallet_dao::Config for Runtime {
 	type ApproveTreasuryPropose = DaoTreasury;
 	type AssetProvider = Assets;
 	type AuthorityId = pallet_dao::crypto::TestAuthId;
+	type ApproveOrigin =
+		pallet_dao_collective::EnsureProportionAtLeastWithArg<AccountId, DaoCouncilCollective>;
 }
 
 impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime
