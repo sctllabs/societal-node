@@ -719,10 +719,7 @@ pub mod pallet {
 			let approve_origin = Self::policy(dao_id)?.approve_origin;
 			T::ApproveOrigin::ensure_origin(
 				origin,
-				&DaoOrigin {
-					dao_account_id: dao_account_id.clone(),
-					proportion: DaoPolicyProportion::AtLeast(approve_origin),
-				},
+				&DaoOrigin { dao_account_id: dao_account_id.clone(), proportion: approve_origin },
 			)?;
 
 			let dao_token = Self::dao_token(dao_id)?;

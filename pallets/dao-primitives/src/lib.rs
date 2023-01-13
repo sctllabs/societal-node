@@ -37,7 +37,7 @@ pub struct DaoGovernanceToken {
 	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
 pub struct DaoPolicyPayload {
-	pub approve_origin: (u32, u32),
+	pub approve_origin: DaoPolicyProportion,
 
 	/// Governance
 	pub enactment_period: u32,
@@ -101,7 +101,7 @@ pub struct DaoConfig<BoundedString, BoundedMetadata> {
 )]
 pub struct DaoPolicy {
 	// TODO: use max members for account length
-	pub approve_origin: (u32, u32),
+	pub approve_origin: DaoPolicyProportion,
 	pub token_voting_min_threshold: u128,
 
 	/// Governance settings
