@@ -1468,12 +1468,12 @@ impl pallet_hotfix_sufficients::Config for Runtime {
 
 parameter_types! {
 	pub const DaoPalletId: PalletId = PalletId(*b"py/sctld");
-	pub const DaoStringLimit: u32 = 50;
+	pub const DaoStringLimit: u32 = 100;
 	pub const DaoMetadataLimit: u32 = 500;
 	pub const DaoMaxCouncilMembers: u32 = 100; // TODO
 	pub const DaoTokenMinBalanceLimit: u128 = 1_000;
 	pub const DaoTokenBalanceLimit: u128 = 1_000_000_000;
-	pub const DaoTokenVotingMinThreshold: u128 = 1_000;
+	pub const DaoTokenVotingMinThreshold: u128 = 10;
 }
 
 impl pallet_dao::Config for Runtime {
@@ -1544,6 +1544,13 @@ impl frame_system::offchain::SigningTypes for Runtime {
 	type Signature = Signature;
 }
 
+impl pallet_utility::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type PalletsOrigin = OriginCaller;
+	type WeightInfo = pallet_utility::weights::SubstrateWeight<Runtime>;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub struct Runtime
@@ -1601,6 +1608,7 @@ construct_runtime!(
 		DaoCouncil: pallet_dao_collective::<Instance1>,
 		DaoCouncilMemberships: pallet_dao_membership::<Instance1>, //TODO: rename
 		Preimage: pallet_preimage,
+		Utility: pallet_utility,
 	}
 );
 

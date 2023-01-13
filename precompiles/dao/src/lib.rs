@@ -20,14 +20,14 @@ type GetEncodedProposalSizeLimit = ConstU32<ENCODED_PROPOSAL_SIZE_LIMIT>;
 type GetArrayLimit = ConstU32<ARRAY_LIMIT>;
 
 /// Solidity selector of the DaoRegistered log.
-pub const SELECTOR_LOG_DAO_REGISTERED: [u8; 32] = keccak256!("DaoRegistered(uint32,address)");
+pub const SELECTOR_LOG_DAO_REGISTERED: [u8; 32] = keccak256!("DaoRegistered(address,uint32)");
 
 pub fn log_dao_registered(address: impl Into<H160>, dao_id: DaoId, who: impl Into<H160>) -> Log {
 	log3(
 		address.into(),
 		SELECTOR_LOG_DAO_REGISTERED,
-		H256::from_slice(&EvmDataWriter::new().write(dao_id).build()),
 		who.into(),
+		H256::from_slice(&EvmDataWriter::new().write(dao_id).build()),
 		Vec::new(),
 	)
 }
