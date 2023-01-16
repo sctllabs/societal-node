@@ -271,7 +271,7 @@ pub mod pallet {
 
 		type ApproveOrigin: EnsureOriginWithArg<
 			<Self as frame_system::Config>::RuntimeOrigin,
-			(u32, u32),
+			DaoOrigin<Self::AccountId>,
 		>;
 	}
 
@@ -724,7 +724,10 @@ pub mod pallet {
 		) -> DispatchResult {
 			let dao_account_id = Self::dao_account_id(dao_id);
 			let approve_origin = Self::policy(dao_id)?.approve_origin;
-			T::ApproveOrigin::ensure_origin(origin, &approve_origin)?;
+			T::ApproveOrigin::ensure_origin(
+				origin,
+				&DaoOrigin { dao_account_id: dao_account_id.clone(), proportion: approve_origin },
+			)?;
 
 			let dao_token = Self::dao_token(dao_id)?;
 
