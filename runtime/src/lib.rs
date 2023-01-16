@@ -918,9 +918,9 @@ impl pallet_dao_membership::Config<DaoTechnicalCommitteeMembership> for Runtime 
 	type RuntimeEvent = RuntimeEvent;
 
 	// TODO: dynamic properties - move to dao-primitives for generic types
-	type ApproveOrigin = pallet_dao_collective::EnsureProportionAtLeastWithArg<
-		AccountId,
-		DaoTechnicalCommitteeCollective,
+	type ApproveOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoTechnicalCommitteeCollective>,
 	>;
 	type MembershipInitialized = DaoTechnicalCommittee;
 	type MembershipChanged = DaoTechnicalCommittee;
