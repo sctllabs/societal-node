@@ -699,9 +699,9 @@ pub mod pallet {
 					Self::deposit_event(Event::DaoPendingApproval(dao_id, who));
 
 					return Ok(())
+				} else {
+					return Err(Error::<T>::TokenNotProvided.into())
 				}
-			} else {
-				return Err(Error::<T>::TokenNotProvided.into())
 			}
 
 			let dao = Dao {
