@@ -31,14 +31,8 @@ fn setup_dao<T: Config>(
 		"purpose": "purpose",
 		"metadata": "metadata",
 		"policy": {
-			"proposal_bond": 1,
-			"proposal_bond_min": 1,
 			"proposal_period": 300000,
 			"approve_origin": [
-				1,
-				2
-			],
-			"reject_origin": [
 				1,
 				2
 			]

@@ -6,7 +6,7 @@ use frame_support::{
 	pallet_prelude::*,
 	traits::{
 		tokens::fungibles::{metadata::Mutate as MetadataMutate, Create, Inspect, Mutate},
-		Currency, Get, ReservableCurrency,
+		Currency, EnsureOriginWithArg, Get, ReservableCurrency,
 	},
 	BoundedVec, PalletId,
 };
@@ -173,6 +173,9 @@ pub mod pallet {
 	#[pallet::config]
 	pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		/// The outer origin type.
+		type RuntimeOrigin: From<RawOrigin<Self::AccountId>>;
+
 		type Currency: ReservableCurrency<Self::AccountId>;
 
 		type AssetId: Member
@@ -263,6 +266,10 @@ pub mod pallet {
 		/// The identifier type for an offchain worker.
 		type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
 	}
+
+	/// Origin for the dao pallet.
+	#[pallet::origin]
+	pub type Origin<T> = RawOrigin<<T as frame_system::Config>::AccountId>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn next_dao_id)]
@@ -582,13 +589,9 @@ pub mod pallet {
 
 			// TODO
 			let policy = DaoPolicy {
-				proposal_bond: dao_payload.policy.proposal_bond,
-				proposal_bond_min: dao_payload.policy.proposal_bond_min,
-				proposal_bond_max: None,
 				proposal_period: dao_payload.policy.proposal_period /
 					T::ExpectedBlockTime::get() as BlockNumber,
 				approve_origin: dao_payload.policy.approve_origin,
-				reject_origin: dao_payload.policy.reject_origin,
 				token_voting_min_threshold: T::DaoTokenVotingMinThreshold::get(),
 			};
 
@@ -1110,5 +1113,34 @@ impl<T: Config> BlockNumberProvider for Pallet<T> {
 	type BlockNumber = T::BlockNumber;
 	fn current_block_number() -> Self::BlockNumber {
 		<frame_system::Pallet<T>>::block_number()
+	}
+}
+
+pub struct EnsureDao<AccountId>(PhantomData<AccountId>);
+impl<
+		O: Into<Result<RawOrigin<AccountId>, O>> + From<RawOrigin<AccountId>>,
+		AccountId: PartialEq<AccountId> + Decode,
+	> EnsureOriginWithArg<O, DaoOrigin<AccountId>> for EnsureDao<AccountId>
+{
+	type Success = ();
+	fn try_origin(o: O, dao_origin: &DaoOrigin<AccountId>) -> Result<Self::Success, O> {
+		o.into().and_then(|o| match o {
+			RawOrigin::Dao(ref dao_account_id) => {
+				if dao_account_id == &dao_origin.dao_account_id {
+					return Ok(())
+				}
+
+				Err(O::from(o))
+			},
+			r => Err(O::from(r)),
+		})
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin(dao_origin: &DaoOrigin<AccountId>) -> Result<O, ()> {
+		let zero_account_id =
+			AccountId::decode(&mut sp_runtime::traits::TrailingZeroInput::zeroes())
+				.expect("infinite length input; no invalid inputs for type; qed");
+		Ok(O::from(RawOrigin::Dao(zero_account_id)))
 	}
 }

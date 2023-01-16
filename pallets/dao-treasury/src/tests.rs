@@ -142,15 +142,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 	}
 
 	fn policy(_id: Self::Id) -> Result<Self::Policy, DispatchError> {
-		Ok(DaoPolicy {
-			proposal_bond: 5,
-			proposal_bond_min: 0,
-			proposal_bond_max: None,
-			proposal_period: 100,
-			approve_origin: (3, 5),
-			reject_origin: (1, 2),
-			token_voting_min_threshold: 0,
-		})
+		Ok(DaoPolicy { proposal_period: 100, approve_origin: (3, 5) })
 	}
 
 	fn dao_account_id(id: Self::Id) -> Self::AccountId {
@@ -199,7 +191,6 @@ impl Config for Test {
 	type PalletId = TreasuryPalletId;
 	type Currency = pallet_balances::Pallet<Test>;
 	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
-	type RejectOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
 	type SpendPeriod = ConstU64<2>;

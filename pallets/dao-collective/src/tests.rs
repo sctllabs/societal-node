@@ -165,15 +165,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 	}
 
 	fn policy(_id: Self::Id) -> Result<Self::Policy, DispatchError> {
-		Ok(DaoPolicy {
-			proposal_bond: 5,
-			proposal_bond_min: 0,
-			proposal_bond_max: None,
-			proposal_period: 3,
-			approve_origin: (3, 5),
-			reject_origin: (3, 5),
-			token_voting_min_threshold: 0,
-		})
+		Ok(DaoPolicy { proposal_period: 3, approve_origin: (3, 5) })
 	}
 
 	fn dao_account_id(id: Self::Id) -> Self::AccountId {

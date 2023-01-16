@@ -46,12 +46,12 @@
 
 use scale_info::TypeInfo;
 use sp_io::storage;
-use sp_runtime::{traits::Hash, RuntimeDebug};
+use sp_runtime::{traits::Hash, Either, RuntimeDebug};
 use sp_std::{marker::PhantomData, prelude::*, result, str};
 
 use dao_primitives::{
-	ApprovePropose, ApproveVote, ChangeDaoMembers, DaoPolicy, DaoProvider, InitializeDaoMembers,
-	PendingProposal, PendingVote,
+	ApprovePropose, ApproveVote, ChangeDaoMembers, DaoOrigin, DaoPolicy, DaoPolicyProportion,
+	DaoProvider, InitializeDaoMembers, PendingProposal, PendingVote,
 };
 
 use frame_support::{
@@ -781,7 +781,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	pub fn do_propose_proposed(
 		who: T::AccountId,
 		dao_id: DaoId,
-		threshold: MemberCount,
+		_threshold: MemberCount, // deprecated
 		proposal: Box<<T as Config<I>>::Proposal>,
 		length_bound: MemberCount,
 	) -> Result<(u32, u32), DispatchError> {
@@ -795,6 +795,10 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		);
 
 		let policy = T::DaoProvider::policy(dao_id)?;
+		let threshold = match policy.approve_origin {
+			DaoPolicyProportion::AtLeast((threshold, _)) => threshold,
+			DaoPolicyProportion::MoreThan((threshold, _)) => threshold,
+		};
 
 		let active_proposals =
 			<Proposals<T, I>>::try_mutate(dao_id, |proposals| -> Result<usize, DispatchError> {
@@ -1262,6 +1266,59 @@ impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>
 	#[cfg(feature = "runtime-benchmarks")]
 	fn try_successful_origin(_arg: &(u32, u32)) -> Result<O, ()> {
 		Ok(O::from(RawOrigin::Members(0u32, 0u32)))
+	}
+}
+pub struct EnsureDaoOriginWithArg<AccountId, I: 'static = ()>(PhantomData<(AccountId, I)>);
+impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>, AccountId, I>
+	EnsureOriginWithArg<O, DaoOrigin<AccountId>> for EnsureDaoOriginWithArg<AccountId, I>
+{
+	type Success = ();
+
+	fn try_origin(o: O, arg: &DaoOrigin<AccountId>) -> Result<Self::Success, O> {
+		o.into().and_then(|o| match o {
+			RawOrigin::Members(n, m) => {
+				if match arg.proportion {
+					DaoPolicyProportion::AtLeast((N, D)) => n * D >= N * m,
+					DaoPolicyProportion::MoreThan((N, D)) => n * D > N * m,
+				} {
+					return Ok(())
+				}
+
+				Err(O::from(o))
+			},
+			r => Err(O::from(r)),
+		})
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin(dao_origin: &DaoOrigin<AccountId>) -> Result<O, ()> {
+		let proportion = &dao_origin.proportion;
+		match proportion {
+			DaoPolicyProportion::AtLeast(at_least) =>
+				Ok(O::from(RawOrigin::Members(at_least.0, at_least.1))),
+			DaoPolicyProportion::MoreThan(more_than) =>
+				Ok(O::from(RawOrigin::Members(more_than.0, more_than.1))),
+		}
+	}
+}
+
+pub struct EitherOfDiverseWithArg<L, R>(PhantomData<(L, R)>);
+impl<
+		OuterOrigin,
+		L: EnsureOriginWithArg<OuterOrigin, Argument>,
+		R: EnsureOriginWithArg<OuterOrigin, Argument>,
+		Argument,
+	> EnsureOriginWithArg<OuterOrigin, Argument> for EitherOfDiverseWithArg<L, R>
+{
+	type Success = Either<L::Success, R::Success>;
+	fn try_origin(o: OuterOrigin, arg: &Argument) -> Result<Self::Success, OuterOrigin> {
+		L::try_origin(o, arg)
+			.map_or_else(|o| R::try_origin(o, arg).map(Either::Right), |o| Ok(Either::Left(o)))
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin(dao_origin: &Argument) -> Result<OuterOrigin, ()> {
+		L::try_successful_origin(dao_origin).or_else(|()| R::try_successful_origin(dao_origin))
 	}
 }
 

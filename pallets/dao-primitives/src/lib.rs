@@ -34,18 +34,15 @@ pub struct DaoGovernanceToken {
 }
 
 #[derive(
-	Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
 pub struct DaoPolicyPayload {
-	pub proposal_bond: u32,
-	pub proposal_bond_min: u128,
 	pub proposal_period: u32,
-	pub approve_origin: (u32, u32),
-	pub reject_origin: (u32, u32),
+	pub approve_origin: DaoPolicyProportion,
 }
 
 #[derive(
-	Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
+	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
 pub struct DaoPayload {
 	#[serde(deserialize_with = "de_string_to_bytes")]
@@ -79,7 +76,6 @@ pub struct DaoConfig<BoundedString, BoundedMetadata> {
 	Default,
 	Clone,
 	PartialEq,
-	Eq,
 	TypeInfo,
 	RuntimeDebug,
 	Serialize,
@@ -87,18 +83,10 @@ pub struct DaoConfig<BoundedString, BoundedMetadata> {
 	MaxEncodedLen,
 )]
 pub struct DaoPolicy {
-	/// Fraction of a proposal's value that should be bonded in order to place the proposal.
-	/// An accepted proposal gets these back. A rejected proposal does not.
-	pub proposal_bond: u32, //TODO: static value or percentage???
-	/// Minimum amount of funds that should be placed in a deposit for making a proposal.
-	pub proposal_bond_min: u128,
-	/// Maximum amount of funds that should be placed in a deposit for making a proposal.
-	pub proposal_bond_max: Option<u128>,
 	/// In millis
 	pub proposal_period: u32,
 	// TODO: use max members for account length
-	pub approve_origin: (u32, u32),
-	pub reject_origin: (u32, u32),
+	pub approve_origin: DaoPolicyProportion,
 	pub token_voting_min_threshold: u128,
 }
 
@@ -127,7 +115,7 @@ pub struct Dao<AccountId, TokenId, BoundedString, BoundedMetadata> {
 	pub config: DaoConfig<BoundedString, BoundedMetadata>,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct PendingDao<
 	AccountId,
 	TokenId,
@@ -142,14 +130,14 @@ pub struct PendingDao<
 	pub technical_committee: BoundedTechnicalCommittee,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct PendingProposal<AccountId> {
 	pub who: AccountId,
 	pub threshold: u32,
 	pub length_bound: u32,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct PendingVote<AccountId, Hash> {
 	pub who: AccountId,
 	pub proposal_hash: Hash,
@@ -183,6 +171,23 @@ pub enum AccountTokenBalance {
 	Offchain {
 		token_address: Vec<u8>,
 	},
+}
+
+pub type Proportion = (u32, u32);
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize, MaxEncodedLen,
+)]
+#[serde(tag = "type", content = "proportion")]
+pub enum DaoPolicyProportion {
+	AtLeast(Proportion),
+	MoreThan(Proportion),
+}
+
+impl Default for DaoPolicyProportion {
+	fn default() -> Self {
+		Self::AtLeast((1, 2))
+	}
 }
 
 pub trait DaoProvider<Hash> {
@@ -311,6 +316,18 @@ pub trait ChangeDaoMembers<DaoId, AccountId: Clone + Ord> {
 		}
 		(incoming, outgoing)
 	}
+}
+
+/// Origin for the collective module.
+#[derive(PartialEq, Eq, Clone, RuntimeDebug, Encode, Decode, TypeInfo, MaxEncodedLen)]
+#[codec(mel_bound(AccountId: MaxEncodedLen))]
+pub enum RawOrigin<AccountId> {
+	Dao(AccountId),
+}
+
+pub struct DaoOrigin<AccountId> {
+	pub dao_account_id: AccountId,
+	pub proportion: DaoPolicyProportion,
 }
 
 pub fn de_string_to_bytes<'de, D>(de: D) -> Result<Vec<u8>, D::Error>

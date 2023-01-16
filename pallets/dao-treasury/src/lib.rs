@@ -85,8 +85,9 @@ use frame_support::{
 	weights::Weight,
 	BoundedVec, PalletId,
 };
+use frame_system::pallet_prelude::OriginFor;
 
-use dao_primitives::{ApproveTreasuryPropose, DaoPolicy, DaoProvider};
+use dao_primitives::{ApproveTreasuryPropose, DaoOrigin, DaoPolicy, DaoProvider};
 
 pub use pallet::*;
 pub use weights::WeightInfo;
@@ -165,10 +166,7 @@ pub mod pallet {
 		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
 
 		/// Origin from which approvals must come.
-		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, (u32, u32)>;
-
-		/// Origin from which rejections must come.
-		type RejectOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, (u32, u32)>;
+		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
 
 		/// The overarching event type.
 		type RuntimeEvent: From<Event<Self, I>>
@@ -176,6 +174,19 @@ pub mod pallet {
 
 		/// Handler for the unbalanced decrease when slashing for a rejected proposal or bounty.
 		type OnSlash: OnUnbalanced<NegativeImbalanceOf<Self, I>>;
+
+		/// Fraction of a proposal's value that should be bonded in order to place the proposal.
+		/// An accepted proposal gets these back. A rejected proposal does not.
+		#[pallet::constant]
+		type ProposalBond: Get<Permill>;
+
+		/// Minimum amount of funds that should be placed in a deposit for making a proposal.
+		#[pallet::constant]
+		type ProposalBondMinimum: Get<BalanceOf<Self, I>>;
+
+		/// Maximum amount of funds that should be placed in a deposit for making a proposal.
+		#[pallet::constant]
+		type ProposalBondMaximum: Get<Option<BalanceOf<Self, I>>>;
 
 		/// Period between successive spends.
 		#[pallet::constant]
@@ -399,7 +410,7 @@ pub mod pallet {
 
 		/// Reject a proposed spend. The original deposit will be slashed.
 		///
-		/// May only be called from `T::RejectOrigin`.
+		/// May only be called from `T::ApproveOrigin`.
 		///
 		/// # <weight>
 		/// - Complexity: O(1)
@@ -412,7 +423,7 @@ pub mod pallet {
 			#[pallet::compact] dao_id: DaoId,
 			#[pallet::compact] proposal_id: ProposalIndex,
 		) -> DispatchResult {
-			T::RejectOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.reject_origin)?;
+			Self::ensure_approved(origin, dao_id)?;
 
 			let proposal = <Proposals<T, I>>::take(&dao_id, &proposal_id)
 				.ok_or(Error::<T, I>::InvalidIndex)?;
@@ -444,10 +455,7 @@ pub mod pallet {
 			#[pallet::compact] dao_id: DaoId,
 			#[pallet::compact] proposal_id: ProposalIndex,
 		) -> DispatchResult {
-			T::ApproveOrigin::ensure_origin(
-				origin,
-				&T::DaoProvider::policy(dao_id)?.approve_origin,
-			)?;
+			Self::ensure_approved(origin, dao_id)?;
 
 			ensure!(
 				<Proposals<T, I>>::contains_key(dao_id, proposal_id),
@@ -506,7 +514,7 @@ pub mod pallet {
 		/// Force a previously approved proposal to be removed from the approval queue.
 		/// The original deposit will no longer be returned.
 		///
-		/// May only be called from `T::RejectOrigin`.
+		/// May only be called from `T::ApproveOrigin`.
 		/// - `proposal_id`: The index of a proposal
 		///
 		/// # <weight>
@@ -524,7 +532,7 @@ pub mod pallet {
 			#[pallet::compact] dao_id: DaoId,
 			#[pallet::compact] proposal_id: ProposalIndex,
 		) -> DispatchResult {
-			T::RejectOrigin::ensure_origin(origin, &T::DaoProvider::policy(dao_id)?.reject_origin)?;
+			Self::ensure_approved(origin, dao_id)?;
 
 			Approvals::<T, I>::try_mutate(dao_id, |v| -> DispatchResult {
 				if let Some(index) = v.iter().position(|x| x == &proposal_id) {
@@ -556,12 +564,10 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	}
 
 	/// The needed bond for a proposal whose spend is `value`.
-	fn calculate_bond(policy: DaoPolicy, value: BalanceOf<T, I>) -> BalanceOf<T, I> {
-		let proposal_bond = Permill::from_percent(policy.proposal_bond);
-
-		let mut r = Self::u128_to_balance_of(policy.proposal_bond_min).max(proposal_bond * value);
-		if let Some(m) = policy.proposal_bond_max {
-			r = r.min(Self::u128_to_balance_of(m));
+	fn calculate_bond(_policy: DaoPolicy, value: BalanceOf<T, I>) -> BalanceOf<T, I> {
+		let mut r = T::ProposalBondMinimum::get().max(T::ProposalBond::get() * value);
+		if let Some(m) = T::ProposalBondMaximum::get() {
+			r = r.min(m);
 		}
 		r
 	}
@@ -658,6 +664,17 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		T::Currency::free_balance(&T::DaoProvider::dao_account_id(dao_id))
 			// Must never be less than 0 but better be safe.
 			.saturating_sub(T::Currency::minimum_balance())
+	}
+
+	pub fn ensure_approved(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
+		let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+		let approve_origin = T::DaoProvider::policy(dao_id)?.approve_origin;
+		T::ApproveOrigin::ensure_origin(
+			origin,
+			&DaoOrigin { dao_account_id, proportion: approve_origin },
+		)?;
+
+		Ok(())
 	}
 }
 
