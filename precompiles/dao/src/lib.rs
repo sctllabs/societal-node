@@ -48,7 +48,7 @@ where
 	/// Parameters:
 	/// * council: Set of accounts to be selected as DAO council
 	/// * data: HEX encoded JSON DAO configuration
-	#[precompile::public("createDao(address[],bytes)")]
+	#[precompile::public("createDao(address[],address[],bytes)")]
 	fn create_dao(
 		handle: &mut impl PrecompileHandle,
 		council: BoundedVec<Address, GetArrayLimit>,

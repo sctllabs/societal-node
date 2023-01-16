@@ -6,9 +6,11 @@ pragma solidity >=0.8.0;
 /// wraps the pallet
 interface PalletDao {
 
-    /// @dev Create DAO .
+    /// @dev Create DAO
+    /// @param council group
+    /// @param technical_committee group
     /// @param data DAO spec
-    function createDao(address[] memory council, bytes memory data) external;
+    function createDao(address[] memory council, address[] memory technical_committee, bytes memory data) external;
 
     event DaoRegistered(address indexed who, uint32 dao_id);
 }
