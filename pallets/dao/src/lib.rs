@@ -853,6 +853,7 @@ pub mod pallet {
 			let dao_id = <NextDaoId<T>>::get();
 
 			dao.account_id = Self::account_id(dao_id);
+			dao.status = DaoStatus::Success;
 
 			let founder = dao.clone().founder;
 
