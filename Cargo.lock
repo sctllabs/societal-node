@@ -4880,6 +4880,7 @@ dependencies = [
  "frame-system",
  "log",
  "pallet-balances",
+ "pallet-dao-assets",
  "pallet-preimage",
  "pallet-scheduler",
  "parity-scale-codec",
