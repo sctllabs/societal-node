@@ -1,5 +1,6 @@
 use crate::{DaoCouncilCollective, DaoCouncilMembership};
 use pallet_dao_collective_precompile::DaoCollectivePrecompile;
+use pallet_dao_democracy_precompile::DaoDemocracyPrecompile;
 use pallet_dao_membership_precompile::DaoMembershipPrecompile;
 use pallet_dao_precompile::DaoPrecompile;
 use pallet_dao_treasury_precompile::DaoTreasuryPrecompile;
@@ -25,6 +26,7 @@ pub type FrontierPrecompiles<R> = PrecompileSetBuilder<
 				PrecompileAt<AddressU64<7>, DaoTreasuryPrecompile<R>>,
 				PrecompileAt<AddressU64<8>, DaoCollectivePrecompile<R, DaoCouncilCollective>>,
 				PrecompileAt<AddressU64<9>, DaoMembershipPrecompile<R, DaoCouncilMembership>>,
+				PrecompileAt<AddressU64<10>, DaoMembershipPrecompile<R, DaoCouncilMembership>>,
 			),
 		>,
 	),

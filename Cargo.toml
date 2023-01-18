@@ -10,6 +10,7 @@ members = [
     "pallets/dao-treasury",
 	"precompiles/dao",
 	"precompiles/dao-collective",
+	"precompiles/dao-democracy",
 	"precompiles/dao-membership",
 	"precompiles/dao-treasury",
 	"precompiles/utils",

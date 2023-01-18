@@ -49,6 +49,7 @@ std = [
 	"frame-benchmarking?/std",
 	"frame-support/std",
 	"frame-system/std",
+	"pallet-dao-assets/std",
 	"scale-info/std",
 	"serde",
 	"sp-io/std",
