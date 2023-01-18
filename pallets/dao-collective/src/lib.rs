@@ -1206,25 +1206,6 @@ impl<
 	}
 }
 
-pub struct EnsureProportionMoreThanWithArg<AccountId, I: 'static = ()>(PhantomData<(AccountId, I)>);
-impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>, AccountId, I>
-	EnsureOriginWithArg<O, (u32, u32)> for EnsureProportionMoreThanWithArg<AccountId, I>
-{
-	type Success = ();
-	fn try_origin(o: O, arg: &(u32, u32)) -> Result<Self::Success, O> {
-		let (min, limit) = arg;
-		o.into().and_then(|o| match o {
-			RawOrigin::Members(n, m) if n * limit > min * m => Ok(()),
-			r => Err(O::from(r)),
-		})
-	}
-
-	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin(_arg: &(u32, u32)) -> Result<O, ()> {
-		Ok(O::from(RawOrigin::Members(1u32, 0u32)))
-	}
-}
-
 pub struct EnsureProportionAtLeast<AccountId, const N: u32, const D: u32, I: 'static = ()>(
 	PhantomData<(AccountId, I)>,
 );
@@ -1250,25 +1231,6 @@ impl<
 	}
 }
 
-pub struct EnsureProportionAtLeastWithArg<AccountId, I: 'static = ()>(PhantomData<(AccountId, I)>);
-impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>, AccountId, I>
-	EnsureOriginWithArg<O, (u32, u32)> for EnsureProportionAtLeastWithArg<AccountId, I>
-{
-	type Success = ();
-	fn try_origin(o: O, arg: &(u32, u32)) -> Result<Self::Success, O> {
-		let (min, limit) = arg;
-
-		o.into().and_then(|o| match o {
-			RawOrigin::Members(n, m) if n * limit >= min * m => Ok(()),
-			r => Err(O::from(r)),
-		})
-	}
-
-	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin(_arg: &(u32, u32)) -> Result<O, ()> {
-		Ok(O::from(RawOrigin::Members(0u32, 0u32)))
-	}
-}
 pub struct EnsureDaoOriginWithArg<AccountId, I: 'static = ()>(PhantomData<(AccountId, I)>);
 impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>, AccountId, I>
 	EnsureOriginWithArg<O, DaoOrigin<AccountId>> for EnsureDaoOriginWithArg<AccountId, I>
