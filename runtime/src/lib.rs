@@ -1169,6 +1169,51 @@ impl pallet_preimage::Config for Runtime {
 	type ByteDeposit = PreimageByteDeposit;
 }
 
+impl pallet_dao_democracy::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+
+	/// A straight majority of the council can decide what their next motion is.
+	type ExternalOrigin =
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>;
+	/// A super-majority can have the next scheduled referendum be a straight majority-carries vote.
+	type ExternalMajorityOrigin =
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>;
+	/// A unanimous council can have the next scheduled referendum be a straight default-carries
+	/// (NTB) vote.
+	type ExternalDefaultOrigin =
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>;
+	/// Two thirds of the technical committee can have an ExternalMajority/ExternalDefault vote
+	/// be tabled immediately and with a shorter voting/enactment period.
+	type FastTrackOrigin =
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoTechnicalCommitteeCollective>;
+	type InstantOrigin =
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoTechnicalCommitteeCollective>;
+	// To cancel a proposal which has been passed, 2/3 of the council must agree to it.
+	type CancellationOrigin =
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>;
+	// To cancel a proposal before it has been passed, the technical committee must be unanimous or
+	// Root must agree.
+	type CancelProposalOrigin =
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoTechnicalCommitteeCollective>;
+	type BlacklistOrigin =
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoTechnicalCommitteeCollective>;
+	// Any single technical committee member may veto a coming council proposal, however they can
+	// only do it once and it lasts only for the cool-off period.
+	type VetoOrigin =
+		pallet_dao_collective::EnsureMember<AccountId, DaoTechnicalCommitteeCollective>;
+	type Slash = Treasury;
+	type Scheduler = Scheduler;
+	type Preimages = Preimage;
+	type PalletsOrigin = OriginCaller;
+	type MaxVotes = ConstU32<100>;
+	type WeightInfo = pallet_dao_democracy::weights::SubstrateWeight<Runtime>;
+	type MaxProposals = MaxProposals;
+	type MaxDeposits = ConstU32<100>;
+	type MaxBlacklisted = ConstU32<100>;
+	type DaoProvider = Dao;
+}
+
 parameter_types! {
 	pub const IndexDeposit: Balance = 1 * DOLLARS;
 }
@@ -1661,6 +1706,7 @@ construct_runtime!(
 		DaoTechnicalCommittee: pallet_dao_collective::<Instance2>,
 		DaoCouncilMembers: pallet_dao_membership::<Instance1>,
 		DaoTechnicalCommitteeMembers: pallet_dao_membership::<Instance2>,
+		DaoDemocracy: pallet_dao_democracy,
 		Preimage: pallet_preimage,
 		Utility: pallet_utility,
 	}

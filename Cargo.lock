@@ -4874,6 +4874,7 @@ dependencies = [
 name = "pallet-dao-democracy"
 version = "4.0.0-dev"
 dependencies = [
+ "dao-primitives",
  "frame-benchmarking",
  "frame-support",
  "frame-system",
@@ -8402,6 +8403,7 @@ dependencies = [
  "pallet-dao-assets",
  "pallet-dao-collective",
  "pallet-dao-collective-precompile",
+ "pallet-dao-democracy",
  "pallet-dao-membership",
  "pallet-dao-membership-precompile",
  "pallet-dao-precompile",
