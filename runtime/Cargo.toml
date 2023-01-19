@@ -95,6 +95,9 @@ pallet-dynamic-fee = { version = "4.0.0-dev", default-features = false, git = "h
 pallet-ethereum = { version = "4.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
 pallet-evm = { version = "6.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
 pallet-evm-chain-id = { version = "1.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
+pallet-evm-precompile-blake2 = { version = "2.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier", branch = "polkadot-v0.9.32" }
+pallet-evm-precompile-bn128 = { version = "2.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier", branch = "polkadot-v0.9.32" }
+pallet-evm-precompile-dispatch = { version = "2.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier", branch = "polkadot-v0.9.32" }
 pallet-evm-precompile-modexp = { version = "2.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
 pallet-evm-precompile-sha3fips = { version = "2.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
 pallet-evm-precompile-simple = { version = "2.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.32" }
@@ -114,6 +117,8 @@ pallet-dao = { version = "4.0.0-dev", default-features = false, path = "../palle
 pallet-dao-assets = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-assets" }
 pallet-dao-collective = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-collective" }
 pallet-dao-collective-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao-collective" }
+pallet-dao-democracy = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-democracy" }
+pallet-dao-democracy-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao-democracy" }
 pallet-dao-membership = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-membership" }
 pallet-dao-membership-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao-membership" }
 pallet-dao-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao" }
@@ -154,6 +159,7 @@ std = [
 	"pallet-dao/std",
 	"pallet-dao-assets/std",
 	"pallet-dao-collective/std",
+	"pallet-dao-democracy/std",
 	"pallet-dao-membership/std",
 	"pallet-dao-treasury/std",
 	"pallet-democracy/std",
@@ -228,6 +234,7 @@ runtime-benchmarks = [
 	"pallet-democracy/runtime-benchmarks",
 	"pallet-dao/runtime-benchmarks",
 	"pallet-dao-collective/runtime-benchmarks",
+	"pallet-dao-democracy/runtime-benchmarks",
 	"pallet-dao-membership/runtime-benchmarks",
 	"pallet-dao-treasury/runtime-benchmarks",
 	"pallet-election-provider-multi-phase/runtime-benchmarks",
