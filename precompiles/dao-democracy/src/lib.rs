@@ -198,16 +198,11 @@ where
 			"Dao {:?}: Proposing with hash {:?}, and amount {:?}", dao_id, proposal_hash, value
 		);
 
-		// This forces it to have the proposal in pre-images.
-		// TODO: REVISIT
-		handle.record_cost(RuntimeHelper::<Runtime>::db_read_gas_cost())?;
-		let len =
-			<Runtime as pallet_dao_democracy::Config>::Preimages::len(&proposal_hash).ok_or({
-				RevertReason::custom("Failure in preimage fetch").in_field("proposal_hash")
-			})?;
-
-		let bounded =
-			Bounded::Lookup::<pallet_dao_democracy::CallOf<Runtime>> { hash: proposal_hash, len };
+		// TODO: should have length
+		let bounded = Bounded::Legacy::<pallet_dao_democracy::CallOf<Runtime>> {
+			hash: proposal_hash,
+			dummy: Default::default(),
+		};
 
 		let origin = Runtime::AddressMapping::into_account_id(handle.context().caller);
 		let call = DemocracyCall::<Runtime>::propose { dao_id, proposal: bounded, value };
