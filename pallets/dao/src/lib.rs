@@ -239,9 +239,6 @@ pub mod pallet {
 		type TechnicalCommitteeProvider: InitializeDaoMembers<u32, Self::AccountId>
 			+ ContainsDaoMember<u32, Self::AccountId>;
 
-		type TechnicalCommitteeApproveProvider: ApprovePropose<u32, Self::AccountId, Self::Hash>
-			+ ApproveVote<u32, Self::AccountId, Self::Hash>;
-
 		type ApproveTreasuryPropose: ApproveTreasuryPropose<u32, Self::AccountId, Self::Hash>;
 
 		type AssetProvider: Inspect<

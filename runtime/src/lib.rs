@@ -1587,9 +1587,8 @@ impl pallet_dao::Config for Runtime {
 	type Balance = Balance;
 	type ExpectedBlockTime = ExpectedBlockTime;
 	type CouncilProvider = DaoCouncilMembers;
-	type CouncilApproveProvider = DaoCouncil;
+	type CouncilApproveProvider = ();
 	type TechnicalCommitteeProvider = DaoTechnicalCommitteeMembers;
-	type TechnicalCommitteeApproveProvider = DaoTechnicalCommittee;
 	type ApproveTreasuryPropose = DaoTreasury;
 	type AssetProvider = Assets;
 	type AuthorityId = pallet_dao::crypto::TestAuthId;
