@@ -36,7 +36,10 @@ pub type FrontierPrecompiles<R> = PrecompileSetBuilder<
 				PrecompileAt<AddressU64<2048>, DaoPrecompile<R>>,
 				PrecompileAt<AddressU64<2049>, DaoTreasuryPrecompile<R>>,
 				PrecompileAt<AddressU64<2050>, DaoCollectivePrecompile<R, DaoCouncilCollective>>,
-				PrecompileAt<AddressU64<2051>, DaoCollectivePrecompile<R, DaoTechnicalCommitteeCollective>>,
+				PrecompileAt<
+					AddressU64<2051>,
+					DaoCollectivePrecompile<R, DaoTechnicalCommitteeCollective>,
+				>,
 				PrecompileAt<AddressU64<2052>, DaoMembershipPrecompile<R, DaoCouncilMembership>>,
 				PrecompileAt<AddressU64<2053>, DaoDemocracyPrecompile<R>>,
 			),

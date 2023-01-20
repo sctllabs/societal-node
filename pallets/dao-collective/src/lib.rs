@@ -46,7 +46,7 @@
 
 use scale_info::{prelude::*, TypeInfo};
 use sp_io::storage;
-use sp_runtime::{traits::Hash, Either, RuntimeDebug};
+use sp_runtime::{traits::Hash, Either, Permill, RuntimeDebug};
 use sp_std::{marker::PhantomData, prelude::*, result, str};
 
 use dao_primitives::{
@@ -482,25 +482,10 @@ pub mod pallet {
 		///       - 1 storage write `Voting` (codec `O(M)`)
 		///   - 1 event
 		/// # </weight>
-		#[pallet::weight((
-			if *threshold < 2 {
-				T::WeightInfo::propose_execute(
-					*length_bound, // B
-					T::MaxMembers::get(), // M
-				).saturating_add(proposal.get_dispatch_info().weight) // P1
-			} else {
-				T::WeightInfo::propose_proposed(
-					*length_bound, // B
-					T::MaxMembers::get(), // M
-					T::MaxProposals::get(), // P2
-				)
-			},
-			DispatchClass::Operational
-		))]
+		#[pallet::weight(10_000)]
 		pub fn propose(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
-			#[pallet::compact] threshold: MemberCount,
 			proposal: Box<<T as Config<I>>::Proposal>,
 			#[pallet::compact] length_bound: u32,
 		) -> DispatchResultWithPostInfo {
@@ -509,33 +494,17 @@ pub mod pallet {
 			let members = Self::members(dao_id);
 			ensure!(members.contains(&who), Error::<T, I>::NotMember);
 
-			//TODO: move threshold to dao/proposal settings???
-			if threshold < 2 {
-				let (proposal_len, result) =
-					Self::do_propose_execute(dao_id, proposal, length_bound)?;
+			let proposal = T::Preimages::bound(proposal)?.transmute();
 
-				Ok(get_result_weight(result)
-					.map(|w| {
-						T::WeightInfo::propose_execute(
-							proposal_len as u32,  // B
-							members.len() as u32, // M
-						)
-						.saturating_add(w) // P1
-					})
-					.into())
-			} else {
-				let proposal = T::Preimages::bound(proposal)?.transmute();
+			let (proposal_len, active_proposals) =
+				Self::do_propose_proposed(who, dao_id, proposal, length_bound)?;
 
-				let (proposal_len, active_proposals) =
-					Self::do_propose_proposed(who, dao_id, threshold, proposal, length_bound)?;
-
-				Ok(Some(T::WeightInfo::propose_proposed(
-					proposal_len as u32,  // B
-					members.len() as u32, // M
-					active_proposals,     // P2
-				))
-				.into())
-			}
+			Ok(Some(T::WeightInfo::propose_proposed(
+				proposal_len as u32,  // B
+				members.len() as u32, // M
+				active_proposals,     // P2
+			))
+			.into())
 		}
 
 		/// Add an aye or nay vote for the sender to the given proposal.
@@ -696,7 +665,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	pub fn do_propose_proposed(
 		who: T::AccountId,
 		dao_id: DaoId,
-		_threshold: MemberCount, // deprecated
 		proposal: BoundedProposal<T, I>,
 		length_bound: MemberCount,
 	) -> Result<(u32, u32), DispatchError> {
@@ -709,10 +677,14 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			Error::<T, I>::DuplicateProposal
 		);
 
+		let seats = Self::members(dao_id).len() as u32;
+
 		let policy = T::DaoProvider::policy(dao_id)?;
 		let threshold = match policy.approve_origin {
-			DaoPolicyProportion::AtLeast((threshold, _)) => threshold,
-			DaoPolicyProportion::MoreThan((threshold, _)) => threshold,
+			DaoPolicyProportion::AtLeast((count, total)) =>
+				Permill::from_rational(count, total).mul_floor(seats),
+			DaoPolicyProportion::MoreThan((count, total)) =>
+				Permill::from_rational(count, total).mul_ceil(seats),
 		};
 
 		let active_proposals =

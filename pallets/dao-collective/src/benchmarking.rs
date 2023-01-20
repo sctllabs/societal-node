@@ -61,8 +61,6 @@ benchmarks_instance_pallet! {
 			T::MaxMembers::get(),
 		)?;
 
-		// Set a high threshold for proposals passing so that they stay around.
-		let threshold = m.max(2);
 		// Length of the proposals should be irrelevant to `set_members`.
 		let length = 100;
 		for i in 0 .. p {
@@ -73,7 +71,6 @@ benchmarks_instance_pallet! {
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(last_old_member.clone()).into(),
 				0,
-				threshold,
 				Box::new(proposal.clone()),
 				MAX_BYTES,
 			)?;
@@ -158,9 +155,8 @@ benchmarks_instance_pallet! {
 		Collective::<T, I>::set_members(SystemOrigin::Root.into(), 0, members, T::MaxMembers::get())?;
 
 		let proposal: T::Proposal = SystemCall::<T>::remark {  remark: vec![1; b as usize] }.into();
-		let threshold = 1;
 
-	}: propose(SystemOrigin::Signed(caller), 0, threshold, Box::new(proposal.clone()), bytes_in_storage)
+	}: propose(SystemOrigin::Signed(caller), 0, Box::new(proposal.clone()), bytes_in_storage)
 	verify {
 		let proposal_hash = T::Hashing::hash_of(&proposal);
 		// Note that execution fails due to mis-matched origin
@@ -187,7 +183,6 @@ benchmarks_instance_pallet! {
 		members.push(caller.clone());
 		Collective::<T, I>::set_members(SystemOrigin::Root.into(), 0, members, T::MaxMembers::get())?;
 
-		let threshold = m;
 		// Add previous proposals.
 		for i in 0 .. p - 1 {
 			// Proposals should be different so that different proposal hashes are generated
@@ -195,7 +190,6 @@ benchmarks_instance_pallet! {
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(caller.clone()).into(),
 				0,
-				threshold,
 				Box::new(proposal),
 				bytes_in_storage,
 			)?;
@@ -205,12 +199,12 @@ benchmarks_instance_pallet! {
 
 		let proposal: T::Proposal = SystemCall::<T>::remark { remark: vec![p as u8; b as usize] }.into();
 
-	}: propose(SystemOrigin::Signed(caller.clone()), 0, threshold, Box::new(proposal.clone()), bytes_in_storage)
+	}: propose(SystemOrigin::Signed(caller.clone()), 0, Box::new(proposal.clone()), bytes_in_storage)
 	verify {
 		// New proposal is recorded
 		assert_eq!(Collective::<T, I>::proposals(0).len(), p as usize);
 		let proposal_hash = T::Hashing::hash_of(&proposal);
-		assert_last_event::<T, I>(Event::Proposed { dao_id: 0, account: caller, proposal_index: p - 1, proposal_hash, threshold }.into());
+		assert_last_event::<T, I>(Event::Proposed { dao_id: 0, account: caller, proposal_index: p - 1, proposal_hash, threshold: m }.into());
 	}
 
 	vote {
@@ -233,9 +227,6 @@ benchmarks_instance_pallet! {
 		members.push(voter.clone());
 		Collective::<T, I>::set_members(SystemOrigin::Root.into(), 0, members.clone(), T::MaxMembers::get())?;
 
-		// Threshold is 1 less than the number of members so that one person can vote nay
-		let threshold = m - 1;
-
 		// Add previous proposals
 		let mut last_hash = T::Hash::default();
 		for i in 0 .. p {
@@ -244,7 +235,6 @@ benchmarks_instance_pallet! {
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(proposer.clone()).into(),
 				0,
-				threshold,
 				Box::new(proposal.clone()),
 				bytes_in_storage,
 			)?;
@@ -311,9 +301,6 @@ benchmarks_instance_pallet! {
 		members.push(voter.clone());
 		Collective::<T, I>::set_members(SystemOrigin::Root.into(), 0, members.clone(), T::MaxMembers::get())?;
 
-		// Threshold is total members so that one nay will disapprove the vote
-		let threshold = m;
-
 		// Add previous proposals
 		let mut last_hash = T::Hash::default();
 		for i in 0 .. p {
@@ -325,7 +312,6 @@ benchmarks_instance_pallet! {
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(proposer.clone()).into(),
 				0,
-				threshold,
 				Box::new(proposal.clone()),
 				bytes_in_storage,
 			)?;
@@ -395,9 +381,6 @@ benchmarks_instance_pallet! {
 		members.push(caller.clone());
 		Collective::<T, I>::set_members(SystemOrigin::Root.into(), 0, members.clone(), T::MaxMembers::get())?;
 
-		// Threshold is 2 so any two ayes will approve the vote
-		let threshold = 2;
-
 		// Add previous proposals
 		let mut last_hash = T::Hash::default();
 		for i in 0 .. p {
@@ -406,7 +389,6 @@ benchmarks_instance_pallet! {
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(caller.clone()).into(),
 				0,
-				threshold,
 				Box::new(proposal.clone()),
 				bytes_in_storage,
 			)?;
@@ -487,9 +469,6 @@ benchmarks_instance_pallet! {
 			T::MaxMembers::get(),
 		)?;
 
-		// Threshold is one less than total members so that two nays will disapprove the vote
-		let threshold = m - 1;
-
 		// Add proposals
 		let mut last_hash = T::Hash::default();
 		for i in 0 .. p {
@@ -501,7 +480,6 @@ benchmarks_instance_pallet! {
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(caller.clone()).into(),
 				0,
-				threshold,
 				Box::new(proposal.clone()),
 				bytes_in_storage,
 			)?;
@@ -562,9 +540,6 @@ benchmarks_instance_pallet! {
 			T::MaxMembers::get(),
 		)?;
 
-		// Threshold is two, so any two ayes will pass the vote
-		let threshold = 2;
-
 		// Add proposals
 		let mut last_hash = T::Hash::default();
 		for i in 0 .. p {
@@ -573,7 +548,6 @@ benchmarks_instance_pallet! {
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(caller.clone()).into(),
 				0,
-				threshold,
 				Box::new(proposal.clone()),
 				bytes_in_storage,
 			)?;
@@ -633,9 +607,6 @@ benchmarks_instance_pallet! {
 			T::MaxMembers::get(),
 		)?;
 
-		// Threshold is one less than total members so that two nays will disapprove the vote
-		let threshold = m - 1;
-
 		// Add proposals
 		let mut last_hash = T::Hash::default();
 		for i in 0 .. p {
@@ -644,7 +615,6 @@ benchmarks_instance_pallet! {
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(caller.clone()).into(),
 				0,
-				threshold,
 				Box::new(proposal.clone()),
 				bytes_in_storage,
 			)?;

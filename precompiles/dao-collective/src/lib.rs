@@ -171,7 +171,6 @@ where
 				Some(origin).into(),
 				pallet_dao_collective::Call::<Runtime, Instance>::propose {
 					dao_id,
-					threshold,
 					proposal,
 					length_bound: proposal_length,
 				},
