@@ -4931,6 +4931,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-dao-eth-governance"
+version = "4.0.0-dev"
+dependencies = [
+ "dao-primitives",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-dao-membership"
 version = "4.0.0-dev"
 dependencies = [
@@ -8472,6 +8489,7 @@ dependencies = [
  "pallet-dao-collective-precompile",
  "pallet-dao-democracy",
  "pallet-dao-democracy-precompile",
+ "pallet-dao-eth-governance",
  "pallet-dao-membership",
  "pallet-dao-membership-precompile",
  "pallet-dao-precompile",
