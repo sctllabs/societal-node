@@ -176,7 +176,7 @@ mod vote;
 mod vote_threshold;
 pub mod weights;
 pub use conviction::Conviction;
-use dao_primitives::{DaoPolicy, DaoProvider, DaoToken};
+use dao_primitives::{DaoOrigin, DaoPolicy, DaoProvider, DaoToken, RawOrigin};
 pub use pallet::*;
 use pallet_dao_assets::LockableAsset;
 pub use types::{Delegations, ReferendumInfo, ReferendumStatus, Tally, UnvoteScope};
@@ -322,7 +322,7 @@ pub mod pallet {
 		type VetoOrigin: EnsureOrigin<Self::RuntimeOrigin, Success = Self::AccountId>;
 
 		/// Overarching type of all pallets origins.
-		type PalletsOrigin: From<frame_system::RawOrigin<Self::AccountId>>;
+		type PalletsOrigin: From<RawOrigin<Self::AccountId>>;
 
 		/// Handler for the unbalanced reduction when slashing a preimage deposit.
 		type Slash: OnUnbalanced<NegativeImbalanceOf<Self>>;
@@ -1680,6 +1680,9 @@ impl<T: Config> Pallet<T> {
 		let approved = status.threshold.approved(status.tally, total_issuance);
 
 		if approved {
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let origin = RawOrigin::Dao(dao_account_id).into();
+
 			Self::deposit_event(Event::<T>::Passed { dao_id, ref_index: index });
 			// Actually `hold` the proposal now since we didn't hold it when it came in via the
 			// submit extrinsic and we now know that it will be needed. This will be reversed by
@@ -1693,7 +1696,7 @@ impl<T: Config> Pallet<T> {
 				DispatchTime::At(when),
 				None,
 				63,
-				frame_system::RawOrigin::Root.into(),
+				origin,
 				status.proposal,
 			)
 			.is_err()
