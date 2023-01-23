@@ -9,6 +9,7 @@ pub use node_primitives::Balance;
 
 use scale_info::TypeInfo;
 use serde::{self, Deserialize, Deserializer, Serialize};
+use sp_core::{crypto::AccountId32, H256};
 use sp_runtime::RuntimeDebug;
 use sp_std::prelude::*;
 
@@ -323,8 +324,20 @@ pub trait ApprovePropose<DaoId, AccountId, Hash> {
 	fn approve_propose(dao_id: DaoId, hash: Hash, approve: bool) -> Result<(), DispatchError>;
 }
 
+impl ApprovePropose<u32, AccountId32, H256> for () {
+	fn approve_propose(dao_id: u32, hash: H256, approve: bool) -> Result<(), DispatchError> {
+		Ok(())
+	}
+}
+
 pub trait ApproveVote<DaoId, AccountId, Hash> {
 	fn approve_vote(dao_id: DaoId, hash: Hash, approve: bool) -> Result<(), DispatchError>;
+}
+
+impl ApproveVote<u32, AccountId32, H256> for () {
+	fn approve_vote(dao_id: u32, hash: H256, approve: bool) -> Result<(), DispatchError> {
+		Ok(())
+	}
 }
 
 pub trait ApproveTreasuryPropose<DaoId, AccountId, Hash> {

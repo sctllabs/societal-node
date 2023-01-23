@@ -46,12 +46,11 @@
 
 use scale_info::{prelude::*, TypeInfo};
 use sp_io::storage;
-use sp_runtime::{traits::Hash, Either, RuntimeDebug};
+use sp_runtime::{traits::Hash, Either, Permill, RuntimeDebug};
 use sp_std::{marker::PhantomData, prelude::*, result, str};
 
 use dao_primitives::{
-	ApprovePropose, ApproveVote, ChangeDaoMembers, DaoOrigin, DaoPolicy, DaoPolicyProportion,
-	DaoProvider, InitializeDaoMembers, PendingProposal, PendingVote,
+	ChangeDaoMembers, DaoOrigin, DaoPolicy, DaoPolicyProportion, DaoProvider, InitializeDaoMembers,
 };
 
 use frame_support::{
@@ -152,7 +151,6 @@ pub struct Votes<BlockNumber, VotingSet> {
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use dao_primitives::{AccountTokenBalance, PendingProposal, PendingVote};
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
@@ -236,19 +234,6 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
-	/// Actual pending proposal for a given hash.
-	#[pallet::storage]
-	#[pallet::getter(fn pending_proposal_of)]
-	pub type PendingProposalOf<T: Config<I>, I: 'static = ()> = StorageDoubleMap<
-		_,
-		Twox64Concat,
-		DaoId,
-		Identity,
-		T::Hash,
-		(PendingProposal<T::AccountId>, BoundedProposal<T, I>),
-		OptionQuery,
-	>;
-
 	/// Votes on a given proposal, if it is ongoing.
 	#[pallet::storage]
 	#[pallet::getter(fn voting)]
@@ -259,19 +244,6 @@ pub mod pallet {
 		Identity,
 		T::Hash,
 		Votes<T::BlockNumber, BoundedVec<T::AccountId, T::MaxVotes>>,
-		OptionQuery,
-	>;
-
-	/// Actual pending proposal for a given hash.
-	#[pallet::storage]
-	#[pallet::getter(fn pending_voting)]
-	pub type PendingVoting<T: Config<I>, I: 'static = ()> = StorageDoubleMap<
-		_,
-		Twox64Concat,
-		DaoId,
-		Identity,
-		T::Hash,
-		PendingVote<T::AccountId, T::Hash>,
 		OptionQuery,
 	>;
 
@@ -290,13 +262,6 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config<I>, I: 'static = ()> {
-		// Proposal pending approval
-		ProposalPendingApproval {
-			dao_id: DaoId,
-			account: T::AccountId,
-			proposal_hash: T::Hash,
-			threshold: MemberCount,
-		},
 		/// A motion (given hash) has been proposed (by given account) with a threshold (given
 		/// `MemberCount`).
 		Proposed {
@@ -305,14 +270,6 @@ pub mod pallet {
 			proposal_index: ProposalIndex,
 			proposal_hash: T::Hash,
 			threshold: MemberCount,
-		},
-		/// Proposal vote pending approval
-		VotePendingApproval {
-			dao_id: DaoId,
-			account: T::AccountId,
-			proposal_hash: T::Hash,
-			proposal_index: ProposalIndex,
-			voted: bool,
 		},
 		/// A motion (given hash) has been voted on by given account, leaving
 		/// a tally (yes votes and no votes given respectively as `MemberCount`).
@@ -525,25 +482,10 @@ pub mod pallet {
 		///       - 1 storage write `Voting` (codec `O(M)`)
 		///   - 1 event
 		/// # </weight>
-		#[pallet::weight((
-			if *threshold < 2 {
-				T::WeightInfo::propose_execute(
-					*length_bound, // B
-					T::MaxMembers::get(), // M
-				).saturating_add(proposal.get_dispatch_info().weight) // P1
-			} else {
-				T::WeightInfo::propose_proposed(
-					*length_bound, // B
-					T::MaxMembers::get(), // M
-					T::MaxProposals::get(), // P2
-				)
-			},
-			DispatchClass::Operational
-		))]
+		#[pallet::weight(10_000)]
 		pub fn propose(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
-			#[pallet::compact] threshold: MemberCount,
 			proposal: Box<<T as Config<I>>::Proposal>,
 			#[pallet::compact] length_bound: u32,
 		) -> DispatchResultWithPostInfo {
@@ -552,68 +494,17 @@ pub mod pallet {
 			let members = Self::members(dao_id);
 			ensure!(members.contains(&who), Error::<T, I>::NotMember);
 
-			let proposal_hash = T::Hashing::hash_of(&proposal);
+			let proposal = T::Preimages::bound(proposal)?.transmute();
 
-			let account_token_balance = T::DaoProvider::ensure_proposal_allowed(
-				dao_id,
-				&who,
-				threshold,
-				proposal_hash,
-				length_bound,
-				false,
-			)?;
+			let (proposal_len, active_proposals) =
+				Self::do_propose_proposed(who, dao_id, proposal, length_bound)?;
 
-			if let AccountTokenBalance::Offchain { .. } = account_token_balance {
-				// TODO: add checks for vec size limits
-
-				let pending_proposal =
-					PendingProposal { who: who.clone(), threshold, length_bound };
-
-				let proposal = T::Preimages::bound(proposal)?.transmute();
-
-				<PendingProposalOf<T, I>>::insert(
-					dao_id,
-					proposal_hash,
-					(pending_proposal, proposal),
-				);
-
-				Self::deposit_event(Event::ProposalPendingApproval {
-					dao_id,
-					account: who,
-					proposal_hash,
-					threshold,
-				});
-
-				return Ok(Default::default())
-			}
-
-			//TODO: move threshold to dao/proposal settings???
-			if threshold < 2 {
-				let (proposal_len, result) =
-					Self::do_propose_execute(dao_id, proposal, length_bound)?;
-
-				Ok(get_result_weight(result)
-					.map(|w| {
-						T::WeightInfo::propose_execute(
-							proposal_len as u32,  // B
-							members.len() as u32, // M
-						)
-						.saturating_add(w) // P1
-					})
-					.into())
-			} else {
-				let proposal = T::Preimages::bound(proposal)?.transmute();
-
-				let (proposal_len, active_proposals) =
-					Self::do_propose_proposed(who, dao_id, threshold, proposal, length_bound)?;
-
-				Ok(Some(T::WeightInfo::propose_proposed(
-					proposal_len as u32,  // B
-					members.len() as u32, // M
-					active_proposals,     // P2
-				))
-				.into())
-			}
+			Ok(Some(T::WeightInfo::propose_proposed(
+				proposal_len as u32,  // B
+				members.len() as u32, // M
+				active_proposals,     // P2
+			))
+			.into())
 		}
 
 		/// Add an aye or nay vote for the sender to the given proposal.
@@ -642,34 +533,6 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 			let members = Self::members(dao_id);
 			ensure!(members.contains(&who), Error::<T, I>::NotMember);
-
-			let pending_vote = PendingVote {
-				who: who.clone(),
-				proposal_hash: proposal,
-				proposal_index: index,
-				vote: approve,
-			};
-
-			let pending_vote_hash = T::Hashing::hash_of(&pending_vote);
-
-			let account_token_balance =
-				T::DaoProvider::ensure_voting_allowed(dao_id, &who, pending_vote_hash, false)?;
-
-			if let AccountTokenBalance::Offchain { .. } = account_token_balance {
-				// TODO: add checks for vec size limits
-
-				<PendingVoting<T, I>>::insert(dao_id, pending_vote_hash, pending_vote);
-
-				Self::deposit_event(Event::VotePendingApproval {
-					dao_id,
-					account: who,
-					proposal_hash: proposal,
-					proposal_index: index,
-					voted: approve,
-				});
-
-				return Ok(Default::default())
-			}
 
 			// Detects first vote of the member in the motion
 			let is_account_voting_first_time =
@@ -802,7 +665,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	pub fn do_propose_proposed(
 		who: T::AccountId,
 		dao_id: DaoId,
-		_threshold: MemberCount, // deprecated
 		proposal: BoundedProposal<T, I>,
 		length_bound: MemberCount,
 	) -> Result<(u32, u32), DispatchError> {
@@ -815,10 +677,14 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			Error::<T, I>::DuplicateProposal
 		);
 
+		let seats = Self::members(dao_id).len() as u32;
+
 		let policy = T::DaoProvider::policy(dao_id)?;
 		let threshold = match policy.approve_origin {
-			DaoPolicyProportion::AtLeast((threshold, _)) => threshold,
-			DaoPolicyProportion::MoreThan((threshold, _)) => threshold,
+			DaoPolicyProportion::AtLeast((count, total)) =>
+				Permill::from_rational(count, total).mul_floor(seats),
+			DaoPolicyProportion::MoreThan((count, total)) =>
+				Permill::from_rational(count, total).mul_ceil(seats),
 		};
 
 		let active_proposals =
@@ -1340,34 +1206,6 @@ impl<T: Config<I>, I: 'static> InitializeDaoMembers<DaoId, T::AccountId> for Pal
 			BoundedVec::<T::AccountId, T::MaxMembers>::try_from(members)
 				.map_err(|_| Error::<T, I>::TooManyMembers)?,
 		);
-
-		Ok(())
-	}
-}
-
-impl<T: Config<I>, I: 'static> ApprovePropose<DaoId, T::AccountId, T::Hash> for Pallet<T, I> {
-	fn approve_propose(dao_id: DaoId, hash: T::Hash, approve: bool) -> Result<(), DispatchError> {
-		let (pending_proposal, proposal) =
-			<PendingProposalOf<T, I>>::take(dao_id, hash).expect("Pending Proposal not found");
-
-		let PendingProposal { who, threshold, length_bound } = pending_proposal;
-
-		if approve {
-			Self::do_propose_proposed(who, dao_id, threshold, proposal, length_bound)?;
-		}
-
-		Ok(())
-	}
-}
-
-impl<T: Config<I>, I: 'static> ApproveVote<DaoId, T::AccountId, T::Hash> for Pallet<T, I> {
-	fn approve_vote(dao_id: DaoId, hash: T::Hash, approve: bool) -> Result<(), DispatchError> {
-		let PendingVote { who, proposal_hash, proposal_index, vote } =
-			<PendingVoting<T, I>>::take(dao_id, hash).expect("Pending Vote not found");
-
-		if approve {
-			Self::do_vote(who, dao_id, proposal_hash, proposal_index, vote)?;
-		}
 
 		Ok(())
 	}
