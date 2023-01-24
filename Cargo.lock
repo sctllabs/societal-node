@@ -4939,6 +4939,7 @@ dependencies = [
  "frame-support",
  "frame-system",
  "log",
+ "pallet-dao-democracy",
  "parity-scale-codec",
  "scale-info",
  "sp-core",

@@ -185,16 +185,16 @@ pub struct PendingDao<
 #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct PendingProposal<AccountId> {
 	pub who: AccountId,
-	pub threshold: u32,
 	pub length_bound: u32,
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
-pub struct PendingVote<AccountId, Hash> {
+pub struct PendingVote<AccountId, Hash, Balance> {
 	pub who: AccountId,
 	pub proposal_hash: Hash,
 	pub proposal_index: u32,
-	pub vote: bool,
+	pub aye: bool,
+	pub balance: Balance,
 }
 
 #[derive(
@@ -263,7 +263,6 @@ pub trait DaoProvider<Hash> {
 	fn ensure_proposal_allowed(
 		id: Self::Id,
 		who: &Self::AccountId,
-		threshold: u32,
 		hash: Hash,
 		length_bound: u32,
 		force: bool,
@@ -289,12 +288,22 @@ pub trait ContainsDaoMember<DaoId, AccountId> {
 	fn contains(dao_id: DaoId, who: &AccountId) -> Result<bool, DispatchError>;
 }
 
-pub trait ApprovePropose<DaoId, AccountId, Hash> {
-	fn approve_propose(dao_id: DaoId, hash: Hash, approve: bool) -> Result<(), DispatchError>;
+pub trait ApprovePropose<DaoId, AccountId, TokenSupply, Hash> {
+	fn approve_propose(
+		dao_id: DaoId,
+		threshold: TokenSupply,
+		hash: Hash,
+		approve: bool,
+	) -> Result<(), DispatchError>;
 }
 
-impl ApprovePropose<u32, AccountId32, H256> for () {
-	fn approve_propose(dao_id: u32, hash: H256, approve: bool) -> Result<(), DispatchError> {
+impl ApprovePropose<u32, AccountId32, u128, H256> for () {
+	fn approve_propose(
+		dao_id: u32,
+		threshold: u128,
+		hash: H256,
+		approve: bool,
+	) -> Result<(), DispatchError> {
 		Ok(())
 	}
 }

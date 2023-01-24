@@ -46,7 +46,7 @@ pub trait Approved<Balance> {
 }
 
 /// Return `true` iff `n1 / d1 < n2 / d2`. `d1` and `d2` may not be zero.
-fn compare_rationals<
+pub fn compare_rationals<
 	T: Zero + Mul<T, Output = T> + Div<T, Output = T> + Rem<T, Output = T> + Ord + Copy,
 >(
 	mut n1: T,

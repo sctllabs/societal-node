@@ -32,6 +32,7 @@ frame-system = { version = "4.0.0-dev", default-features = false, git = "https:/
 
 # Local dependencies
 dao-primitives = { version = "4.0.0-dev", default-features = false, path = "../dao-primitives" }
+pallet-dao-democracy = { version = "4.0.0-dev", default-features = false, path = "../dao-democracy" }
 
 [features]
 default = ["std"]

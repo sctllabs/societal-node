@@ -1580,7 +1580,6 @@ impl pallet_dao::Config for Runtime {
 	type DaoMaxCouncilMembers = DaoMaxCouncilMembers;
 	type DaoMaxTechnicalCommitteeMembers = DaoMaxTechnicalCommitteeMembers;
 	type DaoTokenMinBalanceLimit = DaoTokenMinBalanceLimit;
-	type DaoTokenVotingMinThreshold = DaoTokenVotingMinThreshold;
 	type AssetId = u32;
 	type Balance = Balance;
 	type CouncilProvider = DaoCouncilMembers;
@@ -1603,6 +1602,7 @@ parameter_types! {
 impl pallet_dao_eth_governance::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeOrigin = RuntimeOrigin;
+	type Balance = Balance;
 	type Proposal = RuntimeCall;
 	type MaxProposals = EthGovernanceMaxProposals;
 	type MaxVotes = EthGovernanceMaxVotes;

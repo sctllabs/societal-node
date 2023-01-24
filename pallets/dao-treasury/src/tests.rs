@@ -164,7 +164,6 @@ impl DaoProvider<H256> for TestDaoProvider {
 	fn ensure_proposal_allowed(
 		id: Self::Id,
 		who: &Self::AccountId,
-		threshold: u32,
 		hash: H256,
 		length_bound: u32,
 	) -> Result<AccountTokenBalance, DispatchError> {

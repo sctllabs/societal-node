@@ -61,6 +61,9 @@ type PendingDaoOf<T> = PendingDao<
 /// Dao ID. Just a `u32`.
 pub type DaoId = u32;
 
+/// Token Supply
+pub type TokenSupply = u128;
+
 type AssetId<T> = <T as Config>::AssetId;
 type Balance<T> = <T as Config>::Balance;
 
@@ -129,7 +132,6 @@ pub enum OffchainData<AccountId, Hash> {
 		dao_id: u32,
 		token_address: Vec<u8>,
 		who: AccountId,
-		threshold: u32,
 		hash: Hash,
 		length_bound: u32,
 	},
@@ -223,13 +225,10 @@ pub mod pallet {
 		#[pallet::constant]
 		type DaoTokenMinBalanceLimit: Get<u128>;
 
-		#[pallet::constant]
-		type DaoTokenVotingMinThreshold: Get<u128>;
-
 		type CouncilProvider: InitializeDaoMembers<u32, Self::AccountId>
 			+ ContainsDaoMember<u32, Self::AccountId>;
 
-		type CouncilApproveProvider: ApprovePropose<u32, Self::AccountId, Self::Hash>
+		type CouncilApproveProvider: ApprovePropose<u32, Self::AccountId, TokenSupply, Self::Hash>
 			+ ApproveVote<u32, Self::AccountId, Self::Hash>;
 
 		type TechnicalCommitteeProvider: InitializeDaoMembers<u32, Self::AccountId>
@@ -355,10 +354,20 @@ pub mod pallet {
 						dao_id,
 						token_address,
 						who,
-						threshold,
 						hash,
 						length_bound,
 					} => {
+						let total_supply = match Self::parse_token_balance(
+							Self::fetch_token_total_supply(token_address.clone()),
+						) {
+							Ok(total_supply) => total_supply,
+							Err(e) => {
+								log::error!("offchain_worker error: {:?}", e);
+
+								0
+							},
+						};
+
 						match Self::parse_token_balance(Self::fetch_token_balance_of(
 							token_address,
 							who,
@@ -366,8 +375,10 @@ pub mod pallet {
 							Ok(token_balance) => {
 								call = Some(Call::approve_council_propose {
 									dao_id,
+									threshold: total_supply,
 									hash,
-									approve: token_balance >= T::DaoTokenVotingMinThreshold::get(),
+									// TODO: add to DAO settings?
+									approve: total_supply > 0 && token_balance > 0,
 								});
 							},
 							Err(e) => {
@@ -375,6 +386,7 @@ pub mod pallet {
 
 								call = Some(Call::approve_council_propose {
 									dao_id,
+									threshold: total_supply,
 									hash,
 									approve: false,
 								});
@@ -390,7 +402,7 @@ pub mod pallet {
 								call = Some(Call::approve_treasury_propose {
 									dao_id,
 									hash,
-									approve: token_balance >= T::DaoTokenVotingMinThreshold::get(),
+									approve: token_balance > 0,
 								});
 							},
 							Err(e) => {
@@ -412,7 +424,7 @@ pub mod pallet {
 								call = Some(Call::approve_proposal_vote {
 									dao_id,
 									hash,
-									approve: token_balance >= T::DaoTokenVotingMinThreshold::get(),
+									approve: token_balance > 0,
 								});
 							},
 							Err(e) => {
@@ -486,7 +498,7 @@ pub mod pallet {
 
 			match call {
 				Call::approve_dao { dao_hash, approve } => valid_tx(b"approve_dao".to_vec()),
-				Call::approve_council_propose { dao_id, hash, approve } =>
+				Call::approve_council_propose { dao_id, threshold, hash, approve } =>
 					valid_tx(b"approve_council_dao".to_vec()),
 				Call::approve_treasury_propose { dao_id, hash, approve } =>
 					valid_tx(b"approve_treasury_propose".to_vec()),
@@ -782,12 +794,13 @@ pub mod pallet {
 		pub fn approve_council_propose(
 			origin: OriginFor<T>,
 			dao_id: u32,
+			threshold: u128,
 			hash: T::Hash,
 			approve: bool,
 		) -> DispatchResult {
 			ensure_none(origin)?;
 
-			T::CouncilApproveProvider::approve_propose(dao_id, hash, approve)?;
+			T::CouncilApproveProvider::approve_propose(dao_id, threshold, hash, approve)?;
 
 			Ok(())
 		}
@@ -1065,7 +1078,6 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 	fn ensure_proposal_allowed(
 		id: Self::Id,
 		who: &Self::AccountId,
-		threshold: u32,
 		hash: T::Hash,
 		length_bound: u32,
 		force: bool,
@@ -1081,7 +1093,6 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 					dao_id: id,
 					token_address,
 					who: who.clone(),
-					threshold,
 					hash,
 					length_bound,
 				},
@@ -1124,10 +1135,7 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 
 		match dao.token {
 			DaoToken::FungibleToken(token_id) => {
-				if force &&
-					T::AssetProvider::balance(token_id, who) <
-						Self::u128_to_balance(T::DaoTokenVotingMinThreshold::get())
-				{
+				if force && T::AssetProvider::balance(token_id, who).gt(&Self::u128_to_balance(0)) {
 					return Err(Error::<T>::TokenBalanceLow.into())
 				}
 
