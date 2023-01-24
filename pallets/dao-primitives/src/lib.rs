@@ -30,8 +30,12 @@ pub struct DaoTokenMetadata {
 pub struct DaoGovernanceToken {
 	pub token_id: u32,
 	pub metadata: DaoTokenMetadata,
-	#[serde(deserialize_with = "de_string_to_u128")]
-	pub min_balance: u128,
+	#[serde(default)]
+	#[serde(deserialize_with = "de_option_string_to_u128")]
+	pub min_balance: Option<u128>,
+	#[serde(default)]
+	#[serde(deserialize_with = "de_option_string_to_u128")]
+	pub initial_balance: Option<u128>,
 }
 
 #[derive(
@@ -454,4 +458,14 @@ where
 {
 	let s: &str = Deserialize::deserialize(de)?;
 	Ok(s.parse::<u128>().unwrap())
+}
+
+pub fn de_option_string_to_u128<'de, D>(de: D) -> Result<Option<u128>, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	match Option::<&str>::deserialize(de)? {
+		None => Ok(None),
+		Some(s) => Ok(Some(s.parse::<u128>().unwrap())),
+	}
 }

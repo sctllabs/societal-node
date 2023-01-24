@@ -305,7 +305,7 @@ impl pallet_timestamp::Config for Runtime {
 }
 
 /// Existential deposit.
-pub const EXISTENTIAL_DEPOSIT: u128 = 500;
+pub const EXISTENTIAL_DEPOSIT: u128 = 0;
 
 impl pallet_balances::Config for Runtime {
 	type MaxLocks = ConstU32<50>;
@@ -1567,7 +1567,6 @@ parameter_types! {
 	pub const DaoMaxCouncilMembers: u32 = 100; // TODO
 	pub const DaoMaxTechnicalCommitteeMembers: u32 = 100; // TODO
 	pub const DaoTokenMinBalanceLimit: u128 = 1_000;
-	pub const DaoTokenBalanceLimit: u128 = 1_000_000_000;
 	pub const DaoTokenVotingMinThreshold: u128 = 10;
 }
 
@@ -1581,7 +1580,6 @@ impl pallet_dao::Config for Runtime {
 	type DaoMaxCouncilMembers = DaoMaxCouncilMembers;
 	type DaoMaxTechnicalCommitteeMembers = DaoMaxTechnicalCommitteeMembers;
 	type DaoTokenMinBalanceLimit = DaoTokenMinBalanceLimit;
-	type DaoTokenBalanceLimit = DaoTokenBalanceLimit;
 	type DaoTokenVotingMinThreshold = DaoTokenVotingMinThreshold;
 	type AssetId = u32;
 	type Balance = Balance;
