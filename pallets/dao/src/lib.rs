@@ -80,6 +80,8 @@ const LOCK_BLOCK_EXPIRATION: u32 = 3; // in block number
 
 const ONCHAIN_TX_KEY: &[u8] = b"societal-dao::storage::tx";
 
+const TOKEN_MIN_BALANCE: u128 = 1;
+
 pub mod crypto {
 	use crate::KEY_TYPE;
 	use sp_core::sr25519::Signature as Sr25519Signature;
@@ -162,7 +164,7 @@ pub mod pallet {
 			storage::StorageValueRef,
 			storage_lock::{BlockAndTime, StorageLock},
 		},
-		traits::Hash,
+		traits::{Hash, Zero},
 	};
 
 	/// The current storage version.
@@ -220,9 +222,6 @@ pub mod pallet {
 
 		#[pallet::constant]
 		type DaoTokenMinBalanceLimit: Get<u128>;
-
-		#[pallet::constant]
-		type DaoTokenBalanceLimit: Get<u128>;
 
 		#[pallet::constant]
 		type DaoTokenVotingMinThreshold: Get<u128>;
@@ -631,11 +630,16 @@ pub mod pallet {
 
 				let metadata = token.metadata;
 
-				if token.min_balance == 0 || token.min_balance > T::DaoTokenBalanceLimit::get() {
+				let token_min_balance: Balance<T> =
+					Self::u128_to_balance(token.min_balance.unwrap_or(TOKEN_MIN_BALANCE));
+				let token_initial_balance: Balance<T> =
+					Self::u128_to_balance(token.initial_balance.unwrap_or(TOKEN_MIN_BALANCE));
+				if token_min_balance.is_zero() ||
+					token_initial_balance.is_zero() ||
+					token_initial_balance < token_min_balance
+				{
 					return Err(Error::<T>::TokenBalanceInvalid.into())
 				}
-
-				let min_balance = Self::u128_to_balance(T::DaoTokenMinBalanceLimit::get());
 
 				let issuance =
 					T::AssetProvider::total_issuance(token_id).try_into().unwrap_or(0u128);
@@ -643,8 +647,13 @@ pub mod pallet {
 				if issuance > 0 {
 					return Err(Error::<T>::TokenAlreadyExists.into())
 				} else {
-					T::AssetProvider::create(token_id, dao_account_id.clone(), false, min_balance)
-						.map_err(|_| Error::<T>::TokenCreateFailed)?;
+					T::AssetProvider::create(
+						token_id,
+						dao_account_id.clone(),
+						false,
+						token_min_balance,
+					)
+					.map_err(|_| Error::<T>::TokenCreateFailed)?;
 
 					T::AssetProvider::set(
 						token_id,
@@ -655,14 +664,14 @@ pub mod pallet {
 					)
 					.map_err(|_| Error::<T>::TokenCreateFailed)?;
 
-					let minted = T::DaoTokenBalanceLimit::get().min(token.min_balance);
-
-					T::AssetProvider::mint_into(
-						token_id,
-						&dao_account_id,
-						Self::u128_to_balance(minted),
-					)
-					.map_err(|_| Error::<T>::TokenCreateFailed)?;
+					if token_initial_balance.gt(&Self::u128_to_balance(0)) {
+						T::AssetProvider::mint_into(
+							token_id,
+							&dao_account_id,
+							token_initial_balance,
+						)
+						.map_err(|_| Error::<T>::TokenCreateFailed)?;
+					}
 				}
 			}
 

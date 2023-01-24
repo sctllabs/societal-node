@@ -316,7 +316,6 @@ impl pallet_dao::Config for Test {
 	type CouncilProvider = TestCouncilProvider;
 	type AssetProvider = TestAssetProvider;
 	type DaoTokenMinBalanceLimit = ConstU128<200>;
-	type DaoTokenBalanceLimit = ConstU128<1000000000>;
 	type DaoTokenVotingMinThreshold = ConstU128<20>;
 	type CouncilApproveProvider = TestCouncilProvider;
 	type AuthorityId = crypto::TestAuthId;
