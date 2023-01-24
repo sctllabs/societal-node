@@ -38,36 +38,7 @@ pub struct DaoGovernanceToken {
 	pub initial_balance: Option<u128>,
 }
 
-#[derive(
-	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
-)]
-pub struct DaoPolicyPayload {
-	pub proposal_period: u32,
-	pub approve_origin: DaoPolicyProportion,
-
-	/// Governance
-	pub enactment_period: u32,
-	pub launch_period: u32,
-	pub voting_period: u32,
-	pub vote_locking_period: u32,
-	pub fast_track_voting_period: u32,
-	pub cooloff_period: u32,
-	pub minimum_deposit: u128,
-	pub external_origin: DaoPolicyProportion,
-	pub external_majority_origin: DaoPolicyProportion,
-	pub external_default_origin: DaoPolicyProportion,
-	pub fast_track_origin: DaoPolicyProportion,
-	pub instant_origin: DaoPolicyProportion,
-	pub instant_allowed: bool,
-	pub cancellation_origin: DaoPolicyProportion,
-	pub blacklist_origin: DaoPolicyProportion,
-	pub cancel_proposal_origin: DaoPolicyProportion,
-	pub veto_origin: DaoPolicyProportion,
-}
-
-#[derive(
-	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
-)]
+#[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize)]
 pub struct DaoPayload {
 	#[serde(deserialize_with = "de_string_to_bytes")]
 	pub name: Vec<u8>,
@@ -80,7 +51,7 @@ pub struct DaoPayload {
 	#[serde(default)]
 	#[serde(deserialize_with = "de_option_string_to_bytes")]
 	pub token_address: Option<Vec<u8>>,
-	pub policy: DaoPolicyPayload,
+	pub policy: DaoPolicy,
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
@@ -93,28 +64,22 @@ pub struct DaoConfig<BoundedString, BoundedMetadata> {
 	pub metadata: BoundedMetadata,
 }
 
-// TODO: replace with payload directly
 #[derive(
-	Encode,
-	Decode,
-	Default,
-	Clone,
-	PartialEq,
-	TypeInfo,
-	RuntimeDebug,
-	Serialize,
-	Deserialize,
-	MaxEncodedLen,
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize, MaxEncodedLen,
 )]
 pub struct DaoPolicy {
 	/// In millis
 	pub proposal_period: u32,
-	// TODO: use max members for account length
 	pub approve_origin: DaoPolicyProportion,
-	pub token_voting_min_threshold: u128,
-
 	/// Governance settings
+	#[serde(default)]
+	pub governance: Option<DaoGovernance>,
+}
 
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize, MaxEncodedLen,
+)]
+pub struct GovernanceV1Policy {
 	/// The period between a proposal being approved and enacted.
 	///
 	/// It should generally be a little more than the unstake period to ensure that
@@ -127,9 +92,9 @@ pub struct DaoPolicy {
 	pub voting_period: u32,
 	/// The minimum period of vote locking.
 	///
-	/// It should be no shorter than enactment period to ensure that in the case of an approval,
-	/// those successful voters are locked into the consequences that their votes entail.
-	/// Same as EnactmentPeriod
+	/// It should be no shorter than enactment period to ensure that in the case of an
+	/// approval, those successful voters are locked into the consequences that their votes
+	/// entail. Same as EnactmentPeriod
 	pub vote_locking_period: u32,
 	/// Minimum voting period allowed for a fast-track referendum.
 	pub fast_track_voting_period: u32,
@@ -164,15 +129,15 @@ pub struct DaoPolicy {
 	pub blacklist_origin: DaoPolicyProportion,
 	/// Origin from which a proposal may be cancelled and its backers slashed.
 	pub cancel_proposal_origin: DaoPolicyProportion,
-	/// Origin for anyone able to veto proposals.
-	///
-	/// # Warning
-	///
-	/// The number of Vetoers for a proposal must be small, extrinsics are weighted according to
-	pub veto_origin: DaoPolicyProportion,
 }
 
-// TODO: add token enum
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize, MaxEncodedLen,
+)]
+pub enum DaoGovernance {
+	GovernanceV1(GovernanceV1Policy),
+	OwnershipWeightedVoting,
+}
 
 #[derive(
 	Encode, Decode, Copy, Clone, Default, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen,

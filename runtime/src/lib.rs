@@ -1583,7 +1583,6 @@ impl pallet_dao::Config for Runtime {
 	type DaoTokenVotingMinThreshold = DaoTokenVotingMinThreshold;
 	type AssetId = u32;
 	type Balance = Balance;
-	type ExpectedBlockTime = ExpectedBlockTime;
 	type CouncilProvider = DaoCouncilMembers;
 	type CouncilApproveProvider = ();
 	type TechnicalCommitteeProvider = DaoTechnicalCommitteeMembers;

@@ -226,9 +226,6 @@ pub mod pallet {
 		#[pallet::constant]
 		type DaoTokenVotingMinThreshold: Get<u128>;
 
-		#[pallet::constant]
-		type ExpectedBlockTime: Get<u64>;
-
 		type CouncilProvider: InitializeDaoMembers<u32, Self::AccountId>
 			+ ContainsDaoMember<u32, Self::AccountId>;
 
@@ -550,22 +547,21 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin.clone())?;
 
-			let dao_payload = serde_json::from_slice::<DaoPayload>(&data)
-				.map_err(|_| Error::<T>::InvalidInput)?;
+			let DaoPayload { name, purpose, metadata, token, token_id, token_address, policy } =
+				serde_json::from_slice::<DaoPayload>(&data)
+					.map_err(|_| Error::<T>::InvalidInput)?;
 
 			let dao_id = <NextDaoId<T>>::get();
 			let dao_account_id = Self::account_id(dao_id);
 
-			let dao_name = BoundedVec::<u8, T::DaoStringLimit>::try_from(dao_payload.name.clone())
+			let dao_name = BoundedVec::<u8, T::DaoStringLimit>::try_from(name)
 				.map_err(|_| Error::<T>::NameTooLong)?;
 
-			let dao_purpose =
-				BoundedVec::<u8, T::DaoStringLimit>::try_from(dao_payload.purpose.clone())
-					.map_err(|_| Error::<T>::PurposeTooLong)?;
+			let dao_purpose = BoundedVec::<u8, T::DaoStringLimit>::try_from(purpose)
+				.map_err(|_| Error::<T>::PurposeTooLong)?;
 
-			let dao_metadata =
-				BoundedVec::<u8, T::DaoStringLimit>::try_from(dao_payload.metadata.clone())
-					.map_err(|_| Error::<T>::MetadataTooLong)?;
+			let dao_metadata = BoundedVec::<u8, T::DaoStringLimit>::try_from(metadata)
+				.map_err(|_| Error::<T>::MetadataTooLong)?;
 
 			let min = <T as Config>::Currency::minimum_balance();
 			let _ = <T as Config>::Currency::make_free_balance_be(&dao_account_id, min);
@@ -591,40 +587,9 @@ pub mod pallet {
 			let founder = who.clone();
 			let config = DaoConfig { name: dao_name, purpose: dao_purpose, metadata: dao_metadata };
 
-			// TODO
-			let policy = DaoPolicy {
-				proposal_period: dao_payload.policy.proposal_period /
-					T::ExpectedBlockTime::get() as BlockNumber,
-				approve_origin: dao_payload.policy.approve_origin,
-				token_voting_min_threshold: T::DaoTokenVotingMinThreshold::get(),
-				enactment_period: dao_payload.policy.enactment_period /
-					T::ExpectedBlockTime::get() as BlockNumber,
-				launch_period: dao_payload.policy.launch_period /
-					T::ExpectedBlockTime::get() as BlockNumber,
-				voting_period: dao_payload.policy.voting_period /
-					T::ExpectedBlockTime::get() as BlockNumber,
-				vote_locking_period: dao_payload.policy.vote_locking_period /
-					T::ExpectedBlockTime::get() as BlockNumber,
-				fast_track_voting_period: dao_payload.policy.fast_track_voting_period /
-					T::ExpectedBlockTime::get() as BlockNumber,
-				cooloff_period: dao_payload.policy.cooloff_period /
-					T::ExpectedBlockTime::get() as BlockNumber,
-				minimum_deposit: dao_payload.policy.minimum_deposit,
-				external_origin: dao_payload.policy.external_origin,
-				external_majority_origin: dao_payload.policy.external_majority_origin,
-				external_default_origin: dao_payload.policy.external_default_origin,
-				fast_track_origin: dao_payload.policy.fast_track_origin,
-				instant_origin: dao_payload.policy.instant_origin,
-				instant_allowed: dao_payload.policy.instant_allowed,
-				cancellation_origin: dao_payload.policy.cancellation_origin,
-				blacklist_origin: dao_payload.policy.blacklist_origin,
-				cancel_proposal_origin: dao_payload.policy.cancel_proposal_origin,
-				veto_origin: dao_payload.policy.veto_origin,
-			};
-
 			let mut has_token_id: Option<AssetId<T>> = None;
 
-			if let Some(token) = dao_payload.token {
+			if let Some(token) = token {
 				let token_id = Self::u32_to_asset_id(token.token_id);
 				has_token_id = Some(token_id);
 
@@ -676,7 +641,7 @@ pub mod pallet {
 			}
 
 			if has_token_id.is_none() {
-				if let Some(id) = dao_payload.token_id {
+				if let Some(id) = token_id {
 					let token_id = Self::u32_to_asset_id(id);
 					has_token_id = Some(token_id);
 
@@ -686,7 +651,7 @@ pub mod pallet {
 					if issuance == 0 {
 						return Err(Error::<T>::TokenNotExists.into())
 					}
-				} else if let Some(token_address) = dao_payload.token_address {
+				} else if let Some(token_address) = token_address {
 					let address =
 						BoundedVec::<u8, T::DaoStringLimit>::try_from(token_address.clone())
 							.map_err(|_| Error::<T>::TokenAddressInvalid)?;
