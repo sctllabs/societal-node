@@ -1093,56 +1093,6 @@ impl<
 	}
 }
 
-pub struct EnsureProportionMoreThan<AccountId, I: 'static, const N: u32, const D: u32>(
-	PhantomData<(AccountId, I)>,
-);
-impl<
-		O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>,
-		AccountId,
-		I,
-		const N: u32,
-		const D: u32,
-	> EnsureOrigin<O> for EnsureProportionMoreThan<AccountId, I, N, D>
-{
-	type Success = ();
-	fn try_origin(o: O) -> Result<Self::Success, O> {
-		o.into().and_then(|o| match o {
-			RawOrigin::Members(n, m) if n * D > N * m => Ok(()),
-			r => Err(O::from(r)),
-		})
-	}
-
-	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin() -> Result<O, ()> {
-		Ok(O::from(RawOrigin::Members(1u32, 0u32)))
-	}
-}
-
-pub struct EnsureProportionAtLeast<AccountId, const N: u32, const D: u32, I: 'static = ()>(
-	PhantomData<(AccountId, I)>,
-);
-impl<
-		O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>,
-		AccountId,
-		I,
-		const N: u32,
-		const D: u32,
-	> EnsureOrigin<O> for EnsureProportionAtLeast<AccountId, N, D, I>
-{
-	type Success = ();
-	fn try_origin(o: O) -> Result<Self::Success, O> {
-		o.into().and_then(|o| match o {
-			RawOrigin::Members(n, m) if n * D >= N * m => Ok(()),
-			r => Err(O::from(r)),
-		})
-	}
-
-	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin() -> Result<O, ()> {
-		Ok(O::from(RawOrigin::Members(0u32, 0u32)))
-	}
-}
-
 pub struct EnsureDaoOriginWithArg<AccountId, I: 'static = ()>(PhantomData<(AccountId, I)>);
 impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>, AccountId, I>
 	EnsureOriginWithArg<O, DaoOrigin<AccountId>> for EnsureDaoOriginWithArg<AccountId, I>
