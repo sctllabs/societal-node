@@ -12,6 +12,7 @@ members = [
 	"precompiles/dao",
 	"precompiles/dao-collective",
 	"precompiles/dao-democracy",
+	"precompiles/dao-eth-governance",
 	"precompiles/dao-membership",
 	"precompiles/dao-treasury",
 	"precompiles/utils",

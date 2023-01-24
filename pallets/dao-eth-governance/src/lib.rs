@@ -32,7 +32,7 @@ use sp_std::iter::Sum;
 use crate::vote::{AccountVote, Vote};
 pub use pallet::*;
 
-mod vote;
+pub mod vote;
 
 type BalanceOf<T> = <T as Config>::Balance;
 
