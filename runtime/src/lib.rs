@@ -553,7 +553,6 @@ parameter_types! {
 	pub const CouncilMotionDuration: BlockNumber = 5 * DAYS;
 	pub const CouncilMaxProposals: u32 = 100;
 	pub const CouncilMaxMembers: u32 = 100;
-	pub const CollectiveMaxVotes: u32 = 50;
 }
 
 // TODO - Update settings
@@ -589,11 +588,9 @@ impl pallet_dao_collective::Config<DaoCouncilCollective> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type MaxProposals = CouncilMaxProposals;
 	type MaxMembers = CouncilMaxMembers;
-	type MaxVotes = CollectiveMaxVotes;
 	type DefaultVote = pallet_dao_collective::MoreThanMajorityVote;
 	type WeightInfo = pallet_dao_collective::weights::SubstrateWeight<Runtime>;
 	type DaoProvider = Dao;
-	type Preimages = Preimage;
 }
 
 type DaoTechnicalCommitteeCollective = pallet_dao_collective::Instance2;
@@ -603,11 +600,9 @@ impl pallet_dao_collective::Config<DaoTechnicalCommitteeCollective> for Runtime 
 	type RuntimeEvent = RuntimeEvent;
 	type MaxProposals = TechnicalMaxProposals;
 	type MaxMembers = TechnicalMaxMembers;
-	type MaxVotes = CollectiveMaxVotes;
 	type DefaultVote = pallet_dao_collective::MoreThanMajorityVote;
 	type WeightInfo = pallet_dao_collective::weights::SubstrateWeight<Runtime>;
 	type DaoProvider = Dao;
-	type Preimages = Preimage;
 }
 
 parameter_types! {
