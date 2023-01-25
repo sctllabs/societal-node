@@ -87,7 +87,7 @@ use frame_support::{
 };
 use frame_system::pallet_prelude::OriginFor;
 
-use dao_primitives::{ApproveTreasuryPropose, DaoOrigin, DaoPolicy, DaoProvider};
+use dao_primitives::{DaoOrigin, DaoPolicy, DaoProvider};
 
 pub use pallet::*;
 pub use weights::WeightInfo;
@@ -214,11 +214,6 @@ pub mod pallet {
 		/// NOTE: This parameter is also used within the Bounties Pallet extension if enabled.
 		#[pallet::constant]
 		type MaxApprovals: Get<u32>;
-
-		/// The origin required for approving spends from the treasury outside of the proposal
-		/// process. The `Success` value is the maximum amount that this origin is allowed to
-		/// spend at a time.
-		type SpendOrigin: EnsureOrigin<Self::RuntimeOrigin, Success = BalanceOf<Self, I>>;
 
 		type DaoProvider: DaoProvider<
 			<Self as frame_system::Config>::Hash,
@@ -471,7 +466,6 @@ pub mod pallet {
 			Ok(())
 		}
 
-		// TODO: remove?
 		/// Propose and approve a spend of treasury funds.
 		///
 		/// - `origin`: Must be `SpendOrigin` with the `Success` value being at least `amount`.
@@ -487,12 +481,10 @@ pub mod pallet {
 			#[pallet::compact] amount: BalanceOf<T, I>,
 			beneficiary: <T::Lookup as StaticLookup>::Source,
 		) -> DispatchResult {
-			let max_amount = T::SpendOrigin::ensure_origin(origin)?;
+			Self::ensure_approved(origin, dao_id)?;
+
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
 
-			T::DaoProvider::exists(dao_id)?;
-
-			ensure!(amount <= max_amount, Error::<T, I>::InsufficientPermission);
 			let proposal_index = Self::proposal_count(dao_id);
 			Approvals::<T, I>::try_append(dao_id, proposal_index)
 				.map_err(|_| Error::<T, I>::TooManyApprovals)?;

@@ -24,6 +24,7 @@
 
 use super::{Pallet as Treasury, *};
 
+use dao_primitives::DaoPolicyProportion;
 use frame_benchmarking::{account, benchmarks_instance_pallet};
 use frame_support::{
 	dispatch::UnfilteredDispatchable,
@@ -69,11 +70,14 @@ fn assert_last_event<T: Config<I>, I: 'static>(generic_event: <T as Config<I>>::
 }
 
 benchmarks_instance_pallet! {
-	// This benchmark is short-circuited if `SpendOrigin` cannot provide
+	// This benchmark is short-circuited if `ApproveOrigin` cannot provide
 	// a successful origin, in which case `spend` is un-callable and can use weight=0.
 	spend {
 		let (_, value, beneficiary_lookup) = setup_proposal::<T, _>(SEED);
-		let origin = T::SpendOrigin::try_successful_origin();
+		let origin = T::ApproveOrigin::try_successful_origin(&DaoOrigin {
+		dao_account_id: account("member", 0, SEED),
+		proportion: DaoPolicyProportion::AtLeast((1, 1)),
+	});
 		let beneficiary = T::Lookup::lookup(beneficiary_lookup.clone()).unwrap();
 		let call = Call::<T, I>::spend { dao_id: 0, amount: value, beneficiary: beneficiary_lookup };
 	}: {
