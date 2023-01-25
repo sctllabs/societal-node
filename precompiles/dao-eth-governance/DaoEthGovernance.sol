@@ -26,7 +26,8 @@ interface PalletDaoEthGovernance {
     /// @param proposalHash Hash of the proposal to vote for. Ensure the caller knows what they're
     /// voting in case of front-running or reorgs.
     /// @param proposalIndex Index of the proposal (returned by propose).
-    /// @param approve The vote itself, is the caller approving or not the proposal.
+    /// @param aye The vote itself, is the caller approving or not the proposal.
+    /// @param balance Amount of tokens the caller is voting with.
     function vote(
         uint32 dao_id,
         bytes32 proposalHash,
