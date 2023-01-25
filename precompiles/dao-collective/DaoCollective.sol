@@ -20,10 +20,9 @@ interface PalletDaoCollective {
     /// directly from the group of one member of the collective.
     ///
     /// @param dao_id DAO ID
-    /// @param threshold Amount of members required to dispatch the proposal.
     /// @param proposal SCALE-encoded Substrate call.
     /// @return index Index of the new proposal. Meaningless if threshold < 2
-    function propose(uint32 dao_id, uint32 threshold, bytes memory proposal)
+    function propose(uint32 dao_id, bytes memory proposal)
         external
         returns (uint32 index);
 
@@ -94,8 +93,7 @@ interface PalletDaoCollective {
         address indexed who,
         uint32 dao_id,
         uint32 indexed proposalIndex,
-        bytes32 indexed proposalHash,
-        uint32 threshold
+        bytes32 indexed proposalHash
     );
     event Voted(address indexed who, uint32 dao_id, bytes32 indexed proposalHash, bool voted);
     event Closed(uint32 dao_id, bytes32 indexed proposalHash);

@@ -47,16 +47,14 @@ pub fn log_proposed(
 	dao_id: DaoId,
 	index: u32,
 	hash: H256,
-	threshold: u32,
 ) -> Log {
-	log5(
+	log4(
 		address.into(),
 		SELECTOR_LOG_PROPOSED,
 		who.into(),
 		H256::from_slice(&EvmDataWriter::new().write(dao_id).build()),
 		H256::from_slice(&EvmDataWriter::new().write(index).build()),
-		hash,
-		EvmDataWriter::new().write(threshold).build(),
+		EvmDataWriter::new().write(hash).build(),
 	)
 }
 
@@ -140,11 +138,10 @@ where
 		Ok(())
 	}
 
-	#[precompile::public("propose(uint32,uint32,bytes)")]
+	#[precompile::public("propose(uint32,bytes)")]
 	fn propose(
 		handle: &mut impl PrecompileHandle,
 		dao_id: DaoId,
-		threshold: u32,
 		proposal: BoundedBytes<GetProposalLimit>,
 	) -> EvmResult<u32> {
 		handle.record_cost(RuntimeHelper::<Runtime>::db_read_gas_cost())?;
@@ -177,20 +174,13 @@ where
 			)?;
 		}
 
-		// In pallet_dao_collective a threshold < 2 means the proposal has been
-		// executed directly.
-		let log = if threshold < 2 {
-			log_executed(handle.context().address, dao_id, proposal_hash)
-		} else {
-			log_proposed(
-				handle.context().address,
-				handle.context().caller,
-				dao_id,
-				proposal_index,
-				proposal_hash,
-				threshold,
-			)
-		};
+		let log = log_proposed(
+			handle.context().address,
+			handle.context().caller,
+			dao_id,
+			proposal_index,
+			proposal_hash,
+		);
 
 		handle.record_log_costs(&[&log])?;
 		log.record(handle)?;
