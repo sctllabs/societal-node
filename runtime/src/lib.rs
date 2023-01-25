@@ -1579,7 +1579,6 @@ impl pallet_dao::Config for Runtime {
 	type CouncilProvider = DaoCouncilMembers;
 	type CouncilApproveProvider = DaoEthGovernance;
 	type TechnicalCommitteeProvider = DaoTechnicalCommitteeMembers;
-	type ApproveTreasuryPropose = DaoTreasury;
 	type AssetProvider = Assets;
 	type AuthorityId = pallet_dao::crypto::TestAuthId;
 	type ApproveOrigin = EitherOfDiverseWithArg<

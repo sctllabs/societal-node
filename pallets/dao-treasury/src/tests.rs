@@ -153,14 +153,6 @@ impl DaoProvider<H256> for TestDaoProvider {
 		Ok(true)
 	}
 
-	fn ensure_treasury_proposal_allowed(
-		id: Self::Id,
-		who: &Self::AccountId,
-		hash: H256,
-	) -> Result<AccountTokenBalance, DispatchError> {
-		Ok(AccountTokenBalance::Sufficient)
-	}
-
 	fn ensure_proposal_allowed(
 		id: Self::Id,
 		who: &Self::AccountId,

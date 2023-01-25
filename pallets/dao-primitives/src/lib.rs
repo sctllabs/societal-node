@@ -254,12 +254,6 @@ pub trait DaoProvider<Hash> {
 	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError>;
 	fn count() -> u32;
 	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError>;
-	fn ensure_treasury_proposal_allowed(
-		id: Self::Id,
-		who: &Self::AccountId,
-		hash: Hash,
-		force: bool,
-	) -> Result<AccountTokenBalance, DispatchError>;
 	fn ensure_proposal_allowed(
 		id: Self::Id,
 		who: &Self::AccountId,
@@ -316,14 +310,6 @@ impl ApproveVote<u32, AccountId32, H256> for () {
 	fn approve_vote(dao_id: u32, hash: H256, approve: bool) -> Result<(), DispatchError> {
 		Ok(())
 	}
-}
-
-pub trait ApproveTreasuryPropose<DaoId, AccountId, Hash> {
-	fn approve_treasury_propose(
-		dao_id: DaoId,
-		hash: Hash,
-		approve: bool,
-	) -> Result<(), DispatchError>;
 }
 
 /// Trait for type that can handle incremental changes to a set of account IDs.

@@ -264,21 +264,10 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config<I>, I: 'static = ()> {
-		// Proposal pending approval
-		ProposalPendingApproval {
-			dao_id: DaoId,
-			proposal_hash: T::Hash,
-		},
 		/// New proposal.
-		Proposed {
-			dao_id: DaoId,
-			proposal_index: ProposalIndex,
-		},
+		Proposed { dao_id: DaoId, proposal_index: ProposalIndex },
 		/// We have ended a spend period and will now allocate funds.
-		Spending {
-			dao_id: DaoId,
-			budget_remaining: BalanceOf<T, I>,
-		},
+		Spending { dao_id: DaoId, budget_remaining: BalanceOf<T, I> },
 		/// Some funds have been allocated.
 		Awarded {
 			dao_id: DaoId,
@@ -287,25 +276,13 @@ pub mod pallet {
 			account: T::AccountId,
 		},
 		/// A proposal was rejected; funds were slashed.
-		Rejected {
-			dao_id: DaoId,
-			proposal_index: ProposalIndex,
-			slashed: BalanceOf<T, I>,
-		},
+		Rejected { dao_id: DaoId, proposal_index: ProposalIndex, slashed: BalanceOf<T, I> },
 		/// Some of our funds have been burnt.
-		Burnt {
-			dao_id: DaoId,
-			burnt_funds: BalanceOf<T, I>,
-		},
+		Burnt { dao_id: DaoId, burnt_funds: BalanceOf<T, I> },
 		/// Spending has finished; this is the amount that rolls over until next spend.
-		Rollover {
-			dao_id: DaoId,
-			rollover_balance: BalanceOf<T, I>,
-		},
+		Rollover { dao_id: DaoId, rollover_balance: BalanceOf<T, I> },
 		/// Some funds have been deposited.
-		Deposit {
-			value: BalanceOf<T, I>,
-		},
+		Deposit { value: BalanceOf<T, I> },
 		/// A new spend proposal has been approved.
 		SpendApproved {
 			dao_id: DaoId,
@@ -386,23 +363,6 @@ pub mod pallet {
 			let proposal =
 				Proposal { dao_id, proposer: proposer.clone(), value, beneficiary, bond };
 			let proposal_hash = T::Hashing::hash_of(&proposal);
-
-			let account_token_balance = T::DaoProvider::ensure_treasury_proposal_allowed(
-				dao_id,
-				&proposer,
-				proposal_hash,
-				false,
-			)?;
-
-			if let AccountTokenBalance::Offchain { .. } = account_token_balance {
-				// TODO: add checks for vec size limits
-
-				<PendingProposals<T, I>>::insert(dao_id, proposal_hash, proposal);
-
-				Self::deposit_event(Event::ProposalPendingApproval { dao_id, proposal_hash });
-
-				return Ok(())
-			}
 
 			Self::do_propose_spend(proposal)
 		}
@@ -669,24 +629,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			origin,
 			&DaoOrigin { dao_account_id, proportion: approve_origin },
 		)?;
-
-		Ok(())
-	}
-}
-
-impl<T: Config<I>, I: 'static> ApproveTreasuryPropose<DaoId, T::AccountId, T::Hash>
-	for Pallet<T, I>
-{
-	fn approve_treasury_propose(
-		dao_id: DaoId,
-		hash: T::Hash,
-		approve: bool,
-	) -> Result<(), DispatchError> {
-		let proposal = <PendingProposals<T, I>>::take(dao_id, hash).expect("Proposal not found");
-
-		if approve {
-			return Self::do_propose_spend(proposal)
-		}
 
 		Ok(())
 	}
