@@ -75,6 +75,7 @@ pub mod pallet {
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
 	#[pallet::storage_version(STORAGE_VERSION)]
+	#[pallet::without_storage_info]
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
@@ -129,7 +130,7 @@ pub mod pallet {
 		DaoId,
 		Identity,
 		T::Hash,
-		BoundedProposal<T>,
+		<T as Config>::Proposal,
 		OptionQuery,
 	>;
 
@@ -142,7 +143,7 @@ pub mod pallet {
 		DaoId,
 		Identity,
 		T::Hash,
-		(PendingProposal<T::AccountId>, BoundedProposal<T>),
+		(PendingProposal<T::AccountId>, <T as Config>::Proposal),
 		OptionQuery,
 	>;
 
@@ -299,8 +300,6 @@ pub mod pallet {
 				AccountTokenBalance::Offchain { .. } => {
 					let pending_proposal = PendingProposal { who: who.clone(), length_bound };
 
-					let proposal = T::Preimages::bound(proposal)?.transmute();
-
 					<PendingProposalOf<T>>::insert(
 						dao_id,
 						proposal_hash,
@@ -412,7 +411,7 @@ impl<T: Config> Pallet<T> {
 		who: T::AccountId,
 		dao_id: DaoId,
 		threshold: TokenSupply,
-		proposal: BoundedProposal<T>,
+		proposal: Box<<T as Config>::Proposal>,
 		length_bound: u32,
 	) -> Result<(u32, u32), DispatchError> {
 		let proposal_len = proposal.encoded_size();
@@ -595,15 +594,10 @@ impl<T: Config> Pallet<T> {
 		ensure!(proposal_len <= length_bound, Error::<T>::WrongProposalLength);
 		let proposal = ProposalOf::<T>::get(dao_id, hash).ok_or(Error::<T>::ProposalMissing)?;
 
-		let (call, _lookup_len) = match T::Preimages::peek(&proposal) {
-			Ok(c) => c,
-			Err(_) => return Err(Error::<T>::ProposalMissing.into()),
-		};
-
-		let proposal_weight = call.get_dispatch_info().weight;
+		let proposal_weight = proposal.get_dispatch_info().weight;
 
 		ensure!(proposal_weight.all_lte(weight_bound), Error::<T>::WrongProposalWeight);
-		Ok((call, proposal_len as usize))
+		Ok((proposal, proposal_len as usize))
 	}
 
 	/// Weight:
@@ -677,7 +671,7 @@ impl<T: Config> ApprovePropose<DaoId, T::AccountId, TokenSupply, T::Hash> for Pa
 		let PendingProposal { who, length_bound } = pending_proposal;
 
 		if approve {
-			Self::do_propose_proposed(who, dao_id, threshold, proposal, length_bound)?;
+			Self::do_propose_proposed(who, dao_id, threshold, Box::new(proposal), length_bound)?;
 		}
 
 		Ok(())
