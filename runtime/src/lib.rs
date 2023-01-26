@@ -701,7 +701,6 @@ impl pallet_dao_treasury::Config for Runtime {
 	type SpendFunds = ();
 	type WeightInfo = pallet_dao_treasury::weights::SubstrateWeight<Runtime>;
 	type MaxApprovals = MaxApprovals;
-	type SpendOrigin = frame_support::traits::NeverEnsureOrigin<u128>;
 	type DaoProvider = Dao;
 }
 
@@ -1580,7 +1579,6 @@ impl pallet_dao::Config for Runtime {
 	type CouncilProvider = DaoCouncilMembers;
 	type CouncilApproveProvider = DaoEthGovernance;
 	type TechnicalCommitteeProvider = DaoTechnicalCommitteeMembers;
-	type ApproveTreasuryPropose = DaoTreasury;
 	type AssetProvider = Assets;
 	type AuthorityId = pallet_dao::crypto::TestAuthId;
 	type ApproveOrigin = EitherOfDiverseWithArg<

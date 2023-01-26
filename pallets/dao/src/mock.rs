@@ -1,7 +1,5 @@
 use crate as pallet_dao;
-use dao_primitives::{
-	ApprovePropose, ApproveTreasuryPropose, ApproveVote, ContainsDaoMember, InitializeDaoMembers,
-};
+use dao_primitives::{ApprovePropose, ApproveVote, ContainsDaoMember, InitializeDaoMembers};
 use frame_support::{
 	dispatch::{DispatchError, DispatchResult},
 	parameter_types,
@@ -293,17 +291,6 @@ impl Transfer<AccountId> for TestAssetProvider {
 	}
 }
 
-pub struct TestTreasuryProvider;
-impl ApproveTreasuryPropose<u32, AccountId, H256> for TestTreasuryProvider {
-	fn approve_treasury_propose(
-		dao_id: u32,
-		hash: H256,
-		approve: bool,
-	) -> Result<(), DispatchError> {
-		Ok(())
-	}
-}
-
 impl pallet_dao::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type PalletId = DaoPalletId;
@@ -320,7 +307,6 @@ impl pallet_dao::Config for Test {
 	type CouncilApproveProvider = TestCouncilProvider;
 	type AuthorityId = crypto::TestAuthId;
 	type DaoMaxCouncilMembers = ConstU32<20>;
-	type ApproveTreasuryPropose = TestTreasuryProvider;
 }
 
 // Build genesis storage according to the mock runtime.

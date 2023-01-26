@@ -234,8 +234,6 @@ pub mod pallet {
 		type TechnicalCommitteeProvider: InitializeDaoMembers<u32, Self::AccountId>
 			+ ContainsDaoMember<u32, Self::AccountId>;
 
-		type ApproveTreasuryPropose: ApproveTreasuryPropose<u32, Self::AccountId, Self::Hash>;
-
 		type AssetProvider: Inspect<
 				Self::AccountId,
 				AssetId = <Self as pallet::Config>::AssetId,
@@ -373,7 +371,7 @@ pub mod pallet {
 							who,
 						)) {
 							Ok(token_balance) => {
-								call = Some(Call::approve_council_propose {
+								call = Some(Call::approve_propose {
 									dao_id,
 									threshold: total_supply,
 									hash,
@@ -384,7 +382,7 @@ pub mod pallet {
 							Err(e) => {
 								log::error!("offchain_worker error: {:?}", e);
 
-								call = Some(Call::approve_council_propose {
+								call = Some(Call::approve_propose {
 									dao_id,
 									threshold: total_supply,
 									hash,
@@ -393,28 +391,6 @@ pub mod pallet {
 							},
 						}
 					},
-					OffchainData::ApproveTreasuryProposal { dao_id, token_address, who, hash } =>
-						match Self::parse_token_balance(Self::fetch_token_balance_of(
-							token_address,
-							who,
-						)) {
-							Ok(token_balance) => {
-								call = Some(Call::approve_treasury_propose {
-									dao_id,
-									hash,
-									approve: token_balance > 0,
-								});
-							},
-							Err(e) => {
-								log::error!("offchain_worker error: {:?}", e);
-
-								call = Some(Call::approve_treasury_propose {
-									dao_id,
-									hash,
-									approve: false,
-								});
-							},
-						},
 					OffchainData::ApproveVote { dao_id, token_address, who, hash } =>
 						match Self::parse_token_balance(Self::fetch_token_balance_of(
 							token_address,
@@ -430,7 +406,7 @@ pub mod pallet {
 							Err(e) => {
 								log::error!("offchain_worker error: {:?}", e);
 
-								call = Some(Call::approve_treasury_propose {
+								call = Some(Call::approve_proposal_vote {
 									dao_id,
 									hash,
 									approve: false,
@@ -498,10 +474,8 @@ pub mod pallet {
 
 			match call {
 				Call::approve_dao { dao_hash, approve } => valid_tx(b"approve_dao".to_vec()),
-				Call::approve_council_propose { dao_id, threshold, hash, approve } =>
-					valid_tx(b"approve_council_dao".to_vec()),
-				Call::approve_treasury_propose { dao_id, hash, approve } =>
-					valid_tx(b"approve_treasury_propose".to_vec()),
+				Call::approve_propose { dao_id, threshold, hash, approve } =>
+					valid_tx(b"approve_propose".to_vec()),
 				Call::approve_proposal_vote { dao_id, hash, approve } =>
 					valid_tx(b"approve_proposal_vote".to_vec()),
 				_ => InvalidTransaction::Call.into(),
@@ -791,7 +765,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(10_000)]
-		pub fn approve_council_propose(
+		pub fn approve_propose(
 			origin: OriginFor<T>,
 			dao_id: u32,
 			threshold: u128,
@@ -801,20 +775,6 @@ pub mod pallet {
 			ensure_none(origin)?;
 
 			T::CouncilApproveProvider::approve_propose(dao_id, threshold, hash, approve)?;
-
-			Ok(())
-		}
-
-		#[pallet::weight(10_000)]
-		pub fn approve_treasury_propose(
-			origin: OriginFor<T>,
-			dao_id: u32,
-			hash: T::Hash,
-			approve: bool,
-		) -> DispatchResult {
-			ensure_none(origin)?;
-
-			T::ApproveTreasuryPropose::approve_treasury_propose(dao_id, hash, approve)?;
 
 			Ok(())
 		}
@@ -1048,33 +1008,6 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 		T::CouncilProvider::contains(id, who)
 	}
 
-	fn ensure_treasury_proposal_allowed(
-		id: Self::Id,
-		who: &Self::AccountId,
-		hash: T::Hash,
-		force: bool,
-	) -> Result<AccountTokenBalance, DispatchError> {
-		let token_balance = Self::ensure_token_balance(id, who, force)?;
-
-		if let AccountTokenBalance::Offchain { token_address } = token_balance.clone() {
-			let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
-
-			let data: IndexingData<T::AccountId, T::Hash> = IndexingData(
-				b"approve_treasury_propose".to_vec(),
-				OffchainData::ApproveTreasuryProposal {
-					dao_id: id,
-					token_address,
-					who: who.clone(),
-					hash,
-				},
-			);
-
-			offchain_index::set(&key, &data.encode());
-		}
-
-		Ok(token_balance)
-	}
-
 	fn ensure_proposal_allowed(
 		id: Self::Id,
 		who: &Self::AccountId,
@@ -1088,7 +1021,7 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 			let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
 
 			let data: IndexingData<T::AccountId, T::Hash> = IndexingData(
-				b"approve_council_propose".to_vec(),
+				b"approve_propose".to_vec(),
 				OffchainData::ApproveProposal {
 					dao_id: id,
 					token_address,
