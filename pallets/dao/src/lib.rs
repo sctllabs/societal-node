@@ -627,7 +627,7 @@ pub mod pallet {
 					T::AssetProvider::create(
 						token_id,
 						dao_account_id.clone(),
-						false,
+						true,
 						token_min_balance,
 					)
 					.map_err(|_| Error::<T>::TokenCreateFailed)?;
@@ -757,7 +757,7 @@ pub mod pallet {
 					});
 				},
 				DaoToken::EthTokenAddress(_) => {
-					// TODO: handle token_address
+					return Err(Error::<T>::DaoNotExist.into());
 				},
 			}
 
