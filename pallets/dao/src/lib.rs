@@ -77,7 +77,7 @@ const ERC20_TOKEN_TOTAL_SUPPLY_SIGNATURE: &str =
 	"0x18160ddd0000000000000000000000000000000000000000000000000000000000000000";
 const ERC20_TOKEN_BALANCE_OF_SIGNATURE_PREFIX: &str = "0x70a08231000000000000000000000000";
 
-const FETCH_TIMEOUT_PERIOD: u64 = 3000; // in milli-seconds
+const FETCH_TIMEOUT_PERIOD: u64 = 6000; // in milli-seconds
 const LOCK_TIMEOUT_EXPIRATION: u64 = FETCH_TIMEOUT_PERIOD + 1000; // in milli-seconds
 const LOCK_BLOCK_EXPIRATION: u32 = 3; // in block number
 
@@ -991,7 +991,7 @@ pub mod pallet {
 			let request = offchain::http::Request::post(str::from_utf8(eth_rpc_url).unwrap(), body);
 
 			// Keeping the offchain worker execution time reasonable, so limiting the call to be
-			// within 3s.
+			// within 6s.
 			let timeout = sp_io::offchain::timestamp()
 				.add(offchain::Duration::from_millis(FETCH_TIMEOUT_PERIOD));
 
