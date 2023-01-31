@@ -254,24 +254,19 @@ pub trait DaoProvider<Hash> {
 	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError>;
 	fn count() -> u32;
 	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError>;
-	fn ensure_proposal_allowed(
+	fn ensure_eth_proposal_allowed(
 		id: Self::Id,
-		who: &Self::AccountId,
+		account_id: Vec<u8>,
 		hash: Hash,
 		length_bound: u32,
-		force: bool,
 	) -> Result<AccountTokenBalance, DispatchError>;
-	fn ensure_voting_allowed(
+	fn ensure_eth_voting_allowed(
 		id: Self::Id,
-		who: &Self::AccountId,
+		account_id: Vec<u8>,
 		hash: Hash,
-		force: bool,
+		block_number: u32,
 	) -> Result<AccountTokenBalance, DispatchError>;
-	fn ensure_token_balance(
-		id: Self::Id,
-		who: &Self::AccountId,
-		force: bool,
-	) -> Result<AccountTokenBalance, DispatchError>;
+	fn ensure_eth_token_balance(id: Self::Id) -> Result<AccountTokenBalance, DispatchError>;
 }
 
 pub trait InitializeDaoMembers<DaoId, AccountId> {
@@ -286,6 +281,7 @@ pub trait ApprovePropose<DaoId, AccountId, TokenSupply, Hash> {
 	fn approve_propose(
 		dao_id: DaoId,
 		threshold: TokenSupply,
+		block_number: u32,
 		hash: Hash,
 		approve: bool,
 	) -> Result<(), DispatchError>;
@@ -295,6 +291,7 @@ impl ApprovePropose<u32, AccountId32, u128, H256> for () {
 	fn approve_propose(
 		dao_id: u32,
 		threshold: u128,
+		block_number: u32,
 		hash: H256,
 		approve: bool,
 	) -> Result<(), DispatchError> {

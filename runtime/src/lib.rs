@@ -1560,8 +1560,6 @@ parameter_types! {
 	pub const DaoMetadataLimit: u32 = 500;
 	pub const DaoMaxCouncilMembers: u32 = 100; // TODO
 	pub const DaoMaxTechnicalCommitteeMembers: u32 = 100; // TODO
-	pub const DaoTokenMinBalanceLimit: u128 = 1_000;
-	pub const DaoTokenVotingMinThreshold: u128 = 10;
 }
 
 impl pallet_dao::Config for Runtime {
@@ -1573,11 +1571,10 @@ impl pallet_dao::Config for Runtime {
 	type DaoMetadataLimit = DaoMetadataLimit;
 	type DaoMaxCouncilMembers = DaoMaxCouncilMembers;
 	type DaoMaxTechnicalCommitteeMembers = DaoMaxTechnicalCommitteeMembers;
-	type DaoTokenMinBalanceLimit = DaoTokenMinBalanceLimit;
 	type AssetId = u32;
 	type Balance = Balance;
 	type CouncilProvider = DaoCouncilMembers;
-	type CouncilApproveProvider = DaoEthGovernance;
+	type GovernanceApproveProvider = DaoEthGovernance;
 	type TechnicalCommitteeProvider = DaoTechnicalCommitteeMembers;
 	type AssetProvider = Assets;
 	type AuthorityId = pallet_dao::crypto::TestAuthId;

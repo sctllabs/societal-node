@@ -297,14 +297,11 @@ impl pallet_dao::Config for Test {
 	type Currency = pallet_balances::Pallet<Test>;
 	type DaoStringLimit = ConstU32<20>;
 	type DaoMetadataLimit = ConstU32<20>;
-	type ExpectedBlockTime = ConstU64<3000>;
 	type AssetId = u32;
 	type Balance = u128;
 	type CouncilProvider = TestCouncilProvider;
 	type AssetProvider = TestAssetProvider;
-	type DaoTokenMinBalanceLimit = ConstU128<200>;
-	type DaoTokenVotingMinThreshold = ConstU128<20>;
-	type CouncilApproveProvider = TestCouncilProvider;
+	type GovernanceApproveProvider = TestCouncilProvider;
 	type AuthorityId = crypto::TestAuthId;
 	type DaoMaxCouncilMembers = ConstU32<20>;
 }

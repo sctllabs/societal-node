@@ -13,10 +13,10 @@ use sp_std::{marker::PhantomData, prelude::*};
 /// Dao ID. Just a `u32`.
 pub type DaoId = u32;
 
-pub const ENCODED_PROPOSAL_SIZE_LIMIT: u32 = 2u32.pow(16);
+pub const ENCODED_DAO_PAYLOAD_SIZE_LIMIT: u32 = 2u32.pow(16);
 pub const ARRAY_LIMIT: u32 = 10u32;
 
-type GetEncodedProposalSizeLimit = ConstU32<ENCODED_PROPOSAL_SIZE_LIMIT>;
+type GetEncodedDAOPayloadSizeLimit = ConstU32<ENCODED_DAO_PAYLOAD_SIZE_LIMIT>;
 type GetArrayLimit = ConstU32<ARRAY_LIMIT>;
 
 /// Solidity selector of the DaoRegistered log.
@@ -53,7 +53,7 @@ where
 		handle: &mut impl PrecompileHandle,
 		council: BoundedVec<Address, GetArrayLimit>,
 		technical_committee: BoundedVec<Address, GetArrayLimit>,
-		data: BoundedBytes<GetEncodedProposalSizeLimit>,
+		data: BoundedBytes<GetEncodedDAOPayloadSizeLimit>,
 	) -> EvmResult {
 		let origin = Runtime::AddressMapping::into_account_id(handle.context().caller);
 

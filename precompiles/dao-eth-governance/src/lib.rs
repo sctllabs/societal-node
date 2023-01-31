@@ -20,6 +20,7 @@ pub type DaoId = u32;
 type BalanceOf<Runtime> = <Runtime as pallet_dao_eth_governance::Config>::Balance;
 
 type GetProposalLimit = ConstU32<100>;
+type GetAccountIdLimit = ConstU32<42>;
 
 /// Solidity selector of the Executed log.
 pub const SELECTOR_LOG_EXECUTED: [u8; 32] = keccak256!("Executed(bytes32)");
@@ -107,11 +108,12 @@ where
 	H256: From<<Runtime as frame_system::Config>::Hash>
 		+ Into<<Runtime as frame_system::Config>::Hash>,
 {
-	#[precompile::public("propose(uint32,bytes)")]
+	#[precompile::public("propose(uint32,bytes,bytes)")]
 	fn propose(
 		handle: &mut impl PrecompileHandle,
 		dao_id: DaoId,
 		proposal: BoundedBytes<GetProposalLimit>,
+		account_id: BoundedBytes<GetAccountIdLimit>,
 	) -> EvmResult<u32> {
 		handle.record_cost(RuntimeHelper::<Runtime>::db_read_gas_cost())?;
 
@@ -138,6 +140,7 @@ where
 					dao_id,
 					proposal,
 					length_bound: proposal_length,
+					account_id: account_id.into(),
 				},
 			)?;
 		}
@@ -145,7 +148,7 @@ where
 		Ok(proposal_index)
 	}
 
-	#[precompile::public("vote(uint32,bytes32,uint32,bool,uint128)")]
+	#[precompile::public("vote(uint32,bytes32,uint32,bool,uint128,bytes)")]
 	fn vote(
 		handle: &mut impl PrecompileHandle,
 		dao_id: DaoId,
@@ -153,6 +156,7 @@ where
 		proposal_index: u32,
 		aye: bool,
 		balance: u128,
+		account_id: BoundedBytes<GetAccountIdLimit>,
 	) -> EvmResult {
 		let origin = Runtime::AddressMapping::into_account_id(handle.context().caller);
 
@@ -165,6 +169,7 @@ where
 				proposal: proposal_hash.into(),
 				index: proposal_index,
 				vote,
+				account_id: account_id.into(),
 			},
 		)?;
 
