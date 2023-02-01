@@ -473,6 +473,18 @@ pub mod pallet {
 			proposal: Box<<T as Config<I>>::Proposal>,
 			#[pallet::compact] length_bound: u32,
 		) -> DispatchResultWithPostInfo {
+			Self::propose_with_meta(origin, dao_id, proposal, length_bound, None)
+		}
+
+		/// Adds a new proposal with temporary meta field for arbitrary data indexed by node indexer
+		#[pallet::weight(10_000)]
+		pub fn propose_with_meta(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			proposal: Box<<T as Config<I>>::Proposal>,
+			#[pallet::compact] length_bound: u32,
+			_meta: Option<Vec<u8>>,
+		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
 			let members = Self::members(dao_id);
