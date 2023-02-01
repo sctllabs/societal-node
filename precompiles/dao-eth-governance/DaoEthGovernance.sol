@@ -7,17 +7,25 @@ pragma solidity >=0.8.0;
 interface PalletDaoEthGovernance {
 
     /// @dev Make a proposal for a call.
-    /// The sender must be a member of the collective.
-    /// If the threshold is less than 2 then the proposal will be dispatched
-    /// directly from the group of one member of the collective.
     ///
     /// @param dao_id DAO ID
-    /// @param threshold Amount of members required to dispatch the proposal.
     /// @param proposal SCALE-encoded Substrate call.
-    /// @return index Index of the new proposal. Meaningless if threshold < 2
-    function propose(uint32 dao_id, uint32 threshold, bytes memory proposal)
+    /// @param account_id ETH Account Id to check token balance for - should be equal to the signer
+    /// @return index Index of the new proposal.
+    function propose(uint32 dao_id, bytes memory proposal, bytes memory account_id)
         external
         returns (uint32 index);
+
+    /// Same as 'propose' with additional 'meta' included.
+    ///
+    /// @param dao_id DAO ID
+    /// @param proposal SCALE-encoded Substrate call.
+    /// @param account_id ETH Account Id to check token balance for - should be equal to the signer
+    /// @param meta Proposal Metadata.
+    /// @return index Index of the new proposal.
+    function propose_with_meta(uint32 dao_id, bytes memory proposal, bytes memory account_id, bytes memory meta)
+      external
+      returns (uint32 index);
 
     /// @dev Vote for a proposal.
     /// The sender must be a member of the collective.
@@ -28,12 +36,14 @@ interface PalletDaoEthGovernance {
     /// @param proposalIndex Index of the proposal (returned by propose).
     /// @param aye The vote itself, is the caller approving or not the proposal.
     /// @param balance Amount of tokens the caller is voting with.
+    /// @param account_id ETH Account Id to check token balance for - should be equal to the signer
     function vote(
         uint32 dao_id,
         bytes32 proposalHash,
         uint32 proposalIndex,
         bool aye,
-        uint128 balance
+        uint128 balance,
+        bytes memory account_id
     ) external;
 
     /// @dev Close a proposal.

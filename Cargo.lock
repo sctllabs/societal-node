@@ -4938,6 +4938,7 @@ dependencies = [
  "frame-benchmarking",
  "frame-support",
  "frame-system",
+ "hex",
  "log",
  "pallet-dao-democracy",
  "parity-scale-codec",

@@ -9,7 +9,7 @@ use frame_support::{
 };
 use pallet_evm::AddressMapping;
 use parity_scale_codec::Decode;
-use precompile_utils::{helpers::hash, prelude::*};
+use precompile_utils::{data::BoundedBytesString, helpers::hash, prelude::*};
 use sp_core::{ConstU32, H160, H256};
 use sp_std::{boxed::Box, marker::PhantomData, vec::Vec};
 
@@ -17,6 +17,7 @@ use sp_std::{boxed::Box, marker::PhantomData, vec::Vec};
 pub type DaoId = u32;
 
 type GetProposalLimit = ConstU32<100>;
+type GetProposalMetaLimit = ConstU32<100>;
 
 /// Solidity selector of the Executed log.
 pub const SELECTOR_LOG_EXECUTED: [u8; 32] = keccak256!("Executed(bytes32)");
@@ -144,6 +145,16 @@ where
 		dao_id: DaoId,
 		proposal: BoundedBytes<GetProposalLimit>,
 	) -> EvmResult<u32> {
+		Self::propose_with_meta(handle, dao_id, proposal, BoundedBytes::from(""))
+	}
+
+	#[precompile::public("propose(uint32,bytes,bytes)")]
+	fn propose_with_meta(
+		handle: &mut impl PrecompileHandle,
+		dao_id: DaoId,
+		proposal: BoundedBytes<GetProposalLimit>,
+		meta: BoundedBytes<GetProposalMetaLimit>,
+	) -> EvmResult<u32> {
 		handle.record_cost(RuntimeHelper::<Runtime>::db_read_gas_cost())?;
 
 		let proposal: Vec<_> = proposal.into();
@@ -166,10 +177,11 @@ where
 			RuntimeHelper::<Runtime>::try_dispatch(
 				handle,
 				Some(origin).into(),
-				pallet_dao_collective::Call::<Runtime, Instance>::propose {
+				pallet_dao_collective::Call::<Runtime, Instance>::propose_with_meta {
 					dao_id,
 					proposal,
 					length_bound: proposal_length,
+					meta: Some(meta.into()),
 				},
 			)?;
 		}

@@ -25,7 +25,7 @@ use frame_support::{
 	weights::Weight,
 	Parameter,
 };
-use sp_core::bounded::BoundedVec;
+use sp_core::{bounded::BoundedVec, Hasher, H160};
 use sp_runtime::traits::{IntegerSquareRoot, Zero};
 use sp_std::iter::Sum;
 
@@ -60,6 +60,8 @@ pub struct Votes<BlockNumber, VotingSet> {
 	nays: VotingSet,
 	/// The hard end time of this vote.
 	end: BlockNumber,
+	/// Particular block number to check eth state at
+	block_number: u32,
 }
 
 #[frame_support::pallet]
@@ -270,6 +272,9 @@ pub mod pallet {
 		TooManyMembers,
 		/// Action is not allowed for non-eth DAOs
 		NotEthDao,
+		/// Signer account is not equal to the account provided
+		WrongAccountId,
+		InvalidInput,
 	}
 
 	#[pallet::call]
@@ -283,17 +288,32 @@ pub mod pallet {
 			dao_id: DaoId,
 			proposal: Box<<T as Config>::Proposal>,
 			#[pallet::compact] length_bound: u32,
+			account_id: Vec<u8>,
+		) -> DispatchResultWithPostInfo {
+			Self::propose_with_meta(origin, dao_id, proposal, length_bound, account_id, None)
+		}
+
+		/// Adds a new proposal with temporary meta field for arbitrary data indexed by node indexer
+		#[pallet::weight(10_1000)]
+		pub fn propose_with_meta(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			proposal: Box<<T as Config>::Proposal>,
+			#[pallet::compact] length_bound: u32,
+			account_id: Vec<u8>,
+			_meta: Option<Vec<u8>>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
+			let account_id = Self::validate_account(who.clone(), account_id)?;
+
 			let proposal_hash = T::Hashing::hash_of(&proposal);
 
-			let account_token_balance = T::DaoProvider::ensure_proposal_allowed(
+			let account_token_balance = T::DaoProvider::ensure_eth_proposal_allowed(
 				dao_id,
-				&who,
+				account_id,
 				proposal_hash,
 				length_bound,
-				true,
 			)?;
 
 			match account_token_balance {
@@ -326,9 +346,15 @@ pub mod pallet {
 			proposal: T::Hash,
 			#[pallet::compact] index: ProposalIndex,
 			vote: Vote<BalanceOf<T>>,
+			account_id: Vec<u8>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 			// TODO: check membership
+
+			let account_id = Self::validate_account(who.clone(), account_id)?;
+
+			let voting = Self::voting(dao_id, &proposal).ok_or(Error::<T>::ProposalMissing)?;
+			ensure!(voting.index == index, Error::<T>::WrongIndex);
 
 			let Vote { aye, balance } = vote;
 
@@ -342,8 +368,12 @@ pub mod pallet {
 
 			let pending_vote_hash = T::Hashing::hash_of(&pending_vote);
 
-			let account_token_balance =
-				T::DaoProvider::ensure_voting_allowed(dao_id, &who, pending_vote_hash, false)?;
+			let account_token_balance = T::DaoProvider::ensure_eth_voting_allowed(
+				dao_id,
+				account_id,
+				pending_vote_hash,
+				voting.block_number,
+			)?;
 
 			match account_token_balance {
 				AccountTokenBalance::Offchain { .. } => {
@@ -411,6 +441,7 @@ impl<T: Config> Pallet<T> {
 		who: T::AccountId,
 		dao_id: DaoId,
 		threshold: TokenSupply,
+		block_number: u32,
 		proposal: Box<<T as Config>::Proposal>,
 		length_bound: u32,
 	) -> Result<(u32, u32), DispatchError> {
@@ -442,6 +473,7 @@ impl<T: Config> Pallet<T> {
 				ayes: BoundedVec::<AccountVote<T::AccountId, BalanceOf<T>>, T::MaxVotes>::default(),
 				nays: BoundedVec::<AccountVote<T::AccountId, BalanceOf<T>>, T::MaxVotes>::default(),
 				end,
+				block_number,
 			}
 		};
 		<Voting<T>>::insert(dao_id, proposal_hash, votes);
@@ -656,12 +688,38 @@ impl<T: Config> Pallet<T> {
 		});
 		num_proposals as u32
 	}
+
+	/// Validating account_id provided as an argument against call signer
+	fn validate_account(
+		signer: T::AccountId,
+		account_id: Vec<u8>,
+	) -> Result<Vec<u8>, DispatchError> {
+		let account_id = Result::unwrap_or(str::from_utf8(&account_id), "");
+		if account_id.is_empty() {
+			return Err(Error::<T>::InvalidInput.into())
+		}
+		let account_id_stripped = account_id.strip_prefix("0x").unwrap_or(account_id);
+
+		let hex_account = hex::decode(account_id_stripped).map_err(|_| Error::<T>::InvalidInput)?;
+
+		let mut data = [0u8; 24];
+		data[0..4].copy_from_slice(b"evm:");
+		data[4..24].copy_from_slice(&H160::from_slice(&hex_account[..])[..]);
+
+		let hash = <T::Hashing as Hasher>::hash(&data);
+		let acc = T::AccountId::decode(&mut hash.as_ref()).map_err(|_| Error::<T>::InvalidInput)?;
+
+		ensure!(signer == acc, Error::<T>::WrongAccountId);
+
+		Ok(account_id_stripped.as_bytes().to_vec())
+	}
 }
 
 impl<T: Config> ApprovePropose<DaoId, T::AccountId, TokenSupply, T::Hash> for Pallet<T> {
 	fn approve_propose(
 		dao_id: DaoId,
 		threshold: TokenSupply,
+		block_number: u32,
 		hash: T::Hash,
 		approve: bool,
 	) -> Result<(), DispatchError> {
@@ -671,7 +729,14 @@ impl<T: Config> ApprovePropose<DaoId, T::AccountId, TokenSupply, T::Hash> for Pa
 		let PendingProposal { who, length_bound } = pending_proposal;
 
 		if approve {
-			Self::do_propose_proposed(who, dao_id, threshold, Box::new(proposal), length_bound)?;
+			Self::do_propose_proposed(
+				who,
+				dao_id,
+				threshold,
+				block_number,
+				Box::new(proposal),
+				length_bound,
+			)?;
 		}
 
 		Ok(())
