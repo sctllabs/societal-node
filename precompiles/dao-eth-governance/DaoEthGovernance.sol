@@ -7,7 +7,6 @@ pragma solidity >=0.8.0;
 interface PalletDaoEthGovernance {
 
     /// @dev Make a proposal for a call.
-    /// The sender must be a member of the collective.
     ///
     /// @param dao_id DAO ID
     /// @param proposal SCALE-encoded Substrate call.
@@ -16,6 +15,17 @@ interface PalletDaoEthGovernance {
     function propose(uint32 dao_id, bytes memory proposal, bytes memory account_id)
         external
         returns (uint32 index);
+
+    /// Same as 'propose' with additional 'meta' included.
+    ///
+    /// @param dao_id DAO ID
+    /// @param proposal SCALE-encoded Substrate call.
+    /// @param account_id ETH Account Id to check token balance for - should be equal to the signer
+    /// @param meta Proposal Metadata.
+    /// @return index Index of the new proposal.
+    function propose_with_meta(uint32 dao_id, bytes memory proposal, bytes memory account_id, bytes memory meta)
+      external
+      returns (uint32 index);
 
     /// @dev Vote for a proposal.
     /// The sender must be a member of the collective.

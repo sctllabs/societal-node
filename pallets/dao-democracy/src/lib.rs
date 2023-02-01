@@ -551,6 +551,18 @@ pub mod pallet {
 			proposal: BoundedCallOf<T>,
 			#[pallet::compact] value: BalanceOf<T>,
 		) -> DispatchResult {
+			Self::propose_with_meta(origin, dao_id, proposal, value, None)
+		}
+
+		/// Adds a new proposal with temporary meta field for arbitrary data indexed by node indexer
+		#[pallet::weight(T::WeightInfo::propose())]
+		pub fn propose_with_meta(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			proposal: BoundedCallOf<T>,
+			#[pallet::compact] value: BalanceOf<T>,
+			_meta: Option<Vec<u8>>,
+		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
 			let GovernanceV1Policy { minimum_deposit, .. } =

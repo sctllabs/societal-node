@@ -21,6 +21,7 @@ type BalanceOf<Runtime> = <Runtime as pallet_dao_eth_governance::Config>::Balanc
 
 type GetProposalLimit = ConstU32<100>;
 type GetAccountIdLimit = ConstU32<42>;
+type GetProposalMetaLimit = ConstU32<100>;
 
 /// Solidity selector of the Executed log.
 pub const SELECTOR_LOG_EXECUTED: [u8; 32] = keccak256!("Executed(bytes32)");
@@ -115,6 +116,17 @@ where
 		proposal: BoundedBytes<GetProposalLimit>,
 		account_id: BoundedBytes<GetAccountIdLimit>,
 	) -> EvmResult<u32> {
+		Self::propose_with_meta(handle, dao_id, proposal, account_id, BoundedBytes::from(""))
+	}
+
+	#[precompile::public("propose(uint32,bytes,bytes,bytes)")]
+	fn propose_with_meta(
+		handle: &mut impl PrecompileHandle,
+		dao_id: DaoId,
+		proposal: BoundedBytes<GetProposalLimit>,
+		account_id: BoundedBytes<GetAccountIdLimit>,
+		meta: BoundedBytes<GetProposalMetaLimit>,
+	) -> EvmResult<u32> {
 		handle.record_cost(RuntimeHelper::<Runtime>::db_read_gas_cost())?;
 
 		let proposal: Vec<_> = proposal.into();
@@ -136,11 +148,12 @@ where
 			RuntimeHelper::<Runtime>::try_dispatch(
 				handle,
 				Some(origin).into(),
-				pallet_dao_eth_governance::Call::<Runtime>::propose {
+				pallet_dao_eth_governance::Call::<Runtime>::propose_with_meta {
 					dao_id,
 					proposal,
 					length_bound: proposal_length,
 					account_id: account_id.into(),
+					meta: Some(meta.into())
 				},
 			)?;
 		}

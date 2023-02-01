@@ -29,6 +29,8 @@ mod tests;
 /// Dao ID. Just a `u32`.
 pub type DaoId = u32;
 
+type GetProposalMetaLimit = ConstU32<100>;
+
 type BalanceOf<Runtime> = <<Runtime as pallet_dao_democracy::Config>::Currency as Currency<
 	<Runtime as frame_system::Config>::AccountId,
 >>::Balance;
@@ -185,6 +187,18 @@ where
 		proposal_hash: H256,
 		value: U256,
 	) -> EvmResult {
+		Self::propose_with_meta(handle, dao_id, proposal_hash, value, BoundedBytes::from(""))
+	}
+
+	// The dispatchable wrappers are next. They dispatch a Substrate inner Call.
+	#[precompile::public("propose(uint32,bytes32,uint256,bytes)")]
+	fn propose_with_meta(
+		handle: &mut impl PrecompileHandle,
+		dao_id: DaoId,
+		proposal_hash: H256,
+		value: U256,
+		meta: BoundedBytes<GetProposalMetaLimit>,
+	) -> EvmResult {
 		handle.record_log_costs_manual(2, 32)?;
 
 		// Fetch data from pallet
@@ -205,7 +219,12 @@ where
 		};
 
 		let origin = Runtime::AddressMapping::into_account_id(handle.context().caller);
-		let call = DemocracyCall::<Runtime>::propose { dao_id, proposal: bounded, value };
+		let call = DemocracyCall::<Runtime>::propose_with_meta {
+			dao_id,
+			proposal: bounded,
+			value,
+			meta: Some(meta.into()),
+		};
 
 		RuntimeHelper::<Runtime>::try_dispatch(handle, Some(origin).into(), call)?;
 
