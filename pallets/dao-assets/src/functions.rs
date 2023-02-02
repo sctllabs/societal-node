@@ -931,6 +931,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 
 		Account::<T, I>::mutate(id, who, |maybe_details| {
 			if let Some(details) = maybe_details {
+				details.frozen_balance = Zero::zero();
 				for l in locks.iter() {
 					details.frozen_balance = details.frozen_balance.max(l.amount);
 				}

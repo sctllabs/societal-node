@@ -1,8 +1,9 @@
 use super::*;
 use frame_support::traits::{
-	fungibles::{InspectHold, MutateHold},
+	fungibles::{Inspect, InspectHold, MutateHold},
 	DefensiveSaturating,
 };
+use sp_runtime::traits::Zero;
 use sp_std::cmp;
 
 impl<T: Config<I>, I: 'static> InspectHold<T::AccountId> for Pallet<T, I> {
@@ -44,8 +45,8 @@ impl<T: Config<I>, I: 'static> MutateHold<T::AccountId> for Pallet<T, I> {
 						.ok_or(ArithmeticError::Overflow)?;
 
 					ensure!(
-						account.balance >=
-							Self::reducible_balance(asset, who, true).unwrap_or_default(),
+						Self::can_withdraw(asset, &who, account.balance) ==
+							WithdrawConsequence::Success,
 						Error::<T, I>::LiquidityRestrictions
 					);
 
@@ -91,7 +92,7 @@ impl<T: Config<I>, I: 'static> MutateHold<T::AccountId> for Pallet<T, I> {
 			}
 		}) {
 			Ok(x) => x,
-			Err(_) => return Ok(amount),
+			Err(err) => return Err(err.into()),
 		};
 
 		Ok(amount - actual)
@@ -124,48 +125,59 @@ impl<T: Config<I>, I: 'static> MutateHold<T::AccountId> for Pallet<T, I> {
 			return Ok(amount)
 		}
 
-		let actual =
-			match Account::<T, I>::try_mutate(asset, dest, |maybe_details| match maybe_details {
-				None => Err::<T::Balance, Error<T, I>>(Error::<T, I>::NoAccount),
-				Some(dest) => {
-					let actual = match Account::<T, I>::try_mutate(
-						asset,
-						source,
-						|maybe_details| -> Result<T::Balance, DispatchError> {
-							ensure!(maybe_details.is_some(), Error::<T, I>::NoAccount);
+		Asset::<T, I>::try_mutate(asset, |maybe_details| -> Result<Self::Balance, DispatchError> {
+			let details = maybe_details.as_mut().ok_or(Error::<T, I>::Unknown)?;
 
-							match maybe_details {
-								None => Ok(Zero::zero()),
-								Some(source) => {
-									let actual = cmp::min(source.reserved_balance, amount);
-									ensure!(
-										best_effort || actual == amount,
-										Error::<T, I>::BalanceLow
-									);
+			Account::<T, I>::try_mutate(
+				asset,
+				source,
+				|maybe_details| -> Result<T::Balance, DispatchError> {
+					ensure!(maybe_details.is_some(), Error::<T, I>::NoAccount);
 
-									dest.reserved_balance = dest
-										.reserved_balance
-										.checked_add(&actual)
-										.ok_or(ArithmeticError::Overflow)?;
+					match maybe_details {
+						None => Ok(Zero::zero()),
+						Some(source) => {
+							let actual = cmp::min(source.reserved_balance, amount);
+							ensure!(best_effort || actual == amount, Error::<T, I>::BalanceLow);
 
-									source.reserved_balance -= actual;
+							source.reserved_balance -=
+								match Account::<T, I>::try_mutate(asset, dest, |maybe_details| {
+									match maybe_details {
+										maybe_account @ None => {
+											if on_hold {
+												return Err(Error::<T, I>::NoAccount.into())
+											}
 
-									Ok(actual)
-								},
-							}
+											*maybe_account = Some(AssetAccountOf::<T, I> {
+												balance: Zero::zero(),
+												reserved_balance: actual,
+												frozen_balance: Zero::zero(),
+												is_frozen: false,
+												reason: Self::new_account(dest, details, None)?,
+												extra: T::Extra::default(),
+											});
+
+											Ok(actual)
+										},
+										Some(dest) => {
+											dest.reserved_balance = dest
+												.reserved_balance
+												.checked_add(&actual)
+												.ok_or(ArithmeticError::Overflow)?;
+
+											Ok(actual)
+										},
+									}
+								}) {
+									Ok(x) => x,
+									Err(err) => return Err(err),
+								};
+
+							Ok(actual)
 						},
-					) {
-						Ok(x) => x,
-						Err(_) => return Ok(amount),
-					};
-
-					Ok(actual)
+					}
 				},
-			}) {
-				Ok(x) => x,
-				Err(_) => return Ok(amount),
-			};
-
-		Ok(actual)
+			)
+		})
 	}
 }
