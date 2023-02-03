@@ -483,8 +483,18 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		DaoRegistered(u32, T::AccountId),
-		DaoPendingApproval(u32, T::AccountId),
+		DaoRegistered {
+			dao_id: DaoId,
+			founder: T::AccountId,
+			account_id: T::AccountId,
+			token: DaoToken<T::AssetId, BoundedVec<u8, T::DaoStringLimit>>,
+		},
+		DaoPendingApproval {
+			dao_id: DaoId,
+			founder: T::AccountId,
+			account_id: T::AccountId,
+			token: DaoToken<T::AssetId, BoundedVec<u8, T::DaoStringLimit>>,
+		},
 		DaoTokenTransferred {
 			dao_id: DaoId,
 			token_id: T::AssetId,
@@ -669,12 +679,19 @@ pub mod pallet {
 					>::try_from(technical_committee_members.clone())
 					.map_err(|_| Error::<T>::CouncilMembersOverflow)?;
 
+					let dao_event_source = dao.clone();
+
 					PendingDaos::<T>::insert(
 						dao_hash,
 						PendingDao { dao, policy, council, technical_committee },
 					);
 
-					Self::deposit_event(Event::DaoPendingApproval(dao_id, who));
+					Self::deposit_event(Event::DaoPendingApproval {
+						dao_id,
+						founder: dao_event_source.founder,
+						account_id: dao_event_source.account_id,
+						token: dao_event_source.token,
+					});
 
 					return Ok(())
 				} else {
@@ -821,7 +838,7 @@ pub mod pallet {
 			dao.account_id = Self::account_id(dao_id);
 			dao.status = DaoStatus::Success;
 
-			let founder = dao.clone().founder;
+			let dao_event_source = dao.clone();
 
 			Policies::<T>::insert(dao_id, policy);
 
@@ -833,7 +850,12 @@ pub mod pallet {
 
 			<NextDaoId<T>>::put(dao_id.checked_add(1).unwrap());
 
-			Self::deposit_event(Event::DaoRegistered(dao_id, founder));
+			Self::deposit_event(Event::DaoRegistered {
+				dao_id,
+				founder: dao_event_source.founder,
+				account_id: dao_event_source.account_id,
+				token: dao_event_source.token,
+			});
 
 			Ok(())
 		}
