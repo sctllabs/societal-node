@@ -42,7 +42,7 @@ type DaoOf<T> = Dao<
 	<T as frame_system::Config>::AccountId,
 	<T as Config>::AssetId,
 	BoundedVec<u8, <T as Config>::DaoStringLimit>,
-	BoundedVec<u8, <T as Config>::DaoStringLimit>,
+	BoundedVec<u8, <T as Config>::DaoMetadataLimit>,
 >;
 type PolicyOf = DaoPolicy;
 
@@ -50,7 +50,7 @@ type PendingDaoOf<T> = PendingDao<
 	<T as frame_system::Config>::AccountId,
 	<T as Config>::AssetId,
 	BoundedVec<u8, <T as Config>::DaoStringLimit>,
-	BoundedVec<u8, <T as Config>::DaoStringLimit>,
+	BoundedVec<u8, <T as Config>::DaoMetadataLimit>,
 	BoundedVec<<T as frame_system::Config>::AccountId, <T as Config>::DaoMaxCouncilMembers>,
 	BoundedVec<
 		<T as frame_system::Config>::AccountId,
@@ -488,12 +488,18 @@ pub mod pallet {
 			founder: T::AccountId,
 			account_id: T::AccountId,
 			token: DaoToken<T::AssetId, BoundedVec<u8, T::DaoStringLimit>>,
+			config:
+				DaoConfig<BoundedVec<u8, T::DaoStringLimit>, BoundedVec<u8, T::DaoMetadataLimit>>,
+			policy: DaoPolicy,
 		},
 		DaoPendingApproval {
 			dao_id: DaoId,
 			founder: T::AccountId,
 			account_id: T::AccountId,
 			token: DaoToken<T::AssetId, BoundedVec<u8, T::DaoStringLimit>>,
+			config:
+				DaoConfig<BoundedVec<u8, T::DaoStringLimit>, BoundedVec<u8, T::DaoMetadataLimit>>,
+			policy: DaoPolicy,
 		},
 		DaoTokenTransferred {
 			dao_id: DaoId,
@@ -554,7 +560,7 @@ pub mod pallet {
 			let dao_purpose = BoundedVec::<u8, T::DaoStringLimit>::try_from(purpose)
 				.map_err(|_| Error::<T>::PurposeTooLong)?;
 
-			let dao_metadata = BoundedVec::<u8, T::DaoStringLimit>::try_from(metadata)
+			let dao_metadata = BoundedVec::<u8, T::DaoMetadataLimit>::try_from(metadata)
 				.map_err(|_| Error::<T>::MetadataTooLong)?;
 
 			let min = <T as Config>::Currency::minimum_balance();
@@ -683,7 +689,7 @@ pub mod pallet {
 
 					PendingDaos::<T>::insert(
 						dao_hash,
-						PendingDao { dao, policy, council, technical_committee },
+						PendingDao { dao, policy: policy.clone(), council, technical_committee },
 					);
 
 					Self::deposit_event(Event::DaoPendingApproval {
@@ -691,6 +697,8 @@ pub mod pallet {
 						founder: dao_event_source.founder,
 						account_id: dao_event_source.account_id,
 						token: dao_event_source.token,
+						config: dao_event_source.config,
+						policy,
 					});
 
 					return Ok(())
@@ -840,7 +848,7 @@ pub mod pallet {
 
 			let dao_event_source = dao.clone();
 
-			Policies::<T>::insert(dao_id, policy);
+			Policies::<T>::insert(dao_id, policy.clone());
 
 			Daos::<T>::insert(dao_id, dao);
 
@@ -855,6 +863,8 @@ pub mod pallet {
 				founder: dao_event_source.founder,
 				account_id: dao_event_source.account_id,
 				token: dao_event_source.token,
+				config: dao_event_source.config,
+				policy,
 			});
 
 			Ok(())
