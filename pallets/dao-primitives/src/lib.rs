@@ -70,6 +70,7 @@ pub struct DaoConfig<BoundedString, BoundedMetadata> {
 pub struct DaoPolicy {
 	/// In millis
 	pub proposal_period: u32,
+	#[serde(default)]
 	pub approve_origin: DaoPolicyProportion,
 	/// Governance settings
 	#[serde(default)]
@@ -104,30 +105,39 @@ pub struct GovernanceV1Policy {
 	pub minimum_deposit: u128,
 	/// Origin from which the next tabled referendum may be forced. This is a normal
 	/// "super-majority-required" referendum.
+	#[serde(default)]
 	pub external_origin: DaoPolicyProportion,
 	/// Origin from which the next tabled referendum may be forced; this allows for the tabling
 	/// of a majority-carries referendum.
+	#[serde(default)]
 	pub external_majority_origin: DaoPolicyProportion,
 	/// Origin from which the next tabled referendum may be forced; this allows for the tabling
 	/// of a negative-turnout-bias (default-carries) referendum.
+	#[serde(default)]
 	pub external_default_origin: DaoPolicyProportion,
 	/// Origin from which the next majority-carries (or more permissive) referendum may be
 	/// tabled to vote according to the `FastTrackVotingPeriod` asynchronously in a similar
 	/// manner to the emergency origin. It retains its threshold method.
+	#[serde(default)]
 	pub fast_track_origin: DaoPolicyProportion,
 	/// Origin from which the next majority-carries (or more permissive) referendum may be
 	/// tabled to vote immediately and asynchronously in a similar manner to the emergency
 	/// origin. It retains its threshold method.
+	#[serde(default)]
 	pub instant_origin: DaoPolicyProportion,
 	/// Indicator for whether an emergency origin is even allowed to happen. Some chains may
 	/// want to set this permanently to `false`, others may want to condition it on things such
 	/// as an upgrade having happened recently.
+	#[serde(default)]
 	pub instant_allowed: bool,
 	/// Origin from which any referendum may be cancelled in an emergency.
+	#[serde(default)]
 	pub cancellation_origin: DaoPolicyProportion,
 	/// Origin from which proposals may be blacklisted.
+	#[serde(default)]
 	pub blacklist_origin: DaoPolicyProportion,
 	/// Origin from which a proposal may be cancelled and its backers slashed.
+	#[serde(default)]
 	pub cancel_proposal_origin: DaoPolicyProportion,
 }
 
