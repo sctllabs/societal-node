@@ -19,9 +19,17 @@
 
 use super::*;
 use crate::{mock::*, Error};
-use frame_support::{assert_noop, assert_ok, traits::Currency};
+use frame_support::{
+	assert_noop, assert_ok,
+	traits::{
+		fungibles::{BalancedHold, InspectHold, Mutate, MutateHold},
+		Currency, LockIdentifier,
+	},
+};
 use pallet_balances::Error as BalancesError;
 use sp_runtime::{traits::ConvertInto, TokenError};
+
+const ID_1: LockIdentifier = *b"1       ";
 
 #[test]
 fn basic_minting_should_work() {
@@ -29,8 +37,12 @@ fn basic_minting_should_work() {
 		assert_ok!(Assets::force_create(RuntimeOrigin::root(), 0, 1, true, 1));
 		assert_ok!(Assets::mint(RuntimeOrigin::signed(1), 0, 1, 100));
 		assert_eq!(Assets::balance(0, 1), 100);
+		assert_eq!(Assets::frozen_balance(0, &1_u64), None);
+		assert_eq!(Assets::balance_on_hold(0, &1u64), 0);
 		assert_ok!(Assets::mint(RuntimeOrigin::signed(1), 0, 2, 100));
 		assert_eq!(Assets::balance(0, 2), 100);
+		assert_eq!(Assets::frozen_balance(0, &1_u64), None);
+		assert_eq!(Assets::balance_on_hold(0, &1u64), 0);
 	});
 }
 
@@ -136,7 +148,6 @@ fn refunding_calls_died_hook() {
 		assert_ok!(Assets::refund(RuntimeOrigin::signed(1), 0, true));
 
 		assert_eq!(Asset::<Test>::get(0).unwrap().accounts, 0);
-		assert_eq!(hooks(), vec![Hook::Died(0, 1)]);
 	});
 }
 
@@ -430,27 +441,23 @@ fn min_balance_should_work() {
 		assert!(Assets::maybe_balance(0, 1).is_none());
 		assert_eq!(Assets::balance(0, 2), 100);
 		assert_eq!(Asset::<Test>::get(0).unwrap().accounts, 1);
-		assert_eq!(take_hooks(), vec![Hook::Died(0, 1)]);
 
 		// Death by `force_transfer`.
 		assert_ok!(Assets::force_transfer(RuntimeOrigin::signed(1), 0, 2, 1, 91));
 		assert!(Assets::maybe_balance(0, 2).is_none());
 		assert_eq!(Assets::balance(0, 1), 100);
 		assert_eq!(Asset::<Test>::get(0).unwrap().accounts, 1);
-		assert_eq!(take_hooks(), vec![Hook::Died(0, 2)]);
 
 		// Death by `burn`.
 		assert_ok!(Assets::burn(RuntimeOrigin::signed(1), 0, 1, 91));
 		assert!(Assets::maybe_balance(0, 1).is_none());
 		assert_eq!(Asset::<Test>::get(0).unwrap().accounts, 0);
-		assert_eq!(take_hooks(), vec![Hook::Died(0, 1)]);
 
 		// Death by `transfer_approved`.
 		assert_ok!(Assets::mint(RuntimeOrigin::signed(1), 0, 1, 100));
 		Balances::make_free_balance_be(&1, 1);
 		assert_ok!(Assets::approve_transfer(RuntimeOrigin::signed(1), 0, 2, 100));
 		assert_ok!(Assets::transfer_approved(RuntimeOrigin::signed(2), 0, 1, 3, 91));
-		assert_eq!(take_hooks(), vec![Hook::Died(0, 1)]);
 	});
 }
 
@@ -497,7 +504,6 @@ fn transferring_enough_to_kill_source_when_keep_alive_should_fail() {
 		assert_ok!(Assets::transfer_keep_alive(RuntimeOrigin::signed(1), 0, 2, 90));
 		assert_eq!(Assets::balance(0, 1), 10);
 		assert_eq!(Assets::balance(0, 2), 90);
-		assert!(hooks().is_empty());
 	});
 }
 
@@ -795,7 +801,6 @@ fn destroy_calls_died_hooks() {
 
 		// Asset is gone and accounts 1 and 2 died.
 		assert!(Asset::<Test>::get(0).is_none());
-		assert_eq!(hooks(), vec![Hook::Died(0, 1), Hook::Died(0, 2)]);
 	})
 }
 
@@ -806,8 +811,8 @@ fn freezer_should_work() {
 		assert_ok!(Assets::mint(RuntimeOrigin::signed(1), 0, 1, 100));
 		assert_eq!(Assets::balance(0, 1), 100);
 
-		// freeze 50 of it.
-		set_frozen_balance(0, 1, 50);
+		// lock 50 of it.
+		Assets::set_lock(ID_1, &0, &1, 50);
 
 		assert_ok!(Assets::transfer(RuntimeOrigin::signed(1), 0, 2, 20));
 		// cannot transfer another 21 away as this would take the non-frozen balance (30) to below
@@ -827,15 +832,14 @@ fn freezer_should_work() {
 		let e = Error::<Test>::BalanceLow;
 		assert_noop!(Assets::force_transfer(RuntimeOrigin::signed(1), 0, 1, 2, 21), e);
 
-		// reduce it to only 49 frozen...
-		set_frozen_balance(0, 1, 49);
+		// reduce it to only 49...
+		Assets::set_lock(ID_1, &0, &1, 49);
 		// ...and it's all good:
 		assert_ok!(Assets::force_transfer(RuntimeOrigin::signed(1), 0, 1, 2, 21));
 
 		// and if we clear it, we can remove the account completely.
-		clear_frozen_balance(0, 1);
+		Assets::remove_lock(ID_1, &0, &1);
 		assert_ok!(Assets::transfer(RuntimeOrigin::signed(1), 0, 2, 50));
-		assert_eq!(hooks(), vec![Hook::Died(0, 1)]);
 	});
 }
 
@@ -1105,5 +1109,121 @@ fn querying_roles_should_work() {
 		assert_eq!(Assets::issuer(0), Some(2));
 		assert_eq!(Assets::admin(0), Some(3));
 		assert_eq!(Assets::freezer(0), Some(4));
+	});
+}
+
+#[test]
+fn holding_asset_account_balance_should_work() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(Assets::force_create(RuntimeOrigin::root(), 0, 1, true, 1));
+		assert_ok!(Assets::mint(RuntimeOrigin::signed(1), 0, 1, 100));
+		assert_eq!(Assets::balance(0, 1), 100);
+		assert_eq!(Assets::balance_on_hold(0, &1_u64), 0);
+		assert_ok!(Assets::hold(0, &1, 70));
+		assert_eq!(Assets::balance(0, 1), 30);
+		assert_eq!(Assets::balance_on_hold(0, &1_u64), 70);
+	});
+}
+
+#[test]
+fn asset_transfer_when_on_hold_should_not_work() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(Assets::force_create(RuntimeOrigin::root(), 0, 1, true, 1));
+		assert_ok!(Assets::mint(RuntimeOrigin::signed(1), 0, 1, 100));
+		assert_ok!(Assets::hold(0, &1, 70));
+		assert_noop!(Assets::transfer(Some(1).into(), 0, 2, 70), Error::<Test>::BalanceLow);
+	});
+}
+
+#[test]
+fn deducting_asset_balance_should_work() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(Assets::force_create(RuntimeOrigin::root(), 0, 1, true, 1));
+		assert_ok!(Assets::mint(RuntimeOrigin::signed(1), 0, 1, 100));
+		assert_ok!(Assets::hold(0, &1, 70));
+		assert_eq!(Assets::balance(0, 1), 30);
+	});
+}
+
+#[test]
+fn unreserving_asset_balance_should_work() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(Assets::force_create(RuntimeOrigin::root(), 0, 1, true, 1));
+		assert_ok!(Assets::mint(RuntimeOrigin::signed(1), 0, 1, 100));
+		assert_ok!(Assets::hold(0, &1, 70));
+		assert_eq!(Assets::balance(0, 1), 30);
+		assert_eq!(Assets::balance_on_hold(0, &1), 70);
+		/// failing to release higher amount with `best_effort` set to false
+		assert_noop!(Assets::release(0, &1, 71, false), Error::<Test>::BalanceLow);
+		/// releasing exact amount with `best_effort` set to false
+		assert_ok!(Assets::release(0, &1, 70, false));
+		assert_eq!(Assets::balance(0, 1), 100);
+		assert_eq!(Assets::balance_on_hold(0, &1), 0);
+	});
+}
+
+#[test]
+fn unreserving_higher_with_best_effort_asset_balance_should_work() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(Assets::force_create(RuntimeOrigin::root(), 0, 1, true, 1));
+		assert_ok!(Assets::mint(RuntimeOrigin::signed(1), 0, 1, 100));
+		assert_ok!(Assets::hold(0, &1, 70));
+		/// releasing higher amount with `best_effort` set to true
+		assert_ok!(Assets::release(0, &1, 71, true));
+		assert_eq!(Assets::balance(0, 1), 100);
+		assert_eq!(Assets::balance_on_hold(0, &1), 0);
+	});
+}
+
+#[test]
+fn slashing_asset_balance_should_work() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(Assets::force_create(RuntimeOrigin::root(), 0, 1, true, 1));
+		assert_ok!(Assets::mint(RuntimeOrigin::signed(1), 0, 1, 100));
+		assert_ok!(Assets::hold(0, &1, 70));
+		assert_ok!(Assets::slash(0, &1, 20));
+		assert_eq!(Assets::balance(0, 1), 10);
+		assert_eq!(Assets::balance_on_hold(0, &1), 70);
+	});
+}
+
+#[test]
+fn slashing_reserved_asset_balance_should_work() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(Assets::force_create(RuntimeOrigin::root(), 0, 1, true, 1));
+		assert_ok!(Assets::mint(RuntimeOrigin::signed(1), 0, 1, 100));
+		assert_ok!(Assets::hold(0, &1, 70));
+		assert_eq!(Assets::balance_on_hold(0, &1), 70);
+		assert_eq!(Assets::slash_held(0, &1, 50).1, 0);
+		assert_eq!(Assets::balance(0, &1), 80);
+		assert_eq!(Assets::balance_on_hold(0, &1), 20);
+	});
+}
+
+#[test]
+fn transferring_reserved_balance_should_work() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(Assets::force_create(RuntimeOrigin::root(), 0, 1, true, 1));
+		assert_ok!(Assets::mint(RuntimeOrigin::signed(1), 0, 1, 100));
+		assert_ok!(Assets::hold(0, &1, 70));
+		/// failing to transfer higher held amount - `best_effort` set to false
+		assert_noop!(Assets::transfer_held(0, &1, &2, 80, false, false), Error::<Test>::BalanceLow);
+		/// finally transferring held amount to account that doesn't exist and will be created
+		/// `on_hold` set to true
+		assert_ok!(Assets::transfer_held(0, &1, &2, 40, true, false));
+		assert_eq!(Assets::balance(0, 1), 30);
+		assert_eq!(Assets::balance_on_hold(0, &1), 30);
+		assert_eq!(Assets::balance(0, &2), 0);
+		assert_eq!(Assets::balance_on_hold(0, &2), 40);
+	});
+}
+
+#[test]
+fn transferring_reserved_asset_balance_to_nonexistent_should_fail() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(Assets::force_create(RuntimeOrigin::root(), 0, 1, true, 1));
+		assert_ok!(Assets::mint(RuntimeOrigin::signed(1), 0, 1, 100));
+		assert_ok!(Assets::hold(0, &1, 70));
+		assert_noop!(Assets::transfer_held(0, &1, &2, 40, true, true), Error::<Test>::NoAccount);
 	});
 }

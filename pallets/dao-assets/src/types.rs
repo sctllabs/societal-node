@@ -113,7 +113,8 @@ impl<Balance> ExistenceReason<Balance> {
 
 #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, MaxEncodedLen, TypeInfo)]
 pub struct AssetAccount<Balance, DepositBalance, Extra> {
-	/// The balance.
+	/// Non-reserved balance. It is the total pool what may in principle be transferred or
+	/// reserved.
 	pub(super) balance: Balance,
 	/// The amount that `balance` may not drop below when withdrawing for *anything
 	pub(super) frozen_balance: Balance,

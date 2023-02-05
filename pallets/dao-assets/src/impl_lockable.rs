@@ -69,8 +69,14 @@ impl<T: Config<I>, I: 'static> FrozenBalance<T::AssetId, T::AccountId, T::Balanc
 	for Pallet<T, I>
 {
 	fn frozen_balance(asset: T::AssetId, who: &T::AccountId) -> Option<T::Balance> {
-		Account::<T, I>::get(asset, who).map(|acc| acc.frozen_balance).or(None)
+		match Account::<T, I>::get(asset, who).map(|acc| acc.frozen_balance).or(None) {
+			Some(frozen_balance) if !frozen_balance.is_zero() => return Some(frozen_balance),
+			_ => None,
+		}
 	}
 
-	fn died(_: T::AssetId, _: &T::AccountId) {}
+	fn died(asset: T::AssetId, who: &T::AccountId) {
+		// Sanity check: dead accounts have no balance.
+		assert!(Self::balance(asset, who.clone()).is_zero());
+	}
 }
