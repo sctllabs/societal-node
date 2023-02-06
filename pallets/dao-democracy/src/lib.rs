@@ -273,6 +273,9 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxBlacklisted: Get<u32>;
 
+		#[pallet::constant]
+		type ProposalMetadataLimit: Get<u32>;
+
 		/// Origin from which the next tabled referendum may be forced. This is a normal
 		/// "super-majority-required" referendum.
 		type ExternalOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
@@ -438,7 +441,12 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// A motion has been proposed by a public account.
-		Proposed { dao_id: DaoId, proposal_index: PropIndex, deposit: BalanceOf<T> },
+		Proposed {
+			dao_id: DaoId,
+			proposal_index: PropIndex,
+			deposit: BalanceOf<T>,
+			meta: Option<Vec<u8>>,
+		},
 		/// A public proposal has been tabled for referendum vote.
 		Tabled { dao_id: DaoId, proposal_index: PropIndex, deposit: BalanceOf<T> },
 		/// An external proposal has been tabled.
@@ -523,6 +531,8 @@ pub mod pallet {
 		VotingPeriodLow,
 		/// This type of Governance is not supported
 		NotSupported,
+		/// Metadata size exceeds the limits
+		MetadataTooLong,
 	}
 
 	#[pallet::hooks]
@@ -561,12 +571,19 @@ pub mod pallet {
 			dao_id: DaoId,
 			proposal: BoundedCallOf<T>,
 			#[pallet::compact] value: BalanceOf<T>,
-			_meta: Option<Vec<u8>>,
+			meta: Option<Vec<u8>>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
 			let GovernanceV1Policy { minimum_deposit, .. } =
 				Self::ensure_democracy_supported(dao_id)?;
+
+			if let Some(metadata) = meta.clone() {
+				ensure!(
+					BoundedVec::<u8, T::ProposalMetadataLimit>::try_from(metadata).is_ok(),
+					Error::<T>::MetadataTooLong
+				)
+			}
 
 			ensure!(value >= Self::u128_to_balance_of(minimum_deposit), Error::<T>::ValueLow);
 
@@ -601,6 +618,7 @@ pub mod pallet {
 				dao_id,
 				proposal_index: index,
 				deposit: value,
+				meta,
 			});
 			Ok(())
 		}

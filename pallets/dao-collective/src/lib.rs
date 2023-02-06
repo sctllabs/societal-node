@@ -175,6 +175,9 @@ pub mod pallet {
 		type RuntimeEvent: From<Event<Self, I>>
 			+ IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
+		#[pallet::constant]
+		type ProposalMetadataLimit: Get<u32>;
+
 		/// Maximum number of proposals allowed to be active in parallel.
 		type MaxProposals: Get<ProposalIndex>;
 
@@ -258,6 +261,7 @@ pub mod pallet {
 			proposal_index: ProposalIndex,
 			proposal_hash: T::Hash,
 			threshold: MemberCount,
+			meta: Option<Vec<u8>>,
 		},
 		/// A motion (given hash) has been voted on by given account, leaving
 		/// a tally (yes votes and no votes given respectively as `MemberCount`).
@@ -303,6 +307,8 @@ pub mod pallet {
 		WrongProposalWeight,
 		/// The given length bound for the proposal was too low.
 		WrongProposalLength,
+		/// Metadata size exceeds the limits
+		MetadataTooLong,
 	}
 
 	// Note that councillor operations are assigned to the operational class.
@@ -483,15 +489,23 @@ pub mod pallet {
 			dao_id: DaoId,
 			proposal: Box<<T as Config<I>>::Proposal>,
 			#[pallet::compact] length_bound: u32,
-			_meta: Option<Vec<u8>>,
+			meta: Option<Vec<u8>>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
 			let members = Self::members(dao_id);
 			ensure!(members.contains(&who), Error::<T, I>::NotMember);
 
+			if let Some(metadata) = meta.clone() {
+				ensure!(
+					BoundedVec::<u8, <T as Config<I>>::ProposalMetadataLimit>::try_from(metadata)
+						.is_ok(),
+					Error::<T, I>::MetadataTooLong
+				)
+			}
+
 			let (proposal_len, active_proposals) =
-				Self::do_propose_proposed(who, dao_id, proposal, length_bound)?;
+				Self::do_propose_proposed(who, dao_id, proposal, length_bound, meta)?;
 
 			Ok(Some(T::WeightInfo::propose_proposed(
 				proposal_len as u32,  // B
@@ -661,6 +675,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		dao_id: DaoId,
 		proposal: Box<<T as Config<I>>::Proposal>,
 		length_bound: MemberCount,
+		meta: Option<Vec<u8>>,
 	) -> Result<(u32, u32), DispatchError> {
 		let proposal_len = proposal.encoded_size();
 		ensure!(proposal_len <= length_bound as usize, Error::<T, I>::WrongProposalLength);
@@ -702,6 +717,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			proposal_index: index,
 			proposal_hash,
 			threshold,
+			meta,
 		});
 		Ok((proposal_len as u32, active_proposals as u32))
 	}

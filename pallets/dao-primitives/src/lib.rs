@@ -193,9 +193,10 @@ pub struct PendingDao<
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
-pub struct PendingProposal<AccountId> {
+pub struct PendingProposal<AccountId, BoundedMetadata> {
 	pub who: AccountId,
 	pub length_bound: u32,
+	pub meta: BoundedMetadata,
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]

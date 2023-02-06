@@ -586,6 +586,7 @@ impl pallet_dao_collective::Config<DaoCouncilCollective> for Runtime {
 	type RuntimeOrigin = RuntimeOrigin;
 	type Proposal = RuntimeCall;
 	type RuntimeEvent = RuntimeEvent;
+	type ProposalMetadataLimit = DaoMetadataLimit;
 	type MaxProposals = CouncilMaxProposals;
 	type MaxMembers = CouncilMaxMembers;
 	type DefaultVote = pallet_dao_collective::MoreThanMajorityVote;
@@ -598,6 +599,7 @@ impl pallet_dao_collective::Config<DaoTechnicalCommitteeCollective> for Runtime 
 	type RuntimeOrigin = RuntimeOrigin;
 	type Proposal = RuntimeCall;
 	type RuntimeEvent = RuntimeEvent;
+	type ProposalMetadataLimit = DaoMetadataLimit;
 	type MaxProposals = TechnicalMaxProposals;
 	type MaxMembers = TechnicalMaxMembers;
 	type DefaultVote = pallet_dao_collective::MoreThanMajorityVote;
@@ -1211,6 +1213,7 @@ impl pallet_dao_democracy::Config for Runtime {
 	type MaxProposals = MaxProposals;
 	type MaxDeposits = ConstU32<100>;
 	type MaxBlacklisted = ConstU32<100>;
+	type ProposalMetadataLimit = DaoMetadataLimit;
 	type DaoProvider = Dao;
 }
 
@@ -1594,6 +1597,7 @@ impl pallet_dao_eth_governance::Config for Runtime {
 	type RuntimeOrigin = RuntimeOrigin;
 	type Balance = Balance;
 	type Proposal = RuntimeCall;
+	type ProposalMetadataLimit = DaoMetadataLimit;
 	type MaxProposals = EthGovernanceMaxProposals;
 	type MaxVotes = EthGovernanceMaxVotes;
 	type DaoProvider = Dao;
