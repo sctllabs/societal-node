@@ -99,6 +99,9 @@ pub mod pallet {
 			> + From<frame_system::Call<Self>>
 			+ GetDispatchInfo;
 
+		#[pallet::constant]
+		type ProposalMetadataLimit: Get<u32>;
+
 		/// Maximum number of proposals allowed to be active in parallel.
 		type MaxProposals: Get<ProposalIndex>;
 
@@ -145,7 +148,10 @@ pub mod pallet {
 		DaoId,
 		Identity,
 		T::Hash,
-		(PendingProposal<T::AccountId>, <T as Config>::Proposal),
+		(
+			PendingProposal<T::AccountId, BoundedVec<u8, T::ProposalMetadataLimit>>,
+			<T as Config>::Proposal,
+		),
 		OptionQuery,
 	>;
 
@@ -196,6 +202,7 @@ pub mod pallet {
 			proposal_index: ProposalIndex,
 			proposal_hash: T::Hash,
 			threshold: TokenSupply,
+			meta: BoundedVec<u8, T::ProposalMetadataLimit>,
 		},
 		/// Proposal vote pending approval
 		VotePendingApproval {
@@ -275,6 +282,8 @@ pub mod pallet {
 		/// Signer account is not equal to the account provided
 		WrongAccountId,
 		InvalidInput,
+		/// Metadata size exceeds the limits
+		MetadataTooLong,
 	}
 
 	#[pallet::call]
@@ -301,7 +310,7 @@ pub mod pallet {
 			proposal: Box<<T as Config>::Proposal>,
 			#[pallet::compact] length_bound: u32,
 			account_id: Vec<u8>,
-			_meta: Option<Vec<u8>>,
+			meta: Option<Vec<u8>>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
@@ -316,9 +325,15 @@ pub mod pallet {
 				length_bound,
 			)?;
 
+			let meta = match meta.clone() {
+				Some(metadata) => BoundedVec::<u8, T::ProposalMetadataLimit>::try_from(metadata)
+					.map_err(|_| Error::<T>::MetadataTooLong)?,
+				None => Default::default(),
+			};
+
 			match account_token_balance {
 				AccountTokenBalance::Offchain { .. } => {
-					let pending_proposal = PendingProposal { who: who.clone(), length_bound };
+					let pending_proposal = PendingProposal { who: who.clone(), length_bound, meta };
 
 					<PendingProposalOf<T>>::insert(
 						dao_id,
@@ -444,6 +459,7 @@ impl<T: Config> Pallet<T> {
 		block_number: u32,
 		proposal: Box<<T as Config>::Proposal>,
 		length_bound: u32,
+		meta: BoundedVec<u8, T::ProposalMetadataLimit>,
 	) -> Result<(u32, u32), DispatchError> {
 		let proposal_len = proposal.encoded_size();
 		ensure!(proposal_len <= length_bound as usize, Error::<T>::WrongProposalLength);
@@ -484,6 +500,7 @@ impl<T: Config> Pallet<T> {
 			proposal_index: index,
 			proposal_hash,
 			threshold,
+			meta,
 		});
 		Ok((proposal_len as u32, active_proposals as u32))
 	}
@@ -726,7 +743,7 @@ impl<T: Config> ApprovePropose<DaoId, T::AccountId, TokenSupply, T::Hash> for Pa
 		let (pending_proposal, proposal) =
 			<PendingProposalOf<T>>::take(dao_id, hash).expect("Pending Proposal not found");
 
-		let PendingProposal { who, length_bound } = pending_proposal;
+		let PendingProposal { who, length_bound, meta } = pending_proposal;
 
 		if approve {
 			Self::do_propose_proposed(
@@ -736,6 +753,7 @@ impl<T: Config> ApprovePropose<DaoId, T::AccountId, TokenSupply, T::Hash> for Pa
 				block_number,
 				Box::new(proposal),
 				length_bound,
+				meta,
 			)?;
 		}
 

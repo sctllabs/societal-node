@@ -153,7 +153,7 @@ where
 					proposal,
 					length_bound: proposal_length,
 					account_id: account_id.into(),
-					meta: Some(meta.into())
+					meta: Some(meta.into()),
 				},
 			)?;
 		}
