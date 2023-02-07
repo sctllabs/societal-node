@@ -150,7 +150,6 @@ struct IndexingData<Hash>(Vec<u8>, OffchainData<Hash, BlockNumber>);
 #[frame_support::pallet]
 pub mod pallet {
 	pub use super::*;
-	use frame_support::traits::{fungibles::Transfer, EnsureOriginWithArg};
 	use frame_system::{
 		offchain::{AppCrypto, CreateSignedTransaction, SubmitTransaction},
 		pallet_prelude::*,
@@ -178,7 +177,7 @@ pub mod pallet {
 		/// The outer origin type.
 		type RuntimeOrigin: From<RawOrigin<Self::AccountId>>;
 
-		type Currency: ReservableCurrency<Self::AccountId>;
+		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
 
 		type AssetId: Member
 			+ Parameter
@@ -242,19 +241,10 @@ pub mod pallet {
 				Self::AccountId,
 				AssetId = <Self as pallet::Config>::AssetId,
 				Balance = <Self as pallet::Config>::Balance,
-			> + Transfer<
-				Self::AccountId,
-				AssetId = <Self as pallet::Config>::AssetId,
-				Balance = <Self as pallet::Config>::Balance,
 			>;
 
 		/// The identifier type for an offchain worker.
 		type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
-
-		type ApproveOrigin: EnsureOriginWithArg<
-			<Self as frame_system::Config>::RuntimeOrigin,
-			DaoOrigin<Self::AccountId>,
-		>;
 	}
 
 	/// Origin for the dao pallet.
@@ -584,7 +574,7 @@ pub mod pallet {
 				technical_committee_members.push(account);
 			}
 
-			let founder = who.clone();
+			let founder = who;
 			let config = DaoConfig { name: dao_name, purpose: dao_purpose, metadata: dao_metadata };
 
 			let mut has_token_id: Option<AssetId<T>> = None;
@@ -716,47 +706,6 @@ pub mod pallet {
 			};
 
 			Self::do_register_dao(dao, policy, council_members, technical_committee_members)
-		}
-
-		#[pallet::weight(10_000)]
-		pub fn transfer_token(
-			origin: OriginFor<T>,
-			dao_id: DaoId,
-			#[pallet::compact] amount: Balance<T>,
-			beneficiary: <T::Lookup as StaticLookup>::Source,
-		) -> DispatchResult {
-			let dao_account_id = Self::dao_account_id(dao_id);
-			let approve_origin = Self::policy(dao_id)?.approve_origin;
-			T::ApproveOrigin::ensure_origin(
-				origin,
-				&DaoOrigin { dao_account_id: dao_account_id.clone(), proportion: approve_origin },
-			)?;
-
-			let dao_token = Self::dao_token(dao_id)?;
-
-			let beneficiary = T::Lookup::lookup(beneficiary)?;
-
-			match dao_token {
-				DaoToken::FungibleToken(token_id) => {
-					T::AssetProvider::transfer(
-						token_id,
-						&dao_account_id,
-						&beneficiary,
-						amount,
-						true,
-					)?;
-
-					Self::deposit_event(Event::DaoTokenTransferred {
-						dao_id,
-						token_id,
-						beneficiary,
-						amount,
-					});
-				},
-				DaoToken::EthTokenAddress(_) => return Err(Error::<T>::DaoNotExist.into()),
-			}
-
-			Ok(())
 		}
 
 		#[pallet::weight(10_000)]

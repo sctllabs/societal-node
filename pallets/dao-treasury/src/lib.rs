@@ -71,7 +71,7 @@ use scale_info::TypeInfo;
 
 use sp_runtime::{
 	traits::{AccountIdConversion, Saturating, StaticLookup, Zero},
-	DispatchError, Permill, RuntimeDebug,
+	Permill, RuntimeDebug,
 };
 use sp_std::prelude::*;
 
@@ -130,9 +130,6 @@ pub type DaoId = u32;
 /// An index of a proposal. Just a `u32`.
 pub type ProposalIndex = u32;
 
-// TODO: revise this
-pub type AssetId = u32;
-
 /// A spending proposal.
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
@@ -152,8 +149,12 @@ pub struct Proposal<AccountId, Balance> {
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use dao_primitives::AccountTokenBalance;
-	use frame_support::pallet_prelude::*;
+	use codec::HasCompact;
+	use dao_primitives::DaoToken;
+	use frame_support::{
+		pallet_prelude::*,
+		traits::fungibles::{metadata::Mutate as MetadataMutate, Inspect, Mutate, Transfer},
+	};
 	use frame_system::pallet_prelude::*;
 
 	#[pallet::pallet]
@@ -164,6 +165,17 @@ pub mod pallet {
 	pub trait Config<I: 'static = ()>: frame_system::Config {
 		/// The staking balance.
 		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
+
+		type AssetId: Member
+			+ Parameter
+			+ Default
+			+ Copy
+			+ HasCompact
+			+ MaybeSerializeDeserialize
+			+ MaxEncodedLen
+			+ TypeInfo
+			+ From<u32>
+			+ Ord;
 
 		/// Origin from which approvals must come.
 		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
@@ -219,8 +231,27 @@ pub mod pallet {
 			<Self as frame_system::Config>::Hash,
 			Id = u32,
 			AccountId = Self::AccountId,
+			AssetId = Self::AssetId,
 			Policy = DaoPolicy,
 		>;
+
+		type AssetProvider: Inspect<
+				Self::AccountId,
+				AssetId = <Self as pallet::Config<I>>::AssetId,
+				Balance = BalanceOf<Self, I>,
+			> + MetadataMutate<
+				Self::AccountId,
+				AssetId = <Self as pallet::Config<I>>::AssetId,
+				Balance = BalanceOf<Self, I>,
+			> + Mutate<
+				Self::AccountId,
+				AssetId = <Self as pallet::Config<I>>::AssetId,
+				Balance = BalanceOf<Self, I>,
+			> + Transfer<
+				Self::AccountId,
+				AssetId = <Self as pallet::Config<I>>::AssetId,
+				Balance = BalanceOf<Self, I>,
+			>;
 	}
 
 	/// Number of proposals that have been made.
@@ -290,6 +321,12 @@ pub mod pallet {
 			amount: BalanceOf<T, I>,
 			beneficiary: T::AccountId,
 		},
+		DaoTokenTransferred {
+			dao_id: DaoId,
+			token_id: T::AssetId,
+			beneficiary: T::AccountId,
+			amount: BalanceOf<T, I>,
+		},
 	}
 
 	/// Error for the treasury pallet.
@@ -306,6 +343,7 @@ pub mod pallet {
 		InsufficientPermission,
 		/// Proposal has not been approved.
 		ProposalNotApproved,
+		NotSupported,
 	}
 
 	// TODO: beware of huge DAO count - use chunk spend instead
@@ -464,6 +502,47 @@ pub mod pallet {
 				amount,
 				beneficiary,
 			});
+			Ok(())
+		}
+
+		#[pallet::weight(10_000)]
+		pub fn transfer_token(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			#[pallet::compact] amount: BalanceOf<T, I>,
+			beneficiary: <T::Lookup as StaticLookup>::Source,
+		) -> DispatchResult {
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			let approve_origin = T::DaoProvider::policy(dao_id)?.approve_origin;
+			T::ApproveOrigin::ensure_origin(
+				origin,
+				&DaoOrigin { dao_account_id: dao_account_id.clone(), proportion: approve_origin },
+			)?;
+
+			let dao_token = T::DaoProvider::dao_token(dao_id)?;
+
+			let beneficiary = T::Lookup::lookup(beneficiary)?;
+
+			match dao_token {
+				DaoToken::FungibleToken(token_id) => {
+					T::AssetProvider::transfer(
+						token_id,
+						&dao_account_id,
+						&beneficiary,
+						amount,
+						true,
+					)?;
+
+					Self::deposit_event(Event::DaoTokenTransferred {
+						dao_id,
+						token_id,
+						beneficiary,
+						amount,
+					});
+				},
+				DaoToken::EthTokenAddress(_) => return Err(Error::<T, I>::NotSupported.into()),
+			}
+
 			Ok(())
 		}
 
