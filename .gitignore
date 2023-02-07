@@ -14,3 +14,10 @@
 
 # direnv cache
 .direnv
+
+# VSCode
+.history
+.vscode
+
+#IntelliJ IDEA
+.idea

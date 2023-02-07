@@ -1,8 +1,27 @@
 [workspace]
 members = [
     "node",
-    "pallets/template",
+    "pallets/dao",
+    "pallets/dao-assets",
+    "pallets/dao-collective",
+    "pallets/dao-democracy",
+    "pallets/dao-eth-governance",
+    "pallets/dao-membership",
+    "pallets/dao-primitives",
+    "pallets/dao-treasury",
+	"precompiles/dao",
+	"precompiles/dao-collective",
+	"precompiles/dao-democracy",
+	"precompiles/dao-eth-governance",
+	"precompiles/dao-membership",
+	"precompiles/dao-treasury",
+	"precompiles/utils",
+	"precompiles/utils/macro",
     "runtime",
 ]
+
 [profile.release]
 panic = "unwind"
+
+[profile.production]
+inherits = "release"

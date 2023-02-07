@@ -22,16 +22,19 @@
 
 use crate::service::FullClient;
 
-use node_template_runtime as runtime;
 use runtime::{AccountId, Balance, BalancesCall, SystemCall};
 use sc_cli::Result;
 use sc_client_api::BlockBackend;
+use societal_node_runtime as runtime;
 use sp_core::{Encode, Pair};
 use sp_inherents::{InherentData, InherentDataProvider};
 use sp_keyring::Sr25519Keyring;
 use sp_runtime::{OpaqueExtrinsic, SaturatedConversion};
 
 use std::{sync::Arc, time::Duration};
+
+// Frontier
+// use frontier_template_runtime::{self as runtime, AccountId, Balance, BalancesCall, SystemCall};
 
 /// Generates extrinsics for the `benchmark overhead` command.
 ///
@@ -119,7 +122,7 @@ impl frame_benchmarking_cli::ExtrinsicBuilder for TransferKeepAliveBuilder {
 pub fn create_benchmark_extrinsic(
 	client: &FullClient,
 	sender: sp_core::sr25519::Pair,
-	call: runtime::Call,
+	call: runtime::RuntimeCall,
 	nonce: u32,
 ) -> runtime::UncheckedExtrinsic {
 	let genesis_hash = client.block_hash(0).ok().flatten().expect("Genesis block exists; qed");
