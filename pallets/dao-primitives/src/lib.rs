@@ -13,6 +13,8 @@ use sp_core::{crypto::AccountId32, H256};
 use sp_runtime::RuntimeDebug;
 use sp_std::prelude::*;
 
+pub type DispatchResultWithDaoOrigin<T> = Result<DaoOrigin<T>, DispatchError>;
+
 #[derive(
 	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]

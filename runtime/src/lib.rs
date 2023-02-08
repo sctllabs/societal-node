@@ -685,9 +685,12 @@ parameter_types! {
 	pub const DaoTreasuryProposalBondMinimum: Balance = 0;
 }
 
+pub type AssetId = u32;
+
 impl pallet_dao_treasury::Config for Runtime {
 	type PalletId = DaoTreasuryPalletId;
 	type Currency = Balances;
+	type AssetId = AssetId;
 	type ApproveOrigin = EitherOfDiverseWithArg<
 		EnsureDao<AccountId>,
 		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
@@ -704,6 +707,7 @@ impl pallet_dao_treasury::Config for Runtime {
 	type WeightInfo = pallet_dao_treasury::weights::SubstrateWeight<Runtime>;
 	type MaxApprovals = MaxApprovals;
 	type DaoProvider = Dao;
+	type AssetProvider = Assets;
 }
 
 parameter_types! {
@@ -1077,7 +1081,7 @@ parameter_types! {
 impl pallet_dao_assets::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Balance = Balance;
-	type AssetId = u32;
+	type AssetId = AssetId;
 	type Currency = Balances;
 	type ForceOrigin = EnsureRoot<AccountId>;
 	type AssetDeposit = AssetDeposit;
@@ -1574,17 +1578,13 @@ impl pallet_dao::Config for Runtime {
 	type DaoMetadataLimit = DaoMetadataLimit;
 	type DaoMaxCouncilMembers = DaoMaxCouncilMembers;
 	type DaoMaxTechnicalCommitteeMembers = DaoMaxTechnicalCommitteeMembers;
-	type AssetId = u32;
+	type AssetId = AssetId;
 	type Balance = Balance;
 	type CouncilProvider = DaoCouncilMembers;
 	type GovernanceApproveProvider = DaoEthGovernance;
 	type TechnicalCommitteeProvider = DaoTechnicalCommitteeMembers;
 	type AssetProvider = Assets;
 	type AuthorityId = pallet_dao::crypto::TestAuthId;
-	type ApproveOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
-	>;
 }
 
 parameter_types! {

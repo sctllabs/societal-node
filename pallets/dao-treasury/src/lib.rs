@@ -71,28 +71,28 @@ use scale_info::TypeInfo;
 
 use sp_runtime::{
 	traits::{AccountIdConversion, Saturating, StaticLookup, Zero},
-	DispatchError, Permill, RuntimeDebug,
+	Permill, RuntimeDebug,
 };
 use sp_std::prelude::*;
 
 use frame_support::{
-	pallet_prelude::DispatchResult,
+	pallet_prelude::*,
 	print,
 	traits::{
-		Currency, EnsureOriginWithArg, ExistenceRequirement::KeepAlive, Get, Imbalance,
-		OnUnbalanced, ReservableCurrency, WithdrawReasons,
+		fungibles::{metadata::Mutate as MetadataMutate, Inspect, Mutate, Transfer},
+		Currency, EnsureOriginWithArg,
+		ExistenceRequirement::KeepAlive,
+		Get, Imbalance, OnUnbalanced, ReservableCurrency, WithdrawReasons,
 	},
 	weights::Weight,
 	BoundedVec, PalletId,
 };
 use frame_system::pallet_prelude::OriginFor;
 
-use dao_primitives::{DaoOrigin, DaoPolicy, DaoProvider};
+use dao_primitives::{DaoOrigin, DaoPolicy, DaoProvider, DaoToken, DispatchResultWithDaoOrigin};
 
 pub use pallet::*;
 pub use weights::WeightInfo;
-
-use sp_runtime::traits::Hash;
 
 pub type BalanceOf<T, I = ()> =
 	<<T as Config<I>>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -130,9 +130,6 @@ pub type DaoId = u32;
 /// An index of a proposal. Just a `u32`.
 pub type ProposalIndex = u32;
 
-// TODO: revise this
-pub type AssetId = u32;
-
 /// A spending proposal.
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Encode, Decode, Clone, PartialEq, Eq, MaxEncodedLen, RuntimeDebug, TypeInfo)]
@@ -152,8 +149,7 @@ pub struct Proposal<AccountId, Balance> {
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use dao_primitives::AccountTokenBalance;
-	use frame_support::pallet_prelude::*;
+	use codec::HasCompact;
 	use frame_system::pallet_prelude::*;
 
 	#[pallet::pallet]
@@ -164,6 +160,17 @@ pub mod pallet {
 	pub trait Config<I: 'static = ()>: frame_system::Config {
 		/// The staking balance.
 		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
+
+		type AssetId: Member
+			+ Parameter
+			+ Default
+			+ Copy
+			+ HasCompact
+			+ MaybeSerializeDeserialize
+			+ MaxEncodedLen
+			+ TypeInfo
+			+ From<u32>
+			+ Ord;
 
 		/// Origin from which approvals must come.
 		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
@@ -219,8 +226,27 @@ pub mod pallet {
 			<Self as frame_system::Config>::Hash,
 			Id = u32,
 			AccountId = Self::AccountId,
+			AssetId = Self::AssetId,
 			Policy = DaoPolicy,
 		>;
+
+		type AssetProvider: Inspect<
+				Self::AccountId,
+				AssetId = <Self as pallet::Config<I>>::AssetId,
+				Balance = BalanceOf<Self, I>,
+			> + MetadataMutate<
+				Self::AccountId,
+				AssetId = <Self as pallet::Config<I>>::AssetId,
+				Balance = BalanceOf<Self, I>,
+			> + Mutate<
+				Self::AccountId,
+				AssetId = <Self as pallet::Config<I>>::AssetId,
+				Balance = BalanceOf<Self, I>,
+			> + Transfer<
+				Self::AccountId,
+				AssetId = <Self as pallet::Config<I>>::AssetId,
+				Balance = BalanceOf<Self, I>,
+			>;
 	}
 
 	/// Number of proposals that have been made.
@@ -306,6 +332,7 @@ pub mod pallet {
 		InsufficientPermission,
 		/// Proposal has not been approved.
 		ProposalNotApproved,
+		NotSupported,
 	}
 
 	// TODO: beware of huge DAO count - use chunk spend instead
@@ -360,11 +387,8 @@ pub mod pallet {
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
 
 			let bond = Self::calculate_bond(T::DaoProvider::policy(dao_id)?, value);
-			let proposal =
-				Proposal { dao_id, proposer: proposer.clone(), value, beneficiary, bond };
-			let proposal_hash = T::Hashing::hash_of(&proposal);
 
-			Self::do_propose_spend(proposal)
+			Self::do_propose_spend(Proposal { dao_id, proposer, value, beneficiary, bond })
 		}
 
 		/// Reject a proposed spend. The original deposit will be slashed.
@@ -384,8 +408,8 @@ pub mod pallet {
 		) -> DispatchResult {
 			Self::ensure_approved(origin, dao_id)?;
 
-			let proposal = <Proposals<T, I>>::take(&dao_id, &proposal_id)
-				.ok_or(Error::<T, I>::InvalidIndex)?;
+			let proposal =
+				<Proposals<T, I>>::take(dao_id, &proposal_id).ok_or(Error::<T, I>::InvalidIndex)?;
 			let value = proposal.bond;
 			let imbalance = T::Currency::slash_reserved(&proposal.proposer, value).0;
 			T::OnSlash::on_unbalanced(imbalance);
@@ -465,6 +489,41 @@ pub mod pallet {
 				beneficiary,
 			});
 			Ok(())
+		}
+
+		#[pallet::weight(10_000)]
+		pub fn transfer_token(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			#[pallet::compact] amount: BalanceOf<T, I>,
+			beneficiary: <T::Lookup as StaticLookup>::Source,
+		) -> DispatchResult {
+			let dao_origin = Self::ensure_approved(origin, dao_id)?;
+
+			let dao_token = T::DaoProvider::dao_token(dao_id)?;
+
+			match dao_token {
+				DaoToken::FungibleToken(token_id) => Self::do_transfer_token(
+					token_id,
+					dao_origin.dao_account_id,
+					amount,
+					beneficiary,
+				),
+				DaoToken::EthTokenAddress(_) => Err(Error::<T, I>::NotSupported.into()),
+			}
+		}
+
+		#[pallet::weight(10_000)]
+		pub fn transfer_token_by_id(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			token_id: T::AssetId,
+			#[pallet::compact] amount: BalanceOf<T, I>,
+			beneficiary: <T::Lookup as StaticLookup>::Source,
+		) -> DispatchResult {
+			let dao_origin = Self::ensure_approved(origin, dao_id)?;
+
+			Self::do_transfer_token(token_id, dao_origin.dao_account_id, amount, beneficiary)
 		}
 
 		/// Force a previously approved proposal to be removed from the approval queue.
@@ -614,6 +673,19 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		total_weight
 	}
 
+	pub fn do_transfer_token(
+		token_id: T::AssetId,
+		source: T::AccountId,
+		amount: BalanceOf<T, I>,
+		beneficiary: <T::Lookup as StaticLookup>::Source,
+	) -> DispatchResult {
+		let beneficiary = T::Lookup::lookup(beneficiary)?;
+
+		T::AssetProvider::transfer(token_id, &source, &beneficiary, amount, true)?;
+
+		Ok(())
+	}
+
 	/// Return the amount of money in the pot.
 	// The existential deposit is not part of the pot so treasury account never gets deleted.
 	pub fn pot(dao_id: DaoId) -> BalanceOf<T, I> {
@@ -622,15 +694,16 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			.saturating_sub(T::Currency::minimum_balance())
 	}
 
-	pub fn ensure_approved(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
+	pub fn ensure_approved(
+		origin: OriginFor<T>,
+		dao_id: DaoId,
+	) -> DispatchResultWithDaoOrigin<T::AccountId> {
 		let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
 		let approve_origin = T::DaoProvider::policy(dao_id)?.approve_origin;
-		T::ApproveOrigin::ensure_origin(
-			origin,
-			&DaoOrigin { dao_account_id, proportion: approve_origin },
-		)?;
+		let dao_origin = DaoOrigin { dao_account_id, proportion: approve_origin };
+		T::ApproveOrigin::ensure_origin(origin, &dao_origin)?;
 
-		Ok(())
+		Ok(dao_origin)
 	}
 }
 
