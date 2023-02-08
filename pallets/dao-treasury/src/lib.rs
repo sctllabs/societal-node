@@ -328,7 +328,7 @@ pub mod pallet {
 	impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		/// Propose and approve a spend of treasury funds.
 		///
-		/// - `origin`: Must be `SpendOrigin` with the `Success` value being at least `amount`.
+		/// - `origin`: Must be `ApproveOrigin` with the `Success` value being at least `amount`.
 		/// - `dao_id`: DAO ID.
 		/// - `amount`: The amount to be transferred from the treasury to the `beneficiary`.
 		/// - `beneficiary`: The destination account for the transfer.
