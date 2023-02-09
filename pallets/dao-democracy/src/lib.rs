@@ -445,6 +445,7 @@ pub mod pallet {
 		Proposed {
 			dao_id: DaoId,
 			proposal_index: PropIndex,
+			proposal: BoundedCallOf<T>,
 			deposit: BalanceOf<T>,
 			meta: Option<Vec<u8>>,
 		},
@@ -612,12 +613,13 @@ pub mod pallet {
 
 			PublicPropCount::<T>::insert(dao_id, index + 1);
 
-			PublicProps::<T>::try_append(dao_id, (index, proposal, who))
+			PublicProps::<T>::try_append(dao_id, (index, proposal.clone(), who))
 				.map_err(|_| Error::<T>::TooMany)?;
 
 			Self::deposit_event(Event::<T>::Proposed {
 				dao_id,
 				proposal_index: index,
+				proposal,
 				deposit: value,
 				meta,
 			});

@@ -476,6 +476,8 @@ pub mod pallet {
 			dao_id: DaoId,
 			founder: T::AccountId,
 			account_id: T::AccountId,
+			council: BoundedVec<T::AccountId, T::DaoMaxCouncilMembers>,
+			technical_committee: BoundedVec<T::AccountId, T::DaoMaxTechnicalCommitteeMembers>,
 			token: DaoToken<T::AssetId, BoundedVec<u8, T::DaoStringLimit>>,
 			config:
 				DaoConfig<BoundedVec<u8, T::DaoStringLimit>, BoundedVec<u8, T::DaoMetadataLimit>>,
@@ -566,12 +568,23 @@ pub mod pallet {
 				council_members.push(account);
 			}
 
+			let council = BoundedVec::<T::AccountId, T::DaoMaxCouncilMembers>::try_from(
+				council_members.clone(),
+			)
+			.map_err(|_| Error::<T>::CouncilMembersOverflow)?;
+
 			let mut technical_committee_members: Vec<T::AccountId> = vec![];
 			for member in technical_committee.into_iter() {
 				let account = T::Lookup::lookup(member)?;
 
 				technical_committee_members.push(account);
 			}
+
+			let technical_committee =
+				BoundedVec::<T::AccountId, T::DaoMaxTechnicalCommitteeMembers>::try_from(
+					technical_committee_members.clone(),
+				)
+				.map_err(|_| Error::<T>::CouncilMembersOverflow)?;
 
 			let founder = who;
 			let config = DaoConfig { name: dao_name, purpose: dao_purpose, metadata: dao_metadata };
@@ -663,17 +676,6 @@ pub mod pallet {
 
 					offchain_index::set(&key, &data.encode());
 
-					let council = BoundedVec::<T::AccountId, T::DaoMaxCouncilMembers>::try_from(
-						council_members.clone(),
-					)
-					.map_err(|_| Error::<T>::CouncilMembersOverflow)?;
-
-					let technical_committee = BoundedVec::<
-						T::AccountId,
-						T::DaoMaxTechnicalCommitteeMembers,
-					>::try_from(technical_committee_members.clone())
-					.map_err(|_| Error::<T>::CouncilMembersOverflow)?;
-
 					let dao_event_source = dao.clone();
 
 					PendingDaos::<T>::insert(
@@ -704,7 +706,7 @@ pub mod pallet {
 				status: DaoStatus::Success,
 			};
 
-			Self::do_register_dao(dao, policy, council_members, technical_committee_members)
+			Self::do_register_dao(dao, policy, council, technical_committee)
 		}
 
 		#[pallet::weight(10_000)]
@@ -722,12 +724,7 @@ pub mod pallet {
 				};
 
 			if approve {
-				return Self::do_register_dao(
-					dao,
-					policy,
-					council.to_vec(),
-					technical_committee.to_vec(),
-				)
+				return Self::do_register_dao(dao, policy, council, technical_committee)
 			}
 
 			Ok(())
@@ -786,8 +783,8 @@ pub mod pallet {
 		pub fn do_register_dao(
 			mut dao: DaoOf<T>,
 			policy: PolicyOf,
-			council: Vec<T::AccountId>,
-			technical_committee: Vec<T::AccountId>,
+			council: BoundedVec<T::AccountId, T::DaoMaxCouncilMembers>,
+			technical_committee: BoundedVec<T::AccountId, T::DaoMaxTechnicalCommitteeMembers>,
 		) -> DispatchResult {
 			let dao_id = <NextDaoId<T>>::get();
 
@@ -800,9 +797,12 @@ pub mod pallet {
 
 			Daos::<T>::insert(dao_id, dao);
 
-			T::CouncilProvider::initialize_members(dao_id, council)?;
+			T::CouncilProvider::initialize_members(dao_id, council.to_vec())?;
 
-			T::TechnicalCommitteeProvider::initialize_members(dao_id, technical_committee)?;
+			T::TechnicalCommitteeProvider::initialize_members(
+				dao_id,
+				technical_committee.to_vec(),
+			)?;
 
 			<NextDaoId<T>>::put(dao_id.checked_add(1).unwrap());
 
@@ -810,6 +810,8 @@ pub mod pallet {
 				dao_id,
 				founder: dao_event_source.founder,
 				account_id: dao_event_source.account_id,
+				council,
+				technical_committee,
 				token: dao_event_source.token,
 				config: dao_event_source.config,
 				policy,
