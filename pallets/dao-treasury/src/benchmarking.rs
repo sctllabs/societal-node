@@ -9,11 +9,7 @@ use super::{Pallet as Treasury, *};
 
 use dao_primitives::DaoPolicyProportion;
 use frame_benchmarking::{account, benchmarks_instance_pallet};
-use frame_support::{
-	dispatch::UnfilteredDispatchable,
-	ensure,
-	traits::{EnsureOrigin, OnInitialize},
-};
+use frame_support::{dispatch::UnfilteredDispatchable, ensure};
 use frame_system::RawOrigin;
 
 const SEED: u32 = 0;
@@ -33,7 +29,7 @@ fn setup_proposal<T: Config<I>, I: 'static>(
 // Create proposals that are approved for use in `on_initialize`.
 fn create_approved_proposals<T: Config<I>, I: 'static>(n: u32) -> Result<(), &'static str> {
 	for i in 0..n {
-		let (caller, value, lookup) = setup_proposal::<T, I>(i);
+		let (_caller, value, lookup) = setup_proposal::<T, I>(i);
 		Treasury::<T, I>::spend(RawOrigin::Root.into(), 0, value, lookup)?;
 	}
 	ensure!(<Approvals<T, I>>::get(0).len() == n as usize, "Not all approved");

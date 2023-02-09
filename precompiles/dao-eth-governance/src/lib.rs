@@ -137,7 +137,7 @@ where
 		})?;
 
 		let proposal_index = pallet_dao_eth_governance::Pallet::<Runtime>::proposal_count(dao_id);
-		let proposal_hash: H256 = hash::<Runtime>(&proposal);
+		let _proposal_hash: H256 = hash::<Runtime>(&proposal);
 		let proposal = Runtime::RuntimeCall::decode(&mut &*proposal)
 			.map_err(|_| RevertReason::custom("Failed to decode proposal").in_field("proposal"))?
 			.into();

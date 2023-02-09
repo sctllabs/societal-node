@@ -9,7 +9,7 @@ use frame_support::{
 };
 use pallet_evm::AddressMapping;
 use parity_scale_codec::Decode;
-use precompile_utils::{data::BoundedBytesString, helpers::hash, prelude::*};
+use precompile_utils::{helpers::hash, prelude::*};
 use sp_core::{ConstU32, H160, H256};
 use sp_std::{boxed::Box, marker::PhantomData, vec::Vec};
 

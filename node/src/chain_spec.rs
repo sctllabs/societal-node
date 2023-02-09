@@ -44,7 +44,7 @@ pub type ChainSpec = sc_service::GenericChainSpec<GenesisConfig, Extensions>;
 
 /// Generate a crypto pair from seed.
 pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
-	TPublic::Pair::from_string(&format!("//{}", seed), None)
+	TPublic::Pair::from_string(&format!("//{seed}"), None)
 		.expect("static values are valid; qed")
 		.public()
 }
@@ -64,7 +64,7 @@ pub fn authority_keys_from_seed(
 	seed: &str,
 ) -> (AccountId, AccountId, GrandpaId, BabeId, ImOnlineId, AuthorityDiscoveryId) {
 	(
-		get_account_id_from_seed::<sr25519::Public>(&format!("{}//stash", seed)),
+		get_account_id_from_seed::<sr25519::Public>(&format!("{seed}//stash")),
 		get_account_id_from_seed::<sr25519::Public>(seed),
 		get_from_seed::<GrandpaId>(seed),
 		get_from_seed::<BabeId>(seed),
@@ -244,7 +244,6 @@ pub fn testnet_genesis(
 			let nominations = initial_authorities
 				.as_slice()
 				.choose_multiple(&mut rng, count)
-				.into_iter()
 				.map(|choice| choice.0.clone())
 				.collect::<Vec<_>>();
 			(x.clone(), x.clone(), STASH, StakerStatus::Nominator(nominations))

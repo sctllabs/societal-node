@@ -368,7 +368,7 @@ pub mod pallet {
 
 			let account_id = Self::validate_account(who.clone(), account_id)?;
 
-			let voting = Self::voting(dao_id, &proposal).ok_or(Error::<T>::ProposalMissing)?;
+			let voting = Self::voting(dao_id, proposal).ok_or(Error::<T>::ProposalMissing)?;
 			ensure!(voting.index == index, Error::<T>::WrongIndex);
 
 			let Vote { aye, balance } = vote;
@@ -404,7 +404,7 @@ pub mod pallet {
 						vote,
 					});
 
-					return Ok(Default::default())
+					Ok(Default::default())
 				},
 				_ => Err(Error::<T>::NotEthDao.into()),
 			}
@@ -514,7 +514,7 @@ impl<T: Config> Pallet<T> {
 		index: ProposalIndex,
 		vote: Vote<BalanceOf<T>>,
 	) -> Result<bool, DispatchError> {
-		let mut voting = Self::voting(dao_id, &proposal).ok_or(Error::<T>::ProposalMissing)?;
+		let mut voting = Self::voting(dao_id, proposal).ok_or(Error::<T>::ProposalMissing)?;
 		ensure!(voting.index == index, Error::<T>::WrongIndex);
 
 		let position_yes = voting.ayes.iter().position(|a| a.who == who);
@@ -561,7 +561,7 @@ impl<T: Config> Pallet<T> {
 
 		Self::deposit_event(Event::Voted { dao_id, account: who, proposal_hash: proposal, vote });
 
-		Voting::<T>::insert(dao_id, &proposal, voting);
+		Voting::<T>::insert(dao_id, proposal, voting);
 
 		// TODO: should we close if approved not waiting till the proposal expires
 
@@ -576,7 +576,7 @@ impl<T: Config> Pallet<T> {
 		proposal_weight_bound: Weight,
 		length_bound: u32,
 	) -> DispatchResultWithPostInfo {
-		let voting = Self::voting(dao_id, &proposal_hash).ok_or(Error::<T>::ProposalMissing)?;
+		let voting = Self::voting(dao_id, proposal_hash).ok_or(Error::<T>::ProposalMissing)?;
 		ensure!(voting.index == index, Error::<T>::WrongIndex);
 
 		let ayes_balance: BalanceOf<T> =
@@ -604,7 +604,7 @@ impl<T: Config> Pallet<T> {
 				ayes: ayes_balance,
 				nays: nays_balance,
 			});
-			let (proposal_weight, proposal_count) =
+			let (_proposal_weight, _proposal_count) =
 				Self::do_approve_proposal(dao_id, proposal_hash, proposal);
 			return Ok((Some(Weight::from_ref_time(0)), Pays::Yes).into())
 		} else if disapproved {
@@ -697,8 +697,8 @@ impl<T: Config> Pallet<T> {
 	// Removes a proposal from the pallet, cleaning up votes and the vector of proposals.
 	fn remove_proposal(dao_id: DaoId, proposal_hash: T::Hash) -> u32 {
 		// remove proposal and vote
-		ProposalOf::<T>::remove(dao_id, &proposal_hash);
-		Voting::<T>::remove(dao_id, &proposal_hash);
+		ProposalOf::<T>::remove(dao_id, proposal_hash);
+		Voting::<T>::remove(dao_id, proposal_hash);
 		let num_proposals = Proposals::<T>::mutate(dao_id, |proposals| {
 			proposals.retain(|h| h != &proposal_hash);
 			proposals.len() + 1 // calculate weight based on original length

@@ -178,14 +178,14 @@ pub fn new_partial(
 
 	let (block_import, babe_link) = sc_consensus_babe::block_import(
 		sc_consensus_babe::configuration(&*client)?,
-		grandpa_block_import.clone(),
+		grandpa_block_import,
 		client.clone(),
 	)?;
 
 	let slot_duration = babe_link.config().slot_duration();
 
 	let frontier_block_import =
-		FrontierBlockImport::new(block_import.clone(), client.clone(), frontier_backend.clone());
+		FrontierBlockImport::new(block_import, client.clone(), frontier_backend.clone());
 
 	let import_queue = sc_consensus_babe::import_queue(
 		babe_link.clone(),
@@ -263,7 +263,7 @@ pub fn new_full_base(
 ) -> Result<NewFullBase, ServiceError> {
 	let hwbench = if !disable_hardware_benchmarks {
 		config.database.path().map(|database_path| {
-			let _ = std::fs::create_dir_all(&database_path);
+			let _ = std::fs::create_dir_all(database_path);
 			sc_sysinfo::gather_hwbench(Some(database_path))
 		})
 	} else {
@@ -330,13 +330,13 @@ pub fn new_full_base(
 	let babe_config = babe_link.config().clone();
 	let shared_epoch_changes = babe_link.epoch_changes().clone();
 
-	let client = client.clone();
-	let select_chain = select_chain.clone();
+	let client = client;
+	let select_chain = select_chain;
 	let keystore = keystore_container.sync_keystore();
 	let chain_spec = config.chain_spec.cloned_box();
 	let rpc_backend = backend.clone();
 	let prometheus_registry = config.prometheus_registry().cloned();
-	let filter_pool = filter_pool.clone();
+	let filter_pool = filter_pool;
 	let frontier_backend = frontier_backend;
 	let fee_history_cache = fee_history_cache;
 

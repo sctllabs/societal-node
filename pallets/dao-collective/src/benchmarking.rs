@@ -94,9 +94,8 @@ benchmarks_instance_pallet! {
 		// Construct `new_members`.
 		// It should influence timing since it will sort this vector.
 		let mut new_members = vec![];
-		let mut last_member = account::<T::AccountId>("member", 0, SEED);
 		for i in 0 .. n {
-			last_member = account::<T::AccountId>("member", i, SEED);
+			let last_member = account::<T::AccountId>("member", i, SEED);
 			new_members.push(last_member.clone());
 		}
 

@@ -70,7 +70,7 @@ impl<T: Config<I>, I: 'static> FrozenBalance<T::AssetId, T::AccountId, T::Balanc
 {
 	fn frozen_balance(asset: T::AssetId, who: &T::AccountId) -> Option<T::Balance> {
 		match Account::<T, I>::get(asset, who).map(|acc| acc.frozen_balance).or(None) {
-			Some(frozen_balance) if !frozen_balance.is_zero() => return Some(frozen_balance),
+			Some(frozen_balance) if !frozen_balance.is_zero() => Some(frozen_balance),
 			_ => None,
 		}
 	}
