@@ -1,21 +1,4 @@
-// This file is part of Substrate.
-
-// Copyright (C) 2020-2022 Parity Technologies (UK) Ltd.
-// SPDX-License-Identifier: Apache-2.0
-
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// 	http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-// Changes made comparing to the original benchmarking of the FRAME pallet-treasure:
+// Changes made comparing to the original benchmarking of the FRAME pallet-treasury:
 // - using DAO as a parameter for pallet functions
 
 //! DAO Treasury pallet benchmarking.
@@ -51,9 +34,7 @@ fn setup_proposal<T: Config<I>, I: 'static>(
 fn create_approved_proposals<T: Config<I>, I: 'static>(n: u32) -> Result<(), &'static str> {
 	for i in 0..n {
 		let (caller, value, lookup) = setup_proposal::<T, I>(i);
-		Treasury::<T, I>::propose_spend(RawOrigin::Signed(caller).into(), 0, value, lookup)?;
-		let proposal_id = <ProposalCount<T, I>>::get(0) - 1;
-		Treasury::<T, I>::approve_proposal(RawOrigin::Root.into(), 0, proposal_id)?;
+		Treasury::<T, I>::spend(RawOrigin::Root.into(), 0, value, lookup)?;
 	}
 	ensure!(<Approvals<T, I>>::get(0).len() == n as usize, "Not all approved");
 	Ok(())
@@ -75,9 +56,9 @@ benchmarks_instance_pallet! {
 	spend {
 		let (_, value, beneficiary_lookup) = setup_proposal::<T, _>(SEED);
 		let origin = T::ApproveOrigin::try_successful_origin(&DaoOrigin {
-		dao_account_id: account("member", 0, SEED),
-		proportion: DaoPolicyProportion::AtLeast((1, 1)),
-	});
+			dao_account_id: account("member", 0, SEED),
+			proportion: DaoPolicyProportion::AtLeast((1, 1)),
+		});
 		let beneficiary = T::Lookup::lookup(beneficiary_lookup.clone()).unwrap();
 		let call = Call::<T, I>::spend { dao_id: 0, amount: value, beneficiary: beneficiary_lookup };
 	}: {
@@ -90,49 +71,6 @@ benchmarks_instance_pallet! {
 			assert_last_event::<T, I>(Event::SpendApproved { dao_id: 0, proposal_index: 0, amount: value, beneficiary }.into())
 		}
 	}
-
-	propose_spend {
-		let (caller, value, beneficiary_lookup) = setup_proposal::<T, _>(SEED);
-		// Whitelist caller account from further DB operations.
-		let caller_key = frame_system::Account::<T>::hashed_key_for(&caller);
-		frame_benchmarking::benchmarking::add_to_whitelist(caller_key.into());
-	}: _(RawOrigin::Signed(caller), 0, value, beneficiary_lookup)
-
-	reject_proposal {
-		let (caller, value, beneficiary_lookup) = setup_proposal::<T, _>(SEED);
-		Treasury::<T, _>::propose_spend(
-			RawOrigin::Signed(caller).into(),
-			0,
-			value,
-			beneficiary_lookup
-		)?;
-		let proposal_id = Treasury::<T, _>::proposal_count(0) - 1;
-	}: _(RawOrigin::Root, 0, proposal_id)
-
-	approve_proposal {
-		let p in 0 .. T::MaxApprovals::get() - 1;
-		create_approved_proposals::<T, _>(p)?;
-		let (caller, value, beneficiary_lookup) = setup_proposal::<T, _>(SEED);
-		Treasury::<T, _>::propose_spend(
-			RawOrigin::Signed(caller).into(),
-			0,
-			value,
-			beneficiary_lookup
-		)?;
-		let proposal_id = Treasury::<T, _>::proposal_count(0) - 1;
-	}: _(RawOrigin::Root, 0, proposal_id)
-
-	remove_approval {
-		let (caller, value, beneficiary_lookup) = setup_proposal::<T, _>(SEED);
-		Treasury::<T, _>::propose_spend(
-			RawOrigin::Signed(caller).into(),
-			0,
-			value,
-			beneficiary_lookup
-		)?;
-		let proposal_id = Treasury::<T, _>::proposal_count(0) - 1;
-		Treasury::<T, I>::approve_proposal(RawOrigin::Root.into(), 0, proposal_id)?;
-	}: _(RawOrigin::Root, 0, proposal_id)
 
 	on_initialize_proposals {
 		let p in 0 .. T::MaxApprovals::get();

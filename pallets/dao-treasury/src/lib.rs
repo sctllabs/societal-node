@@ -1,21 +1,5 @@
-// This file is part of Substrate.
-
-// Copyright (C) 2017-2022 Parity Technologies (UK) Ltd.
-// SPDX-License-Identifier: Apache-2.0
-
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// 	http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-// Re-purposing the pallet to manage funds for the DAOs created by the pallet-dao factory:
+// Re-purposing the original treasury pallet to manage funds for the DAOs created by the pallet-dao
+// factory:
 // - re-worked pallet storage to persist proposals/approvals for each DAO
 // - updated pallet extrinsic functions adding dao support
 // - added support for DaoProvider retrieving custom configuration for each DAO
@@ -24,29 +8,21 @@
 
 //! # DAO Treasury Pallet
 //!
-//! The Treasury pallet provides a "pot" of funds that can be managed by stakeholders in the system
-//! and a structure for making spending proposals from this pot.
+//! The DAO Treasury pallet provides a "pot" of funds that can be managed by DAO members.
 //!
 //! - [`Config`]
 //! - [`Call`]
 //!
 //! ## Overview
 //!
-//! The Treasury Pallet itself provides the pot to store funds, and a means for stakeholders to
-//! propose, approve, and deny expenditures. The chain will need to provide a method (e.g.
-//! inflation, fees) for collecting funds.
-//!
-//! By way of example, the Council could vote to fund the Treasury with a portion of the block
-//! reward and use the funds to pay developers.
+//! The DAO Treasury Pallet itself provides the pot to store and means for DAO members to
+//! manage expenditures via external origins.
 //!
 //!
 //! ### Terminology
 //!
-//! - **Proposal:** A suggestion to allocate funds from the pot to a beneficiary.
 //! - **Beneficiary:** An account who will receive the funds from a proposal iff the proposal is
 //!   approved.
-//! - **Deposit:** Funds that a proposer must lock when making a proposal. The deposit will be
-//!   returned or slashed if the proposal is approved or rejected respectively.
 //! - **Pot:** Unspent funds accumulated by the treasury pallet.
 //!
 //! ## Interface
@@ -54,10 +30,9 @@
 //! ### Dispatchable Functions
 //!
 //! General spending/proposal protocol:
-//! - `propose_spend` - Make a spending proposal and stake the required deposit.
-//! - `reject_proposal` - Reject a proposal, slashing the deposit.
-//! - `approve_proposal` - Accept the proposal, returning the deposit.
-//! - `remove_approval` - Remove an approval, the deposit will no longer be returned.
+//! - `spend` - Spend DAO native tokens.
+//! - `transfer_token` - Transfer DAO Governance Token.
+//! - `transfer_token_by_id` - Transfer any token owned by the DAO.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -106,6 +81,7 @@ pub type NegativeImbalanceOf<T, I = ()> = <<T as Config<I>>::Currency as Currenc
 /// A trait to allow the Treasury Pallet to spend it's funds for other purposes.
 /// There is an expectation that the implementer of this trait will correctly manage
 /// the mutable variables passed to it:
+/// * `dao_id`: DAO ID
 /// * `budget_remaining`: How much available funds that can be spent by the treasury. As funds are
 ///   spent, you must correctly deduct from this value.
 /// * `imbalance`: Any imbalances that you create should be subsumed in here to maximize efficiency
@@ -117,6 +93,7 @@ pub type NegativeImbalanceOf<T, I = ()> = <<T as Config<I>>::Currency as Currenc
 #[impl_trait_for_tuples::impl_for_tuples(30)]
 pub trait SpendFunds<T: Config<I>, I: 'static = ()> {
 	fn spend_funds(
+		dao_id: DaoId,
 		budget_remaining: &mut BalanceOf<T, I>,
 		imbalance: &mut PositiveImbalanceOf<T, I>,
 		total_weight: &mut Weight,
@@ -181,19 +158,6 @@ pub mod pallet {
 
 		/// Handler for the unbalanced decrease when slashing for a rejected proposal or bounty.
 		type OnSlash: OnUnbalanced<NegativeImbalanceOf<Self, I>>;
-
-		/// Fraction of a proposal's value that should be bonded in order to place the proposal.
-		/// An accepted proposal gets these back. A rejected proposal does not.
-		#[pallet::constant]
-		type ProposalBond: Get<Permill>;
-
-		/// Minimum amount of funds that should be placed in a deposit for making a proposal.
-		#[pallet::constant]
-		type ProposalBondMinimum: Get<BalanceOf<Self, I>>;
-
-		/// Maximum amount of funds that should be placed in a deposit for making a proposal.
-		#[pallet::constant]
-		type ProposalBondMaximum: Get<Option<BalanceOf<Self, I>>>;
 
 		/// Period between successive spends.
 		#[pallet::constant]
@@ -290,8 +254,6 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config<I>, I: 'static = ()> {
-		/// New proposal.
-		Proposed { dao_id: DaoId, proposal_index: ProposalIndex },
 		/// We have ended a spend period and will now allocate funds.
 		Spending { dao_id: DaoId, budget_remaining: BalanceOf<T, I> },
 		/// Some funds have been allocated.
@@ -301,8 +263,6 @@ pub mod pallet {
 			award: BalanceOf<T, I>,
 			account: T::AccountId,
 		},
-		/// A proposal was rejected; funds were slashed.
-		Rejected { dao_id: DaoId, proposal_index: ProposalIndex, slashed: BalanceOf<T, I> },
 		/// Some of our funds have been burnt.
 		Burnt { dao_id: DaoId, burnt_funds: BalanceOf<T, I> },
 		/// Spending has finished; this is the amount that rolls over until next spend.
@@ -335,7 +295,9 @@ pub mod pallet {
 		NotSupported,
 	}
 
-	// TODO: beware of huge DAO count - use chunk spend instead
+	/// TODO: beware of huge DAO count - use chunk spend instead
+	/// perhaps set another storage for pending spends per block similar to scheduler approach
+	/// or use scheduler instead???
 	#[pallet::hooks]
 	impl<T: Config<I>, I: 'static> Hooks<BlockNumberFor<T>> for Pallet<T, I> {
 		/// # <weight>
@@ -364,95 +326,10 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config<I>, I: 'static> Pallet<T, I> {
-		/// Put forward a suggestion for spending. A deposit proportional to the value
-		/// is reserved and slashed if the proposal is rejected. It is returned once the
-		/// proposal is awarded.
-		///
-		/// # <weight>
-		/// - Complexity: O(1)
-		/// - DbReads: `ProposalCount`, `origin account`
-		/// - DbWrites: `ProposalCount`, `Proposals`, `origin account`
-		/// # </weight>
-		#[pallet::weight(T::WeightInfo::propose_spend())]
-		pub fn propose_spend(
-			origin: OriginFor<T>,
-			dao_id: DaoId,
-			#[pallet::compact] value: BalanceOf<T, I>,
-			beneficiary: <T::Lookup as StaticLookup>::Source,
-		) -> DispatchResult {
-			let proposer = ensure_signed(origin.clone())?;
-
-			T::DaoProvider::ensure_member(dao_id, &proposer)?;
-
-			let beneficiary = T::Lookup::lookup(beneficiary)?;
-
-			let bond = Self::calculate_bond(T::DaoProvider::policy(dao_id)?, value);
-
-			Self::do_propose_spend(Proposal { dao_id, proposer, value, beneficiary, bond })
-		}
-
-		/// Reject a proposed spend. The original deposit will be slashed.
-		///
-		/// May only be called from `T::ApproveOrigin`.
-		///
-		/// # <weight>
-		/// - Complexity: O(1)
-		/// - DbReads: `Proposals`, `rejected proposer account`
-		/// - DbWrites: `Proposals`, `rejected proposer account`
-		/// # </weight>
-		#[pallet::weight((T::WeightInfo::reject_proposal(), DispatchClass::Operational))]
-		pub fn reject_proposal(
-			origin: OriginFor<T>,
-			#[pallet::compact] dao_id: DaoId,
-			#[pallet::compact] proposal_id: ProposalIndex,
-		) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
-
-			let proposal =
-				<Proposals<T, I>>::take(dao_id, &proposal_id).ok_or(Error::<T, I>::InvalidIndex)?;
-			let value = proposal.bond;
-			let imbalance = T::Currency::slash_reserved(&proposal.proposer, value).0;
-			T::OnSlash::on_unbalanced(imbalance);
-
-			Self::deposit_event(Event::<T, I>::Rejected {
-				dao_id,
-				proposal_index: proposal_id,
-				slashed: value,
-			});
-			Ok(())
-		}
-
-		/// Approve a proposal. At a later time, the proposal will be allocated to the beneficiary
-		/// and the original deposit will be returned.
-		///
-		/// May only be called from `T::ApproveOrigin`.
-		///
-		/// # <weight>
-		/// - Complexity: O(1).
-		/// - DbReads: `Proposals`, `Approvals`
-		/// - DbWrite: `Approvals`
-		/// # </weight>
-		#[pallet::weight(10000)]
-		pub fn approve_proposal(
-			origin: OriginFor<T>,
-			#[pallet::compact] dao_id: DaoId,
-			#[pallet::compact] proposal_id: ProposalIndex,
-		) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
-
-			ensure!(
-				<Proposals<T, I>>::contains_key(dao_id, proposal_id),
-				Error::<T, I>::InvalidIndex
-			);
-
-			Approvals::<T, I>::try_append(dao_id, proposal_id)
-				.map_err(|_| Error::<T, I>::TooManyApprovals)?;
-			Ok(())
-		}
-
 		/// Propose and approve a spend of treasury funds.
 		///
 		/// - `origin`: Must be `SpendOrigin` with the `Success` value being at least `amount`.
+		/// - `dao_id`: DAO ID.
 		/// - `amount`: The amount to be transferred from the treasury to the `beneficiary`.
 		/// - `beneficiary`: The destination account for the transfer.
 		///
@@ -525,41 +402,6 @@ pub mod pallet {
 
 			Self::do_transfer_token(token_id, dao_origin.dao_account_id, amount, beneficiary)
 		}
-
-		/// Force a previously approved proposal to be removed from the approval queue.
-		/// The original deposit will no longer be returned.
-		///
-		/// May only be called from `T::ApproveOrigin`.
-		/// - `proposal_id`: The index of a proposal
-		///
-		/// # <weight>
-		/// - Complexity: O(A) where `A` is the number of approvals
-		/// - Db reads and writes: `Approvals`
-		/// # </weight>
-		///
-		/// Errors:
-		/// - `ProposalNotApproved`: The `proposal_id` supplied was not found in the approval queue,
-		/// i.e., the proposal has not been approved. This could also mean the proposal does not
-		/// exist altogether, thus there is no way it would have been approved in the first place.
-		#[pallet::weight((T::WeightInfo::remove_approval(), DispatchClass::Operational))]
-		pub fn remove_approval(
-			origin: OriginFor<T>,
-			#[pallet::compact] dao_id: DaoId,
-			#[pallet::compact] proposal_id: ProposalIndex,
-		) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
-
-			Approvals::<T, I>::try_mutate(dao_id, |v| -> DispatchResult {
-				if let Some(index) = v.iter().position(|x| x == &proposal_id) {
-					v.remove(index);
-					Ok(())
-				} else {
-					Err(Error::<T, I>::ProposalNotApproved.into())
-				}
-			})?;
-
-			Ok(())
-		}
 	}
 }
 
@@ -576,30 +418,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 
 	pub fn u128_to_balance_of(cost: u128) -> BalanceOf<T, I> {
 		TryInto::<BalanceOf<T, I>>::try_into(cost).ok().unwrap()
-	}
-
-	/// The needed bond for a proposal whose spend is `value`.
-	fn calculate_bond(_policy: DaoPolicy, value: BalanceOf<T, I>) -> BalanceOf<T, I> {
-		let mut r = T::ProposalBondMinimum::get().max(T::ProposalBond::get() * value);
-		if let Some(m) = T::ProposalBondMaximum::get() {
-			r = r.min(m);
-		}
-		r
-	}
-
-	pub fn do_propose_spend(proposal: Proposal<T::AccountId, BalanceOf<T, I>>) -> DispatchResult {
-		let Proposal { proposer, dao_id, bond, .. } = proposal.clone();
-
-		T::Currency::reserve(&proposer, bond)
-			.map_err(|_| Error::<T, I>::InsufficientProposersBalance)?;
-
-		let c = Self::proposal_count(dao_id);
-		<ProposalCount<T, I>>::insert(dao_id, c + 1);
-		<Proposals<T, I>>::insert(dao_id, c, proposal);
-
-		Self::deposit_event(Event::Proposed { dao_id, proposal_index: c });
-
-		Ok(())
 	}
 
 	/// Spend some money! returns number of approvals before spend.
@@ -650,6 +468,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 
 		// Call Runtime hooks to external pallet using treasury to compute spend funds.
 		T::SpendFunds::spend_funds(
+			dao_id,
 			&mut budget_remaining,
 			&mut imbalance,
 			&mut total_weight,
