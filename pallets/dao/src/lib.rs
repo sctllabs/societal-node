@@ -174,8 +174,6 @@ pub mod pallet {
 	#[pallet::config]
 	pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-		/// The outer origin type.
-		type RuntimeOrigin: From<RawOrigin<Self::AccountId>>;
 
 		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
 

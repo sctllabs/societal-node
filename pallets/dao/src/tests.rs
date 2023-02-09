@@ -1,5 +1,5 @@
 use crate::{mock::*, BoundedVec, Config, Dao, DaoConfig, DaoPolicy, Error};
-use dao_primitives::DaoStatus;
+use dao_primitives::{DaoPolicyProportion, DaoStatus, DaoToken};
 use frame_benchmarking::account;
 use frame_support::{
 	assert_noop, assert_ok,
@@ -18,6 +18,7 @@ fn create_dao_invalid_input() {
 			DaoFactory::create_dao(
 				RuntimeOrigin::signed(account.clone()),
 				vec![account, account1],
+				vec![],
 				r"invalid input".as_bytes().to_vec()
 			),
 			Error::<Test>::InvalidInput
@@ -38,6 +39,7 @@ fn create_dao_fails_on_string_limits() {
 			DaoFactory::create_dao(
 				RuntimeOrigin::signed(account.clone()),
 				vec![account.clone(), account1.clone()],
+				vec![],
 				serde_json::to_vec(&dao_json).ok().unwrap()
 			),
 			Error::<Test>::NameTooLong
@@ -49,6 +51,7 @@ fn create_dao_fails_on_string_limits() {
 			DaoFactory::create_dao(
 				RuntimeOrigin::signed(account.clone()),
 				vec![account.clone(), account1.clone()],
+				vec![],
 				serde_json::to_vec(&dao_json).ok().unwrap()
 			),
 			Error::<Test>::PurposeTooLong
@@ -60,6 +63,7 @@ fn create_dao_fails_on_string_limits() {
 			DaoFactory::create_dao(
 				RuntimeOrigin::signed(account.clone()),
 				vec![account, account1.clone()],
+				vec![],
 				serde_json::to_vec(&dao_json).ok().unwrap()
 			),
 			Error::<Test>::MetadataTooLong
@@ -81,6 +85,7 @@ fn create_dao_token_failure() {
 			DaoFactory::create_dao(
 				RuntimeOrigin::signed(account.clone()),
 				vec![account.clone(), account1.clone()],
+				vec![],
 				serde_json::to_vec(&dao_json).ok().unwrap()
 			),
 			Error::<Test>::TokenNotProvided
@@ -93,6 +98,7 @@ fn create_dao_token_failure() {
 			DaoFactory::create_dao(
 				RuntimeOrigin::signed(account.clone()),
 				vec![account.clone(), account1.clone()],
+				vec![],
 				serde_json::to_vec(&dao_json).ok().unwrap()
 			),
 			Error::<Test>::TokenNotExists
@@ -104,6 +110,7 @@ fn create_dao_token_failure() {
 			DaoFactory::create_dao(
 				RuntimeOrigin::signed(account.clone()),
 				vec![account, account1],
+				vec![],
 				serde_json::to_vec(&dao_json).ok().unwrap()
 			),
 			Error::<Test>::TokenAlreadyExists
@@ -122,6 +129,7 @@ fn create_dao_works() {
 		assert_ok!(DaoFactory::create_dao(
 			RuntimeOrigin::signed(account.clone()),
 			vec![account.clone(), account1.clone()],
+			vec![],
 			dao
 		));
 
@@ -136,10 +144,7 @@ fn create_dao_works() {
 			TokenSymbol::get().as_bytes().to_vec()
 		);
 		assert_eq!(<Test as Config>::AssetProvider::decimals(TokenId::get()), TokenDecimals::get());
-		assert_eq!(
-			<Test as Config>::AssetProvider::minimum_balance(TokenId::get()),
-			TokenMinBalance::get().parse::<u128>().unwrap()
-		);
+		assert_eq!(<Test as Config>::AssetProvider::minimum_balance(TokenId::get()), 1);
 
 		assert_eq!(*Members::get().get(&0).unwrap(), vec![account, account1]);
 
@@ -148,7 +153,6 @@ fn create_dao_works() {
 			DaoFactory::daos(0).unwrap(),
 			Dao {
 				founder: account,
-				token_id: Some(0),
 				account_id: Public::from_string("5EYCAe5ijiYfqMFxyJDmHoxzF1VJ4NTsqtRAgdjN3q6pCz51")
 					.ok()
 					.unwrap(),
@@ -167,14 +171,18 @@ fn create_dao_works() {
 					.unwrap(),
 				},
 				status: DaoStatus::Success,
-				token_address: None
+				token: DaoToken::FungibleToken(TokenId::get()),
 			}
 		);
 
 		assert_eq!(DaoFactory::policies(0).is_some(), true);
 		assert_eq!(
 			DaoFactory::policies(0).unwrap(),
-			DaoPolicy { proposal_period: 100, approve_origin: (1, 2) }
+			DaoPolicy {
+				proposal_period: 100,
+				approve_origin: DaoPolicyProportion::AtLeast((1, 2)),
+				governance: None
+			}
 		);
 	});
 }

@@ -1563,7 +1563,6 @@ parameter_types! {
 
 impl pallet_dao::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type RuntimeOrigin = RuntimeOrigin;
 	type Currency = Balances;
 	type PalletId = DaoPalletId;
 	type DaoStringLimit = DaoStringLimit;
