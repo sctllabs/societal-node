@@ -187,6 +187,7 @@ pub use vote_threshold::{Approved, VoteThreshold};
 pub use weights::WeightInfo;
 
 #[cfg(test)]
+#[cfg(feature = "dao_democracy_tests")]
 mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]

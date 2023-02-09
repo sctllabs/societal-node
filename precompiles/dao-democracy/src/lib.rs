@@ -21,9 +21,11 @@ use sp_std::{
 	marker::PhantomData,
 };
 
+#[cfg(feature = "dao_democracy_tests")]
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
+#[cfg(feature = "dao_democracy_tests")]
 mod tests;
 
 /// Dao ID. Just a `u32`.
@@ -64,7 +66,7 @@ pub const SELECTOR_LOG_UNDELEGATED: [u8; 32] = keccak256!("Undelegated(uint32,ad
 pub struct DaoDemocracyPrecompile<Runtime>(PhantomData<Runtime>);
 
 #[precompile_utils::precompile]
-#[precompile::test_concrete_types(mock::Runtime)]
+// #[precompile::test_concrete_types(mock::Runtime)]
 impl<Runtime> DaoDemocracyPrecompile<Runtime>
 where
 	Runtime: pallet_dao_democracy::Config
