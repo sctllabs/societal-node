@@ -9,7 +9,7 @@ use sp_runtime::{
 	traits::{AccountIdConversion, BlakeTwo256, IdentityLookup},
 };
 
-use dao_primitives::AccountTokenBalance;
+use dao_primitives::{AccountTokenBalance, DaoPolicyProportion, DaoToken};
 use frame_support::{
 	ord_parameter_types, parameter_types,
 	traits::{AsEnsureOriginWithArg, ConstU32, ConstU64},
@@ -117,7 +117,11 @@ impl DaoProvider<H256> for TestDaoProvider {
 	}
 
 	fn policy(_id: Self::Id) -> Result<Self::Policy, DispatchError> {
-		Ok(DaoPolicy { proposal_period: 100, approve_origin: (3, 5) })
+		Ok(DaoPolicy {
+			proposal_period: 100,
+			approve_origin: DaoPolicyProportion::AtLeast((3, 5)),
+			governance: None,
+		})
 	}
 
 	fn dao_account_id(id: Self::Id) -> Self::AccountId {
@@ -128,27 +132,29 @@ impl DaoProvider<H256> for TestDaoProvider {
 		Ok(true)
 	}
 
-	fn ensure_proposal_allowed(
+	fn dao_token(id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
+		todo!()
+	}
+
+	fn ensure_eth_proposal_allowed(
 		id: Self::Id,
-		who: &Self::AccountId,
+		account_id: Vec<u8>,
 		hash: H256,
 		length_bound: u32,
 	) -> Result<AccountTokenBalance, DispatchError> {
 		Ok(AccountTokenBalance::Sufficient)
 	}
 
-	fn ensure_voting_allowed(
+	fn ensure_eth_voting_allowed(
 		id: Self::Id,
-		who: &Self::AccountId,
+		account_id: Vec<u8>,
 		hash: H256,
+		block_number: u32,
 	) -> Result<AccountTokenBalance, DispatchError> {
 		Ok(AccountTokenBalance::Sufficient)
 	}
 
-	fn ensure_token_balance(
-		id: Self::Id,
-		who: &Self::AccountId,
-	) -> Result<AccountTokenBalance, DispatchError> {
+	fn ensure_eth_token_balance(id: Self::Id) -> Result<AccountTokenBalance, DispatchError> {
 		Ok(AccountTokenBalance::Sufficient)
 	}
 }
