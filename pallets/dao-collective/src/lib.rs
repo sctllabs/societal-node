@@ -260,6 +260,7 @@ pub mod pallet {
 			account: T::AccountId,
 			proposal_index: ProposalIndex,
 			proposal_hash: T::Hash,
+			proposal: T::Proposal,
 			threshold: MemberCount,
 			meta: Option<Vec<u8>>,
 		},
@@ -704,7 +705,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 
 		let index = Self::proposal_count(dao_id);
 		<ProposalCount<T, I>>::mutate(dao_id, |i| *i += 1);
-		<ProposalOf<T, I>>::insert(dao_id, proposal_hash, proposal);
+		<ProposalOf<T, I>>::insert(dao_id, proposal_hash, proposal.clone());
 		let votes = {
 			let end = frame_system::Pallet::<T>::block_number() + policy.proposal_period.into();
 			Votes { index, threshold, ayes: vec![], nays: vec![], end }
@@ -716,6 +717,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			account: who,
 			proposal_index: index,
 			proposal_hash,
+			proposal: *proposal,
 			threshold,
 			meta,
 		});

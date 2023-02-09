@@ -204,7 +204,7 @@ benchmarks_instance_pallet! {
 		// New proposal is recorded
 		assert_eq!(Collective::<T, I>::proposals(0).len(), p as usize);
 		let proposal_hash = T::Hashing::hash_of(&proposal);
-		assert_last_event::<T, I>(Event::Proposed { dao_id: 0, account: caller, proposal_index: p - 1, proposal_hash, threshold: m, meta: Default::default() }.into());
+		assert_last_event::<T, I>(Event::Proposed { dao_id: 0, account: caller, proposal_index: p - 1, proposal_hash, proposal, threshold: m, meta: Default::default() }.into());
 	}
 
 	vote {
