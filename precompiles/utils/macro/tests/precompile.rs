@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moonbeam.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "testing")]
 #[test]
 fn ui() {
 	let t = trybuild::TestCases::new();
@@ -21,6 +22,7 @@ fn ui() {
 	t.pass("tests/precompile/pass/**/*.rs");
 }
 
+#[cfg(feature = "testing")]
 #[test]
 fn expand() {
 	macrotest::expand_without_refresh("tests/precompile/expand/**/*.rs");
