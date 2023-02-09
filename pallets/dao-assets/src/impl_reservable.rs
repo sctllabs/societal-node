@@ -45,7 +45,7 @@ impl<T: Config<I>, I: 'static> MutateHold<T::AccountId> for Pallet<T, I> {
 						.ok_or(ArithmeticError::Overflow)?;
 
 					ensure!(
-						Self::can_withdraw(asset, &who, account.balance) ==
+						Self::can_withdraw(asset, who, account.balance) ==
 							WithdrawConsequence::Success,
 						Error::<T, I>::LiquidityRestrictions
 					);

@@ -680,11 +680,6 @@ impl pallet_treasury::Config for Runtime {
 	type SpendOrigin = frame_support::traits::NeverEnsureOrigin<u128>;
 }
 
-parameter_types! {
-	pub const DaoTreasuryProposalBond: Permill = Permill::from_percent(0);
-	pub const DaoTreasuryProposalBondMinimum: Balance = 0;
-}
-
 pub type AssetId = u32;
 
 impl pallet_dao_treasury::Config for Runtime {
@@ -697,9 +692,6 @@ impl pallet_dao_treasury::Config for Runtime {
 	>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
-	type ProposalBond = DaoTreasuryProposalBond;
-	type ProposalBondMinimum = DaoTreasuryProposalBondMinimum;
-	type ProposalBondMaximum = ();
 	type SpendPeriod = SpendPeriod;
 	type Burn = Burn;
 	type BurnDestination = ();
@@ -1571,7 +1563,6 @@ parameter_types! {
 
 impl pallet_dao::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type RuntimeOrigin = RuntimeOrigin;
 	type Currency = Balances;
 	type PalletId = DaoPalletId;
 	type DaoStringLimit = DaoStringLimit;

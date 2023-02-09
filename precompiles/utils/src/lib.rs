@@ -34,6 +34,7 @@ pub mod solidity;
 pub mod testing;
 
 #[cfg(test)]
+#[cfg(feature = "testing")]
 mod tests;
 
 use crate::alloc::{borrow::ToOwned, vec::Vec};

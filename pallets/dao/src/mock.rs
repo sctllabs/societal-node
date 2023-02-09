@@ -120,6 +120,7 @@ impl pallet_balances::Config for Test {
 parameter_types! {
 	pub const DaoPalletId: PalletId = PalletId(*b"py/sctld");
 	pub static Members: HashMap<u32, Vec<AccountId>> = HashMap::new();
+	pub static TechnicalCommittee: HashMap<u32, Vec<AccountId>> = HashMap::new();
 
 	pub DaoName: String = "dao".into();
 	pub DaoPurpose: String = "dao purpose".into();
@@ -129,7 +130,7 @@ parameter_types! {
 	pub TokenName: String = "dao_token".into();
 	pub TokenSymbol: String = "sctl".into();
 	pub TokenDecimals: u8 = 3;
-	pub TokenMinBalance: String = "1000000000".into();
+	pub TokenInitialBalance: String = "1000000000".into();
 }
 
 pub struct TestCouncilProvider;
@@ -159,8 +160,53 @@ impl ApproveVote<u32, AccountId, H256> for TestCouncilProvider {
 	}
 }
 
-impl ApprovePropose<u32, AccountId, H256> for TestCouncilProvider {
-	fn approve_propose(dao_id: u32, hash: H256, approve: bool) -> Result<(), DispatchError> {
+impl ApprovePropose<u32, AccountId, u128, H256> for TestCouncilProvider {
+	fn approve_propose(
+		dao_id: u32,
+		threshold: u128,
+		block_number: u32,
+		hash: H256,
+		approve: bool,
+	) -> Result<(), DispatchError> {
+		Ok(())
+	}
+}
+
+pub struct TestTechnicalCommitteeProvider;
+impl InitializeDaoMembers<u32, AccountId> for TestTechnicalCommitteeProvider {
+	fn initialize_members(
+		dao_id: u32,
+		source_members: Vec<AccountId>,
+	) -> Result<(), DispatchError> {
+		let mut members = HashMap::new();
+		members.insert(dao_id, source_members.clone());
+
+		TechnicalCommittee::set(members);
+
+		Ok(())
+	}
+}
+
+impl ContainsDaoMember<u32, AccountId> for TestTechnicalCommitteeProvider {
+	fn contains(dao_id: u32, who: &AccountId) -> Result<bool, DispatchError> {
+		Ok(true)
+	}
+}
+
+impl ApproveVote<u32, AccountId, H256> for TestTechnicalCommitteeProvider {
+	fn approve_vote(dao_id: u32, hash: H256, approve: bool) -> Result<(), DispatchError> {
+		Ok(())
+	}
+}
+
+impl ApprovePropose<u32, AccountId, u128, H256> for TestTechnicalCommitteeProvider {
+	fn approve_propose(
+		dao_id: u32,
+		threshold: u128,
+		block_number: u32,
+		hash: H256,
+		approve: bool,
+	) -> Result<(), DispatchError> {
 		Ok(())
 	}
 }
@@ -190,11 +236,7 @@ impl Inspect<AccountId> for TestAssetProvider {
 	}
 
 	fn minimum_balance(asset: Self::AssetId) -> Self::Balance {
-		if asset == TokenId::get() {
-			return TokenMinBalance::get().parse::<u128>().unwrap()
-		}
-
-		0
+		1
 	}
 
 	fn balance(_asset: Self::AssetId, _who: &AccountId) -> Self::Balance {
@@ -304,6 +346,8 @@ impl pallet_dao::Config for Test {
 	type GovernanceApproveProvider = TestCouncilProvider;
 	type AuthorityId = crypto::TestAuthId;
 	type DaoMaxCouncilMembers = ConstU32<20>;
+	type DaoMaxTechnicalCommitteeMembers = ConstU32<20>;
+	type TechnicalCommitteeProvider = TestTechnicalCommitteeProvider;
 }
 
 // Build genesis storage according to the mock runtime.
@@ -317,15 +361,11 @@ pub fn get_dao_json() -> Value {
 		"purpose": DaoPurpose::get(),
 		"metadata": DaoMetadata::get(),
 		"policy": {
-			"proposal_period": 300000,
-			"approve_origin": [
-				1,
-				2
-			]
+			"proposal_period": 100
 		},
 		"token": {
 			"token_id": TokenId::get(),
-			"min_balance": TokenMinBalance::get(),
+			"initial_balance": TokenInitialBalance::get(),
 			"metadata": {
 				"name": TokenName::get(),
 				"symbol": TokenSymbol::get(),

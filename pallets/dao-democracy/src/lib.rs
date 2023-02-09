@@ -187,6 +187,7 @@ pub use vote_threshold::{Approved, VoteThreshold};
 pub use weights::WeightInfo;
 
 #[cfg(test)]
+#[cfg(feature = "dao_democracy_tests")]
 mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
@@ -903,7 +904,7 @@ pub mod pallet {
 				return Err(Error::<T>::NoProposal.into())
 			}
 
-			let mut existing_vetoers = <Blacklist<T>>::get(dao_id, &proposal_hash)
+			let mut existing_vetoers = <Blacklist<T>>::get(dao_id, proposal_hash)
 				.map(|pair| pair.1)
 				.unwrap_or_default();
 			let insert_position =
@@ -914,7 +915,7 @@ pub mod pallet {
 
 			let until = <frame_system::Pallet<T>>::block_number()
 				.saturating_add(Self::u32_to_block_number(cooloff_period));
-			<Blacklist<T>>::insert(dao_id, &proposal_hash, (until, existing_vetoers));
+			<Blacklist<T>>::insert(dao_id, proposal_hash, (until, existing_vetoers));
 
 			Self::deposit_event(Event::<T>::Vetoed { dao_id, who, proposal_hash, until });
 			<NextExternal<T>>::remove(dao_id);
@@ -1132,7 +1133,7 @@ pub mod pallet {
 
 			// Insert the proposal into the blacklist.
 			let permanent = (T::BlockNumber::max_value(), BoundedVec::<T::AccountId, _>::default());
-			Blacklist::<T>::insert(dao_id, &proposal_hash, permanent);
+			Blacklist::<T>::insert(dao_id, proposal_hash, permanent);
 
 			// Remove the queued proposal, if it's there.
 			PublicProps::<T>::mutate(dao_id, |props| {

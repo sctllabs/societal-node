@@ -22,7 +22,7 @@
 
 use super::{Event as CollectiveEvent, *};
 use crate as pallet_dao_collective;
-use dao_primitives::AccountTokenBalance;
+use dao_primitives::{AccountTokenBalance, DaoToken};
 use frame_support::{
 	assert_noop, assert_ok, parameter_types,
 	traits::{ConstU32, ConstU64},
@@ -128,6 +128,7 @@ impl Config<Instance1> for Test {
 	type RuntimeOrigin = RuntimeOrigin;
 	type Proposal = RuntimeCall;
 	type RuntimeEvent = RuntimeEvent;
+	type ProposalMetadataLimit = ConstU32<100>;
 	type MaxProposals = MaxProposals;
 	type MaxMembers = MaxMembers;
 	type DefaultVote = MoreThanMajorityVote;
@@ -138,6 +139,7 @@ impl Config<Instance2> for Test {
 	type RuntimeOrigin = RuntimeOrigin;
 	type Proposal = RuntimeCall;
 	type RuntimeEvent = RuntimeEvent;
+	type ProposalMetadataLimit = ConstU32<100>;
 	type MaxProposals = MaxProposals;
 	type MaxMembers = MaxMembers;
 	type DefaultVote = MoreThanMajorityVote;
@@ -146,7 +148,7 @@ impl Config<Instance2> for Test {
 }
 impl mock_democracy::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
-	type ExternalMajorityOrigin = EnsureProportionAtLeast<u64, 3, 4, Instance1>;
+	type ExternalMajorityOrigin = EnsureMembers<u64, Instance1, 1>;
 }
 
 pub struct TestDaoProvider;
@@ -165,7 +167,11 @@ impl DaoProvider<H256> for TestDaoProvider {
 	}
 
 	fn policy(_id: Self::Id) -> Result<Self::Policy, DispatchError> {
-		Ok(DaoPolicy { proposal_period: 3, approve_origin: (3, 5) })
+		Ok(DaoPolicy {
+			proposal_period: 3,
+			approve_origin: DaoPolicyProportion::AtLeast((1, 2)),
+			governance: None,
+		})
 	}
 
 	fn dao_account_id(id: Self::Id) -> Self::AccountId {
@@ -176,27 +182,29 @@ impl DaoProvider<H256> for TestDaoProvider {
 		Ok(true)
 	}
 
-	fn ensure_proposal_allowed(
+	fn dao_token(id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
+		todo!()
+	}
+
+	fn ensure_eth_proposal_allowed(
 		id: Self::Id,
-		who: &Self::AccountId,
+		account_id: Vec<u8>,
 		hash: H256,
 		length_bound: u32,
 	) -> Result<AccountTokenBalance, DispatchError> {
 		Ok(AccountTokenBalance::Sufficient)
 	}
 
-	fn ensure_voting_allowed(
+	fn ensure_eth_voting_allowed(
 		id: Self::Id,
-		who: &Self::AccountId,
+		account_id: Vec<u8>,
 		hash: H256,
+		block_number: u32,
 	) -> Result<AccountTokenBalance, DispatchError> {
 		Ok(AccountTokenBalance::Sufficient)
 	}
 
-	fn ensure_token_balance(
-		id: Self::Id,
-		who: &Self::AccountId,
-	) -> Result<AccountTokenBalance, DispatchError> {
+	fn ensure_eth_token_balance(id: Self::Id) -> Result<AccountTokenBalance, DispatchError> {
 		Ok(AccountTokenBalance::Sufficient)
 	}
 }
@@ -205,6 +213,7 @@ impl Config for Test {
 	type RuntimeOrigin = RuntimeOrigin;
 	type Proposal = RuntimeCall;
 	type RuntimeEvent = RuntimeEvent;
+	type ProposalMetadataLimit = ConstU32<100>;
 	type MaxProposals = MaxProposals;
 	type MaxMembers = MaxMembers;
 	type DefaultVote = MoreThanMajorityVote;
@@ -256,18 +265,17 @@ fn close_works() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			3,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
-		assert_ok!(Collective::vote(RuntimeOrigin::signed(1), 0, hash, 0, true));
-		assert_ok!(Collective::vote(RuntimeOrigin::signed(2), 0, hash, 0, true));
 
 		System::set_block_number(3);
 		assert_noop!(
 			Collective::close(RuntimeOrigin::signed(4), 0, hash, 0, proposal_weight, proposal_len),
 			Error::<Test, Instance1>::TooEarly
 		);
+
+		assert_ok!(Collective::vote(RuntimeOrigin::signed(1), 0, hash, 0, true));
 
 		System::set_block_number(4);
 		assert_ok!(Collective::close(
@@ -287,7 +295,8 @@ fn close_works() {
 					account: 1,
 					proposal_index: 0,
 					proposal_hash: hash,
-					threshold: 3
+					threshold: 1,
+					meta: None,
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
@@ -297,18 +306,10 @@ fn close_works() {
 					yes: 1,
 					no: 0
 				})),
-				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
-					dao_id: 0,
-					account: 2,
-					proposal_hash: hash,
-					voted: true,
-					yes: 2,
-					no: 0
-				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Closed {
 					dao_id: 0,
 					proposal_hash: hash,
-					yes: 3,
+					yes: 1,
 					no: 0
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Approved {
@@ -340,7 +341,6 @@ fn proposal_weight_limit_works_on_approve() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			3,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -385,7 +385,6 @@ fn proposal_weight_limit_ignored_on_disapprove() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			3,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -419,7 +418,6 @@ fn close_with_no_prime_but_majority_works() {
 		assert_ok!(CollectiveMajority::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			5,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -445,7 +443,8 @@ fn close_with_no_prime_but_majority_works() {
 					account: 1,
 					proposal_index: 0,
 					proposal_hash: hash,
-					threshold: 5
+					threshold: 2,
+					meta: None,
 				})),
 				record(RuntimeEvent::CollectiveMajority(CollectiveEvent::Voted {
 					dao_id: 0,
@@ -474,7 +473,7 @@ fn close_with_no_prime_but_majority_works() {
 				record(RuntimeEvent::CollectiveMajority(CollectiveEvent::Closed {
 					dao_id: 0,
 					proposal_hash: hash,
-					yes: 5,
+					yes: 3,
 					no: 0
 				})),
 				record(RuntimeEvent::CollectiveMajority(CollectiveEvent::Approved {
@@ -501,7 +500,6 @@ fn removal_of_old_voters_votes_works() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			3,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -509,12 +507,12 @@ fn removal_of_old_voters_votes_works() {
 		assert_ok!(Collective::vote(RuntimeOrigin::signed(2), 0, hash, 0, true));
 		assert_eq!(
 			Collective::voting(0, &hash),
-			Some(Votes { index: 0, threshold: 3, ayes: vec![1, 2], nays: vec![], end })
+			Some(Votes { index: 0, threshold: 1, ayes: vec![1, 2], nays: vec![], end })
 		);
 		Collective::change_members_sorted(0, &[4], &[1], &[2, 3, 4]);
 		assert_eq!(
 			Collective::voting(0, &hash),
-			Some(Votes { index: 0, threshold: 3, ayes: vec![2], nays: vec![], end })
+			Some(Votes { index: 0, threshold: 1, ayes: vec![2], nays: vec![], end })
 		);
 
 		let proposal = make_proposal(69);
@@ -523,7 +521,6 @@ fn removal_of_old_voters_votes_works() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(2),
 			0,
-			2,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -531,12 +528,12 @@ fn removal_of_old_voters_votes_works() {
 		assert_ok!(Collective::vote(RuntimeOrigin::signed(3), 0, hash, 1, false));
 		assert_eq!(
 			Collective::voting(0, &hash),
-			Some(Votes { index: 1, threshold: 2, ayes: vec![2], nays: vec![3], end })
+			Some(Votes { index: 1, threshold: 1, ayes: vec![2], nays: vec![3], end })
 		);
 		Collective::change_members_sorted(0, &[], &[3], &[2, 4]);
 		assert_eq!(
 			Collective::voting(0, &hash),
-			Some(Votes { index: 1, threshold: 2, ayes: vec![2], nays: vec![], end })
+			Some(Votes { index: 1, threshold: 1, ayes: vec![2], nays: vec![], end })
 		);
 	});
 }
@@ -551,7 +548,6 @@ fn removal_of_old_voters_votes_works_with_set_members() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			3,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -559,7 +555,7 @@ fn removal_of_old_voters_votes_works_with_set_members() {
 		assert_ok!(Collective::vote(RuntimeOrigin::signed(2), 0, hash, 0, true));
 		assert_eq!(
 			Collective::voting(0, &hash),
-			Some(Votes { index: 0, threshold: 3, ayes: vec![1, 2], nays: vec![], end })
+			Some(Votes { index: 0, threshold: 1, ayes: vec![1, 2], nays: vec![], end })
 		);
 		assert_ok!(Collective::set_members(
 			RuntimeOrigin::root(),
@@ -569,7 +565,7 @@ fn removal_of_old_voters_votes_works_with_set_members() {
 		));
 		assert_eq!(
 			Collective::voting(0, &hash),
-			Some(Votes { index: 0, threshold: 3, ayes: vec![2], nays: vec![], end })
+			Some(Votes { index: 0, threshold: 1, ayes: vec![2], nays: vec![], end })
 		);
 
 		let proposal = make_proposal(69);
@@ -578,7 +574,6 @@ fn removal_of_old_voters_votes_works_with_set_members() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(2),
 			0,
-			2,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -586,7 +581,7 @@ fn removal_of_old_voters_votes_works_with_set_members() {
 		assert_ok!(Collective::vote(RuntimeOrigin::signed(3), 0, hash, 1, false));
 		assert_eq!(
 			Collective::voting(0, &hash),
-			Some(Votes { index: 1, threshold: 2, ayes: vec![2], nays: vec![3], end })
+			Some(Votes { index: 1, threshold: 1, ayes: vec![2], nays: vec![3], end })
 		);
 		assert_ok!(Collective::set_members(
 			RuntimeOrigin::root(),
@@ -596,7 +591,7 @@ fn removal_of_old_voters_votes_works_with_set_members() {
 		));
 		assert_eq!(
 			Collective::voting(0, &hash),
-			Some(Votes { index: 1, threshold: 2, ayes: vec![2], nays: vec![], end })
+			Some(Votes { index: 1, threshold: 1, ayes: vec![2], nays: vec![], end })
 		);
 	});
 }
@@ -611,7 +606,6 @@ fn propose_works() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			3,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -619,7 +613,7 @@ fn propose_works() {
 		assert_eq!(Collective::proposal_of(0, &hash), Some(proposal));
 		assert_eq!(
 			Collective::voting(0, &hash),
-			Some(Votes { index: 0, threshold: 3, ayes: vec![], nays: vec![], end })
+			Some(Votes { index: 0, threshold: 1, ayes: vec![], nays: vec![], end })
 		);
 
 		assert_eq!(
@@ -629,7 +623,8 @@ fn propose_works() {
 				account: 1,
 				proposal_index: 0,
 				proposal_hash: hash,
-				threshold: 3
+				threshold: 1,
+				meta: None,
 			}))]
 		);
 	});
@@ -644,7 +639,6 @@ fn limit_active_proposals() {
 			assert_ok!(Collective::propose(
 				RuntimeOrigin::signed(1),
 				0,
-				3,
 				Box::new(proposal.clone()),
 				proposal_len
 			));
@@ -655,7 +649,6 @@ fn limit_active_proposals() {
 			Collective::propose(
 				RuntimeOrigin::signed(1),
 				0,
-				3,
 				Box::new(proposal.clone()),
 				proposal_len
 			),
@@ -676,7 +669,6 @@ fn correct_validate_and_get_proposal() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			3,
 			Box::new(proposal.clone()),
 			length
 		));
@@ -723,7 +715,6 @@ fn motions_ignoring_non_collective_proposals_works() {
 			Collective::propose(
 				RuntimeOrigin::signed(42),
 				0,
-				3,
 				Box::new(proposal.clone()),
 				proposal_len
 			),
@@ -741,7 +732,6 @@ fn motions_ignoring_non_collective_votes_works() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			3,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -762,7 +752,6 @@ fn motions_ignoring_bad_index_collective_vote_works() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			3,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -783,20 +772,19 @@ fn motions_vote_after_works() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			2,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
 		// Initially there a no votes when the motion is proposed.
 		assert_eq!(
 			Collective::voting(0, &hash),
-			Some(Votes { index: 0, threshold: 2, ayes: vec![], nays: vec![], end })
+			Some(Votes { index: 0, threshold: 1, ayes: vec![], nays: vec![], end })
 		);
 		// Cast first aye vote.
 		assert_ok!(Collective::vote(RuntimeOrigin::signed(1), 0, hash, 0, true));
 		assert_eq!(
 			Collective::voting(0, &hash),
-			Some(Votes { index: 0, threshold: 2, ayes: vec![1], nays: vec![], end })
+			Some(Votes { index: 0, threshold: 1, ayes: vec![1], nays: vec![], end })
 		);
 		// Try to cast a duplicate aye vote.
 		assert_noop!(
@@ -807,7 +795,7 @@ fn motions_vote_after_works() {
 		assert_ok!(Collective::vote(RuntimeOrigin::signed(1), 0, hash, 0, false));
 		assert_eq!(
 			Collective::voting(0, &hash),
-			Some(Votes { index: 0, threshold: 2, ayes: vec![], nays: vec![1], end })
+			Some(Votes { index: 0, threshold: 1, ayes: vec![], nays: vec![1], end })
 		);
 		// Try to cast a duplicate nay vote.
 		assert_noop!(
@@ -823,7 +811,8 @@ fn motions_vote_after_works() {
 					account: 1,
 					proposal_index: 0,
 					proposal_hash: hash,
-					threshold: 2
+					threshold: 1,
+					meta: None,
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
@@ -856,13 +845,12 @@ fn motions_all_first_vote_free_works() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			2,
 			Box::new(proposal.clone()),
 			proposal_len,
 		));
 		assert_eq!(
 			Collective::voting(0, &hash),
-			Some(Votes { index: 0, threshold: 2, ayes: vec![], nays: vec![], end })
+			Some(Votes { index: 0, threshold: 1, ayes: vec![], nays: vec![], end })
 		);
 
 		// For the motion, acc 2's first vote, expecting Ok with Pays::No.
@@ -915,11 +903,11 @@ fn motions_reproposing_disapproved_works() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			3,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
 		assert_ok!(Collective::vote(RuntimeOrigin::signed(2), 0, hash, 0, false));
+		assert_ok!(Collective::vote(RuntimeOrigin::signed(3), 0, hash, 0, false));
 		assert_ok!(Collective::close(
 			RuntimeOrigin::signed(2),
 			0,
@@ -932,7 +920,6 @@ fn motions_reproposing_disapproved_works() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			2,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -955,7 +942,6 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			2,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -977,7 +963,8 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 					account: 1,
 					proposal_index: 0,
 					proposal_hash: hash,
-					threshold: 2
+					threshold: 1,
+					meta: None,
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
@@ -1005,10 +992,13 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 					dao_id: 0,
 					proposal_hash: hash
 				})),
+				record(RuntimeEvent::Democracy(
+					mock_democracy::pallet::Event::<Test>::ExternalProposed
+				)),
 				record(RuntimeEvent::Collective(CollectiveEvent::Executed {
 					dao_id: 0,
 					proposal_hash: hash,
-					result: Err(DispatchError::BadOrigin)
+					result: Ok(())
 				})),
 			]
 		);
@@ -1019,7 +1009,6 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			2,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -1042,7 +1031,8 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 					account: 1,
 					proposal_index: 1,
 					proposal_hash: hash,
-					threshold: 2
+					threshold: 1,
+					meta: None,
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
@@ -1101,12 +1091,11 @@ fn motions_disapproval_works() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			3,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
-		assert_ok!(Collective::vote(RuntimeOrigin::signed(1), 0, hash, 0, true));
 		assert_ok!(Collective::vote(RuntimeOrigin::signed(2), 0, hash, 0, false));
+		assert_ok!(Collective::vote(RuntimeOrigin::signed(3), 0, hash, 0, false));
 		assert_ok!(Collective::close(
 			RuntimeOrigin::signed(2),
 			0,
@@ -1124,29 +1113,30 @@ fn motions_disapproval_works() {
 					account: 1,
 					proposal_index: 0,
 					proposal_hash: hash,
-					threshold: 3
-				})),
-				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
-					dao_id: 0,
-					account: 1,
-					proposal_hash: hash,
-					voted: true,
-					yes: 1,
-					no: 0
+					threshold: 1,
+					meta: None,
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 2,
 					proposal_hash: hash,
 					voted: false,
-					yes: 1,
+					yes: 0,
 					no: 1
+				})),
+				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
+					dao_id: 0,
+					account: 3,
+					proposal_hash: hash,
+					voted: false,
+					yes: 0,
+					no: 2
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Closed {
 					dao_id: 0,
 					proposal_hash: hash,
-					yes: 1,
-					no: 1
+					yes: 0,
+					no: 2
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Disapproved {
 					dao_id: 0,
@@ -1167,7 +1157,6 @@ fn motions_approval_works() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			2,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -1190,7 +1179,8 @@ fn motions_approval_works() {
 					account: 1,
 					proposal_index: 0,
 					proposal_hash: hash,
-					threshold: 2
+					threshold: 1,
+					meta: None,
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
@@ -1238,7 +1228,6 @@ fn motion_with_no_votes_closes_with_disapproval() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			3,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -1249,7 +1238,8 @@ fn motion_with_no_votes_closes_with_disapproval() {
 				account: 1,
 				proposal_index: 0,
 				proposal_hash: hash,
-				threshold: 3
+				threshold: 1,
+				meta: None,
 			}))
 		);
 
@@ -1306,7 +1296,6 @@ fn close_disapprove_does_not_care_about_weight_or_len() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			2,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -1325,6 +1314,7 @@ fn close_disapprove_does_not_care_about_weight_or_len() {
 		// Now we make the proposal fail
 		assert_ok!(Collective::vote(RuntimeOrigin::signed(1), 0, hash, 0, false));
 		assert_ok!(Collective::vote(RuntimeOrigin::signed(2), 0, hash, 0, false));
+		assert_ok!(Collective::vote(RuntimeOrigin::signed(3), 0, hash, 0, false));
 		// It can close even if the weight/len information is bad
 		assert_ok!(Collective::close(RuntimeOrigin::signed(2), 0, hash, 0, Weight::zero(), 0));
 	})
@@ -1339,7 +1329,6 @@ fn disapprove_proposal_works() {
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
 			0,
-			2,
 			Box::new(proposal.clone()),
 			proposal_len
 		));
@@ -1356,7 +1345,8 @@ fn disapprove_proposal_works() {
 					account: 1,
 					proposal_index: 0,
 					proposal_hash: hash,
-					threshold: 2
+					threshold: 1,
+					meta: None,
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,

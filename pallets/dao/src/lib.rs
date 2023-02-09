@@ -35,6 +35,7 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+#[cfg(feature = "runtime-benchmarks")]
 type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
@@ -174,8 +175,6 @@ pub mod pallet {
 	#[pallet::config]
 	pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-		/// The outer origin type.
-		type RuntimeOrigin: From<RawOrigin<Self::AccountId>>;
 
 		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
 
@@ -334,7 +333,7 @@ pub mod pallet {
 						token_address,
 						account_id,
 						hash,
-						length_bound,
+						length_bound: _,
 					} => {
 						let block_number = match Self::parse_block_number(Self::fetch_from_eth(
 							token_address.clone(),
@@ -835,7 +834,7 @@ pub mod pallet {
 			let result = response?.result;
 			let value = Result::unwrap_or(str::from_utf8(&result), "");
 			if value.is_empty() {
-				return Err(Error::<T>::HttpFetchingError.into())
+				return Err(Error::<T>::HttpFetchingError)
 			}
 
 			let value_stripped = value.strip_prefix("0x").unwrap_or(value);
@@ -1011,7 +1010,7 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 	type Policy = PolicyOf;
 
 	fn exists(id: Self::Id) -> Result<(), DispatchError> {
-		if !Daos::<T>::contains_key(&id) {
+		if !Daos::<T>::contains_key(id) {
 			return Err(Error::<T>::DaoNotExist.into())
 		}
 
@@ -1023,7 +1022,7 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 	}
 
 	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError> {
-		match Policies::<T>::get(&id) {
+		match Policies::<T>::get(id) {
 			Some(policy) => Ok(policy),
 			None => Err(Error::<T>::PolicyNotExist.into()),
 		}
@@ -1093,7 +1092,7 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 		let dao = Daos::<T>::get(id).ok_or(Error::<T>::DaoNotExist)?;
 
 		match dao.token {
-			DaoToken::FungibleToken(_) => return Err(Error::<T>::NotSupported.into()),
+			DaoToken::FungibleToken(_) => Err(Error::<T>::NotSupported.into()),
 			DaoToken::EthTokenAddress(token_address) =>
 				Ok(AccountTokenBalance::Offchain { token_address: token_address.to_vec() }),
 		}
@@ -1104,7 +1103,7 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 	}
 
 	fn dao_token(id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
-		match Daos::<T>::get(&id) {
+		match Daos::<T>::get(id) {
 			None => Err(Error::<T>::DaoNotExist.into()),
 			Some(dao) => Ok(match dao.token {
 				DaoToken::FungibleToken(token_id) => DaoToken::FungibleToken(token_id),
@@ -1138,12 +1137,11 @@ impl<
 
 				Err(O::from(o))
 			},
-			r => Err(O::from(r)),
 		})
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin(dao_origin: &DaoOrigin<AccountId>) -> Result<O, ()> {
+	fn try_successful_origin(_dao_origin: &DaoOrigin<AccountId>) -> Result<O, ()> {
 		let zero_account_id =
 			AccountId::decode(&mut sp_runtime::traits::TrailingZeroInput::zeroes())
 				.expect("infinite length input; no invalid inputs for type; qed");

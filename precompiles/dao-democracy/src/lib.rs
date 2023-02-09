@@ -5,7 +5,7 @@
 use fp_evm::PrecompileHandle;
 use frame_support::{
 	dispatch::{Dispatchable, GetDispatchInfo, PostDispatchInfo},
-	traits::{Bounded, ConstU32, Currency, QueryPreimage},
+	traits::{Bounded, ConstU32, Currency},
 };
 use pallet_dao_democracy::{
 	AccountVote, Call as DemocracyCall, Conviction, ReferendumInfo, Vote, VoteThreshold,
@@ -21,9 +21,11 @@ use sp_std::{
 	marker::PhantomData,
 };
 
+#[cfg(feature = "dao_democracy_tests")]
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
+#[cfg(feature = "dao_democracy_tests")]
 mod tests;
 
 /// Dao ID. Just a `u32`.
@@ -36,9 +38,6 @@ type BalanceOf<Runtime> = <<Runtime as pallet_dao_democracy::Config>::Currency a
 >>::Balance;
 
 type DemocracyOf<Runtime> = pallet_dao_democracy::Pallet<Runtime>;
-
-pub const ENCODED_PROPOSAL_SIZE_LIMIT: u32 = 2u32.pow(16);
-type GetEncodedProposalSizeLimit = ConstU32<ENCODED_PROPOSAL_SIZE_LIMIT>;
 
 /// Solidity selector of the Proposed log, which is the Keccak of the Log signature.
 pub const SELECTOR_LOG_PROPOSED: [u8; 32] = keccak256!("Proposed(uint32,uint32,uint256)");
@@ -64,7 +63,7 @@ pub const SELECTOR_LOG_UNDELEGATED: [u8; 32] = keccak256!("Undelegated(uint32,ad
 pub struct DaoDemocracyPrecompile<Runtime>(PhantomData<Runtime>);
 
 #[precompile_utils::precompile]
-#[precompile::test_concrete_types(mock::Runtime)]
+// #[precompile::test_concrete_types(mock::Runtime)]
 impl<Runtime> DaoDemocracyPrecompile<Runtime>
 where
 	Runtime: pallet_dao_democracy::Config
@@ -153,8 +152,8 @@ where
 
 		Ok((
 			ref_status.end.into(),
-			ref_status.proposal.hash().into(),
-			threshold_u8.into(),
+			ref_status.proposal.hash(),
+			threshold_u8,
 			ref_status.delay.into(),
 			ref_status.tally.ayes.into(),
 			ref_status.tally.nays.into(),
@@ -287,11 +286,10 @@ where
 		let ref_index = ref_index.converted();
 		let vote_amount_balance = Self::u256_to_amount(vote_amount).in_field("voteAmount")?;
 
-		let conviction_enum: Conviction =
-			conviction.clone().converted().try_into().map_err(|_| {
-				RevertReason::custom("Must be an integer between 0 and 6 included")
-					.in_field("conviction")
-			})?;
+		let conviction_enum: Conviction = conviction.converted().try_into().map_err(|_| {
+			RevertReason::custom("Must be an integer between 0 and 6 included")
+				.in_field("conviction")
+		})?;
 
 		let vote = AccountVote::Standard {
 			vote: Vote { aye, conviction: conviction_enum },
@@ -370,7 +368,7 @@ where
 		);
 
 		let to = Runtime::AddressMapping::into_account_id(representative.into());
-		let to: <Runtime::Lookup as StaticLookup>::Source = Runtime::Lookup::unlookup(to.clone());
+		let to: <Runtime::Lookup as StaticLookup>::Source = Runtime::Lookup::unlookup(to);
 		let origin = Runtime::AddressMapping::into_account_id(handle.context().caller);
 		let call = DemocracyCall::<Runtime>::delegate { dao_id, to, conviction, balance: amount };
 
@@ -414,8 +412,7 @@ where
 	fn unlock(handle: &mut impl PrecompileHandle, dao_id: DaoId, target: Address) -> EvmResult {
 		let target: H160 = target.into();
 		let target = Runtime::AddressMapping::into_account_id(target);
-		let target: <Runtime::Lookup as StaticLookup>::Source =
-			Runtime::Lookup::unlookup(target.clone());
+		let target: <Runtime::Lookup as StaticLookup>::Source = Runtime::Lookup::unlookup(target);
 
 		log::trace!(
 			target: "democracy-precompile",

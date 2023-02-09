@@ -1,20 +1,3 @@
-// This file is part of Substrate.
-
-// Copyright (C) 2020-2022 Parity Technologies (UK) Ltd.
-// SPDX-License-Identifier: Apache-2.0
-
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// 	http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 // Changes made comparing to the original tests of the FRAME pallet-treasure:
 // - using DAO as a parameter for pallet functions
 
@@ -30,12 +13,21 @@ use sp_runtime::{
 	traits::{BadOrigin, BlakeTwo256, IdentityLookup},
 };
 
-use dao_primitives::AccountTokenBalance;
+use dao_primitives::{AccountTokenBalance, DaoPolicyProportion};
 use frame_support::{
 	assert_noop, assert_ok,
 	dispatch::DispatchError,
 	parameter_types,
-	traits::{AsEnsureOriginWithArg, ConstU32, ConstU64, OnInitialize},
+	traits::{
+		tokens::{
+			fungibles::{
+				metadata::{Inspect as MetadataInspect, Mutate as MetadataMutate},
+				Create, Inspect, Mutate,
+			},
+			DepositConsequence, WithdrawConsequence,
+		},
+		AsEnsureOriginWithArg, ConstU128, ConstU32, ConstU64, OnInitialize,
+	},
 	PalletId,
 };
 
@@ -44,6 +36,7 @@ use crate as treasury;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
+type AccountId = u128;
 
 frame_support::construct_runtime!(
 	pub enum Test where
@@ -72,14 +65,14 @@ impl frame_system::Config for Test {
 	type RuntimeCall = RuntimeCall;
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
-	type AccountId = u128; // u64 is not enough to hold bytes used to generate bounty account
+	type AccountId = AccountId; // u64 is not enough to hold bytes used to generate bounty account
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
 	type RuntimeEvent = RuntimeEvent;
 	type BlockHashCount = ConstU64<250>;
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = pallet_balances::AccountData<u64>;
+	type AccountData = pallet_balances::AccountData<u128>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -91,10 +84,10 @@ impl pallet_balances::Config for Test {
 	type MaxLocks = ();
 	type MaxReserves = ();
 	type ReserveIdentifier = [u8; 8];
-	type Balance = u64;
+	type Balance = u128;
 	type RuntimeEvent = RuntimeEvent;
 	type DustRemoval = ();
-	type ExistentialDeposit = ConstU64<1>;
+	type ExistentialDeposit = ConstU128<1>;
 	type AccountStore = System;
 	type WeightInfo = ();
 }
@@ -102,10 +95,15 @@ thread_local! {
 	static TEN_TO_FOURTEEN: RefCell<Vec<u128>> = RefCell::new(vec![10,11,12,13,14]);
 }
 parameter_types! {
-	pub const ProposalBond: Permill = Permill::from_percent(5);
 	pub const Burn: Permill = Permill::from_percent(50);
 	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
 	pub const DaoPalletId: PalletId = PalletId(*b"py/sctld");
+
+	pub TokenId: u32 = 0;
+	pub TokenName: String = "dao_token".into();
+	pub TokenSymbol: String = "sctl".into();
+	pub TokenDecimals: u8 = 3;
+	pub TokenMinBalance: String = "1000000000".into();
 }
 pub struct TestSpendOrigin;
 impl frame_support::traits::EnsureOrigin<RuntimeOrigin> for TestSpendOrigin {
@@ -142,7 +140,11 @@ impl DaoProvider<H256> for TestDaoProvider {
 	}
 
 	fn policy(_id: Self::Id) -> Result<Self::Policy, DispatchError> {
-		Ok(DaoPolicy { proposal_period: 100, approve_origin: (3, 5) })
+		Ok(DaoPolicy {
+			proposal_period: 100,
+			approve_origin: DaoPolicyProportion::AtLeast((3, 5)),
+			governance: None,
+		})
 	}
 
 	fn dao_account_id(id: Self::Id) -> Self::AccountId {
@@ -153,34 +155,163 @@ impl DaoProvider<H256> for TestDaoProvider {
 		Ok(true)
 	}
 
-	fn ensure_proposal_allowed(
+	fn dao_token(id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
+		todo!()
+	}
+
+	fn ensure_eth_proposal_allowed(
 		id: Self::Id,
-		who: &Self::AccountId,
+		account_id: Vec<u8>,
 		hash: H256,
 		length_bound: u32,
 	) -> Result<AccountTokenBalance, DispatchError> {
 		Ok(AccountTokenBalance::Sufficient)
 	}
 
-	fn ensure_voting_allowed(
+	fn ensure_eth_voting_allowed(
 		id: Self::Id,
-		who: &Self::AccountId,
+		account_id: Vec<u8>,
 		hash: H256,
+		block_number: u32,
 	) -> Result<AccountTokenBalance, DispatchError> {
 		Ok(AccountTokenBalance::Sufficient)
 	}
 
-	fn ensure_token_balance(
-		id: Self::Id,
-		who: &Self::AccountId,
-	) -> Result<AccountTokenBalance, DispatchError> {
+	fn ensure_eth_token_balance(id: Self::Id) -> Result<AccountTokenBalance, DispatchError> {
 		Ok(AccountTokenBalance::Sufficient)
+	}
+}
+
+pub struct TestAssetProvider;
+impl Create<AccountId> for TestAssetProvider {
+	fn create(
+		_id: u32,
+		_admin: AccountId,
+		_is_sufficient: bool,
+		_min_balance: u128,
+	) -> DispatchResult {
+		Ok(())
+	}
+}
+
+impl Inspect<AccountId> for TestAssetProvider {
+	type AssetId = u32;
+	type Balance = u128;
+
+	fn total_issuance(asset: Self::AssetId) -> Self::Balance {
+		if asset == 2 {
+			return 1
+		}
+
+		0
+	}
+
+	fn minimum_balance(asset: Self::AssetId) -> Self::Balance {
+		if asset == TokenId::get() {
+			return TokenMinBalance::get().parse::<u128>().unwrap()
+		}
+
+		0
+	}
+
+	fn balance(_asset: Self::AssetId, _who: &AccountId) -> Self::Balance {
+		0
+	}
+
+	fn reducible_balance(
+		_asset: Self::AssetId,
+		_who: &AccountId,
+		_keep_alive: bool,
+	) -> Self::Balance {
+		0
+	}
+
+	fn can_deposit(
+		_asset: Self::AssetId,
+		_who: &AccountId,
+		_amount: Self::Balance,
+		_mint: bool,
+	) -> DepositConsequence {
+		DepositConsequence::Success
+	}
+
+	fn can_withdraw(
+		_asset: Self::AssetId,
+		_who: &AccountId,
+		_amount: Self::Balance,
+	) -> WithdrawConsequence<Self::Balance> {
+		WithdrawConsequence::Success
+	}
+}
+
+impl Mutate<AccountId> for TestAssetProvider {
+	fn mint_into(_asset: u32, _who: &AccountId, _amount: u128) -> DispatchResult {
+		Ok(())
+	}
+
+	fn burn_from(_asset: u32, _who: &AccountId, _amount: u128) -> Result<u128, DispatchError> {
+		Ok(0)
+	}
+
+	fn slash(_asset: u32, _who: &AccountId, _amount: u128) -> Result<u128, DispatchError> {
+		Ok(0)
+	}
+}
+
+impl MetadataInspect<AccountId> for TestAssetProvider {
+	fn name(asset: u32) -> Vec<u8> {
+		if asset == TokenId::get() {
+			return TokenName::get().as_bytes().to_vec()
+		}
+
+		vec![]
+	}
+
+	fn symbol(asset: u32) -> Vec<u8> {
+		if asset == TokenId::get() {
+			return TokenSymbol::get().as_bytes().to_vec()
+		}
+
+		vec![]
+	}
+
+	fn decimals(asset: u32) -> u8 {
+		if asset == TokenId::get() {
+			return TokenDecimals::get()
+		}
+
+		0
+	}
+}
+
+impl MetadataMutate<AccountId> for TestAssetProvider {
+	fn set(
+		_asset: u32,
+		_from: &AccountId,
+		_name: Vec<u8>,
+		_symbol: Vec<u8>,
+		_decimals: u8,
+	) -> DispatchResult {
+		Ok(())
+	}
+}
+
+impl Transfer<AccountId> for TestAssetProvider {
+	fn transfer(
+		asset: u32,
+		source: &AccountId,
+		dest: &AccountId,
+		amount: u128,
+		keep_alive: bool,
+	) -> Result<Self::Balance, DispatchError> {
+		Ok(amount)
 	}
 }
 
 impl Config for Test {
 	type PalletId = TreasuryPalletId;
 	type Currency = pallet_balances::Pallet<Test>;
+	type AssetId = u32;
 	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
@@ -190,8 +321,8 @@ impl Config for Test {
 	type WeightInfo = ();
 	type SpendFunds = ();
 	type MaxApprovals = ConstU32<100>;
-	type SpendOrigin = TestSpendOrigin;
 	type DaoProvider = TestDaoProvider;
+	type AssetProvider = TestAssetProvider;
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
@@ -217,22 +348,10 @@ fn genesis_config_works() {
 fn spend_origin_permissioning_works() {
 	new_test_ext().execute_with(|| {
 		assert_noop!(Treasury::spend(RuntimeOrigin::signed(1), 0, 1, 1), BadOrigin);
-		assert_noop!(
-			Treasury::spend(RuntimeOrigin::signed(10), 0, 6, 1),
-			Error::<Test>::InsufficientPermission
-		);
-		assert_noop!(
-			Treasury::spend(RuntimeOrigin::signed(11), 0, 11, 1),
-			Error::<Test>::InsufficientPermission
-		);
-		assert_noop!(
-			Treasury::spend(RuntimeOrigin::signed(12), 0, 21, 1),
-			Error::<Test>::InsufficientPermission
-		);
-		assert_noop!(
-			Treasury::spend(RuntimeOrigin::signed(13), 0, 51, 1),
-			Error::<Test>::InsufficientPermission
-		);
+		assert_noop!(Treasury::spend(RuntimeOrigin::signed(10), 0, 6, 1), BadOrigin);
+		assert_noop!(Treasury::spend(RuntimeOrigin::signed(11), 0, 11, 1), BadOrigin);
+		assert_noop!(Treasury::spend(RuntimeOrigin::signed(12), 0, 21, 1), BadOrigin);
+		assert_noop!(Treasury::spend(RuntimeOrigin::signed(13), 0, 51, 1), BadOrigin);
 	});
 }
 
@@ -241,13 +360,13 @@ fn spend_origin_works() {
 	new_test_ext().execute_with(|| {
 		// Check that accumulate works when we have Some value in Dummy already.
 		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
-		assert_ok!(Treasury::spend(RuntimeOrigin::signed(10), 0, 5, 6));
-		assert_ok!(Treasury::spend(RuntimeOrigin::signed(10), 0, 5, 6));
-		assert_ok!(Treasury::spend(RuntimeOrigin::signed(10), 0, 5, 6));
-		assert_ok!(Treasury::spend(RuntimeOrigin::signed(10), 0, 5, 6));
-		assert_ok!(Treasury::spend(RuntimeOrigin::signed(11), 0, 10, 6));
-		assert_ok!(Treasury::spend(RuntimeOrigin::signed(12), 0, 20, 6));
-		assert_ok!(Treasury::spend(RuntimeOrigin::signed(13), 0, 50, 6));
+		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, 5, 6));
+		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, 5, 6));
+		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, 5, 6));
+		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, 5, 6));
+		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, 10, 6));
+		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, 20, 6));
+		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, 50, 6));
 
 		<Treasury as OnInitialize<u64>>::on_initialize(1);
 		assert_eq!(Balances::free_balance(6), 0);
@@ -268,40 +387,11 @@ fn minting_works() {
 }
 
 #[test]
-fn spend_proposal_takes_min_deposit() {
-	new_test_ext().execute_with(|| {
-		assert_ok!(Treasury::propose_spend(RuntimeOrigin::signed(0), 0, 1, 3));
-		assert_eq!(Balances::free_balance(0), 100);
-		assert_eq!(Balances::reserved_balance(0), 0);
-	});
-}
-
-#[test]
-fn spend_proposal_takes_proportional_deposit() {
-	new_test_ext().execute_with(|| {
-		assert_ok!(Treasury::propose_spend(RuntimeOrigin::signed(0), 0, 100, 3));
-		assert_eq!(Balances::free_balance(0), 95);
-		assert_eq!(Balances::reserved_balance(0), 5);
-	});
-}
-
-#[test]
-fn spend_proposal_fails_when_proposer_poor() {
-	new_test_ext().execute_with(|| {
-		assert_noop!(
-			Treasury::propose_spend(RuntimeOrigin::signed(2), 0, 100, 3),
-			Error::<Test, _>::InsufficientProposersBalance,
-		);
-	});
-}
-
-#[test]
 fn accepted_spend_proposal_ignored_outside_spend_period() {
 	new_test_ext().execute_with(|| {
 		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
 
-		assert_ok!(Treasury::propose_spend(RuntimeOrigin::signed(0), 0, 100, 3));
-		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::root(), 0, 0));
+		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, 100, 3));
 
 		<Treasury as OnInitialize<u64>>::on_initialize(1);
 		assert_eq!(Balances::free_balance(3), 0);
@@ -323,75 +413,12 @@ fn unused_pot_should_diminish() {
 }
 
 #[test]
-fn rejected_spend_proposal_ignored_on_spend_period() {
-	new_test_ext().execute_with(|| {
-		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
-
-		assert_ok!(Treasury::propose_spend(RuntimeOrigin::signed(0), 0, 100, 3));
-		assert_ok!(Treasury::reject_proposal(RuntimeOrigin::root(), 0, 0));
-
-		<Treasury as OnInitialize<u64>>::on_initialize(2);
-		assert_eq!(Balances::free_balance(3), 0);
-		assert_eq!(Treasury::pot(0), 100);
-	});
-}
-
-#[test]
-fn reject_already_rejected_spend_proposal_fails() {
-	new_test_ext().execute_with(|| {
-		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
-
-		assert_ok!(Treasury::propose_spend(RuntimeOrigin::signed(0), 0, 100, 3));
-		assert_ok!(Treasury::reject_proposal(RuntimeOrigin::root(), 0, 0));
-		assert_noop!(
-			Treasury::reject_proposal(RuntimeOrigin::root(), 0, 0),
-			Error::<Test, _>::InvalidIndex
-		);
-	});
-}
-
-#[test]
-fn reject_non_existent_spend_proposal_fails() {
-	new_test_ext().execute_with(|| {
-		assert_noop!(
-			Treasury::reject_proposal(RuntimeOrigin::root(), 0, 0),
-			Error::<Test, _>::InvalidIndex
-		);
-	});
-}
-
-#[test]
-fn accept_non_existent_spend_proposal_fails() {
-	new_test_ext().execute_with(|| {
-		assert_noop!(
-			Treasury::approve_proposal(RuntimeOrigin::root(), 0, 0),
-			Error::<Test, _>::InvalidIndex
-		);
-	});
-}
-
-#[test]
-fn accept_already_rejected_spend_proposal_fails() {
-	new_test_ext().execute_with(|| {
-		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
-
-		assert_ok!(Treasury::propose_spend(RuntimeOrigin::signed(0), 0, 100, 3));
-		assert_ok!(Treasury::reject_proposal(RuntimeOrigin::root(), 0, 0));
-		assert_noop!(
-			Treasury::approve_proposal(RuntimeOrigin::root(), 0, 0),
-			Error::<Test, _>::InvalidIndex
-		);
-	});
-}
-
-#[test]
 fn accepted_spend_proposal_enacted_on_spend_period() {
 	new_test_ext().execute_with(|| {
 		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
 		assert_eq!(Treasury::pot(0), 100);
 
-		assert_ok!(Treasury::propose_spend(RuntimeOrigin::signed(0), 0, 100, 3));
-		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::root(), 0, 0));
+		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, 100, 3));
 
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 		assert_eq!(Balances::free_balance(3), 100);
@@ -405,8 +432,7 @@ fn pot_underflow_should_not_diminish() {
 		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
 		assert_eq!(Treasury::pot(0), 100);
 
-		assert_ok!(Treasury::propose_spend(RuntimeOrigin::signed(0), 0, 150, 3));
-		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::root(), 0, 0));
+		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, 150, 3));
 
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 		assert_eq!(Treasury::pot(0), 100); // Pot hasn't changed
@@ -430,14 +456,12 @@ fn treasury_account_doesnt_get_deleted() {
 		let treasury_balance =
 			Balances::free_balance(&<Test as Config>::DaoProvider::dao_account_id(0));
 
-		assert_ok!(Treasury::propose_spend(RuntimeOrigin::signed(0), 0, treasury_balance, 3));
-		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::root(), 0, 0));
+		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, treasury_balance, 3));
 
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 		assert_eq!(Treasury::pot(0), 100); // Pot hasn't changed
 
-		assert_ok!(Treasury::propose_spend(RuntimeOrigin::signed(0), 0, Treasury::pot(0), 3));
-		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::root(), 0, 1));
+		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, Treasury::pot(0), 3));
 
 		<Treasury as OnInitialize<u64>>::on_initialize(4);
 		assert_eq!(Treasury::pot(0), 0); // Pot is emptied
@@ -460,10 +484,8 @@ fn inexistent_account_works() {
 		assert_eq!(Balances::free_balance(<Test as Config>::DaoProvider::dao_account_id(0)), 0); // Account does not exist
 		assert_eq!(Treasury::pot(0), 0); // Pot is empty
 
-		assert_ok!(Treasury::propose_spend(RuntimeOrigin::signed(0), 0, 99, 3));
-		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::root(), 0, 0));
-		assert_ok!(Treasury::propose_spend(RuntimeOrigin::signed(0), 0, 1, 3));
-		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::root(), 0, 1));
+		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, 99, 3));
+		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, 1, 3));
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 		assert_eq!(Treasury::pot(0), 0); // Pot hasn't changed
 		assert_eq!(Balances::free_balance(3), 0); // Balance of `3` hasn't changed
@@ -506,37 +528,20 @@ fn genesis_funding_works() {
 #[test]
 fn max_approvals_limited() {
 	new_test_ext().execute_with(|| {
-		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), u64::MAX);
-		Balances::make_free_balance_be(&0, u64::MAX);
+		Balances::make_free_balance_be(
+			&<Test as Config>::DaoProvider::dao_account_id(0),
+			u128::MAX,
+		);
+		Balances::make_free_balance_be(&0, u128::MAX);
 
-		for _ in 0..<Test as Config>::MaxApprovals::get() {
-			assert_ok!(Treasury::propose_spend(RuntimeOrigin::signed(0), 0, 100, 3));
-			assert_ok!(Treasury::approve_proposal(RuntimeOrigin::root(), 0, 0));
+		for _ in 0..<<Test as Config>::MaxApprovals as sp_core::TypedGet>::get() {
+			assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, 100, 3));
 		}
 
 		// One too many will fail
-		assert_ok!(Treasury::propose_spend(RuntimeOrigin::signed(0), 0, 100, 3));
 		assert_noop!(
-			Treasury::approve_proposal(RuntimeOrigin::root(), 0, 0),
+			Treasury::spend(RuntimeOrigin::root(), 0, 100, 3),
 			Error::<Test, _>::TooManyApprovals
-		);
-	});
-}
-
-#[test]
-fn remove_already_removed_approval_fails() {
-	new_test_ext().execute_with(|| {
-		Balances::make_free_balance_be(&<Test as Config>::DaoProvider::dao_account_id(0), 101);
-
-		assert_ok!(Treasury::propose_spend(RuntimeOrigin::signed(0), 0, 100, 3));
-		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::root(), 0, 0));
-		assert_eq!(Treasury::approvals(0), vec![0]);
-		assert_ok!(Treasury::remove_approval(RuntimeOrigin::root(), 0, 0));
-		assert_eq!(Treasury::approvals(0), vec![]);
-
-		assert_noop!(
-			Treasury::remove_approval(RuntimeOrigin::root(), 0, 0),
-			Error::<Test, _>::ProposalNotApproved
 		);
 	});
 }

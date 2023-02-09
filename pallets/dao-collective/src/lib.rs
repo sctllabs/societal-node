@@ -508,7 +508,7 @@ pub mod pallet {
 				Self::do_propose_proposed(who, dao_id, proposal, length_bound, meta)?;
 
 			Ok(Some(T::WeightInfo::propose_proposed(
-				proposal_len as u32,  // B
+				proposal_len,         // B
 				members.len() as u32, // M
 				active_proposals,     // P2
 			))
@@ -731,7 +731,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		index: ProposalIndex,
 		approve: bool,
 	) -> Result<bool, DispatchError> {
-		let mut voting = Self::voting(dao_id, &proposal).ok_or(Error::<T, I>::ProposalMissing)?;
+		let mut voting = Self::voting(dao_id, proposal).ok_or(Error::<T, I>::ProposalMissing)?;
 		ensure!(voting.index == index, Error::<T, I>::WrongIndex);
 
 		let position_yes = voting.ayes.iter().position(|a| a == &who);
@@ -771,7 +771,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			no: no_votes,
 		});
 
-		Voting::<T, I>::insert(dao_id, &proposal, voting);
+		Voting::<T, I>::insert(dao_id, proposal, voting);
 
 		Ok(is_account_voting_first_time)
 	}
@@ -784,14 +784,15 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		proposal_weight_bound: Weight,
 		length_bound: u32,
 	) -> DispatchResultWithPostInfo {
-		let voting = Self::voting(dao_id, &proposal_hash).ok_or(Error::<T, I>::ProposalMissing)?;
+		let voting = Self::voting(dao_id, proposal_hash).ok_or(Error::<T, I>::ProposalMissing)?;
 		ensure!(voting.index == index, Error::<T, I>::WrongIndex);
 
 		let mut no_votes = voting.nays.len() as MemberCount;
 		let mut yes_votes = voting.ayes.len() as MemberCount;
 		let seats = Self::members(dao_id).len() as MemberCount;
+		// TODO: re-visit this
 		let approved = yes_votes >= voting.threshold;
-		let disapproved = seats.saturating_sub(no_votes) < voting.threshold;
+		let disapproved = seats.saturating_sub(no_votes) <= voting.threshold;
 		// Allow (dis-)approving the proposal as soon as there are enough votes.
 		if approved {
 			let (proposal, len) = Self::validate_and_get_proposal(
@@ -998,16 +999,8 @@ impl<T: Config<I>, I: 'static> ChangeDaoMembers<DaoId, T::AccountId> for Pallet<
 		for h in Self::proposals(dao_id).into_iter() {
 			<Voting<T, I>>::mutate(dao_id, h, |v| {
 				if let Some(mut votes) = v.take() {
-					votes.ayes = votes
-						.ayes
-						.into_iter()
-						.filter(|i| outgoing.binary_search(i).is_err())
-						.collect();
-					votes.nays = votes
-						.nays
-						.into_iter()
-						.filter(|i| outgoing.binary_search(i).is_err())
-						.collect();
+					votes.ayes.retain(|i| outgoing.binary_search(i).is_err());
+					votes.nays.retain(|i| outgoing.binary_search(i).is_err());
 					*v = Some(votes);
 				}
 			});
@@ -1085,10 +1078,10 @@ impl<O: Into<Result<RawOrigin<AccountId, I>, O>> + From<RawOrigin<AccountId, I>>
 
 	fn try_origin(o: O, arg: &DaoOrigin<AccountId>) -> Result<Self::Success, O> {
 		o.into().and_then(|o| match o {
-			RawOrigin::Members(n, m) => {
+			RawOrigin::Members(count, total) => {
 				if match arg.proportion {
-					DaoPolicyProportion::AtLeast((N, D)) => n * D >= N * m,
-					DaoPolicyProportion::MoreThan((N, D)) => n * D > N * m,
+					DaoPolicyProportion::AtLeast((n, d)) => count * d >= n * total,
+					DaoPolicyProportion::MoreThan((n, d)) => count * d > n * total,
 				} {
 					return Ok(())
 				}

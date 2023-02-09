@@ -117,11 +117,12 @@ lengthBound: 10000
 daoId: 0
 proposalHash: <proposal hash from the steps above>
 proposalIndex: 0
-proposalWeightBound: 1000000000
-lengthBound: 100
+refTime: 1000000000
+proofSize: 0
+lengthBound: 10000
 ```
 
-<img src="images/polkadotjs/Screenshot%202022-11-18%20at%2013.12.48.png" width="600" style="padding-left: 50px;">
+<img src="images/assets/Screenshot%202023-02-09%20at%2013.44.07.png" width="600" style="padding-left: 50px;">
 
 - Go to `Developer --> Chain State` and select `assets --> account` with the proposal target account and press `+` button
 
