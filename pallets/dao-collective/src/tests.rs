@@ -22,7 +22,7 @@
 
 use super::{Event as CollectiveEvent, *};
 use crate as pallet_dao_collective;
-use dao_primitives::{AccountTokenBalance, DaoToken};
+use dao_primitives::{AccountTokenBalance, BountyPayoutDelay, BountyUpdatePeriod, DaoToken};
 use frame_support::{
 	assert_noop, assert_ok, parameter_types,
 	traits::{ConstU32, ConstU64},
@@ -171,6 +171,8 @@ impl DaoProvider<H256> for TestDaoProvider {
 			proposal_period: 3,
 			approve_origin: DaoPolicyProportion::AtLeast((1, 2)),
 			governance: None,
+			bounty_payout_delay: BountyPayoutDelay(10),
+			bounty_update_period: BountyUpdatePeriod(10),
 		})
 	}
 
@@ -295,6 +297,7 @@ fn close_works() {
 					account: 1,
 					proposal_index: 0,
 					proposal_hash: hash,
+					proposal,
 					threshold: 1,
 					meta: None,
 				})),
@@ -443,6 +446,7 @@ fn close_with_no_prime_but_majority_works() {
 					account: 1,
 					proposal_index: 0,
 					proposal_hash: hash,
+					proposal,
 					threshold: 2,
 					meta: None,
 				})),
@@ -610,7 +614,7 @@ fn propose_works() {
 			proposal_len
 		));
 		assert_eq!(*Collective::proposals(0), vec![hash]);
-		assert_eq!(Collective::proposal_of(0, &hash), Some(proposal));
+		assert_eq!(Collective::proposal_of(0, &hash), Some(proposal.clone()));
 		assert_eq!(
 			Collective::voting(0, &hash),
 			Some(Votes { index: 0, threshold: 1, ayes: vec![], nays: vec![], end })
@@ -623,6 +627,7 @@ fn propose_works() {
 				account: 1,
 				proposal_index: 0,
 				proposal_hash: hash,
+				proposal,
 				threshold: 1,
 				meta: None,
 			}))]
@@ -811,6 +816,7 @@ fn motions_vote_after_works() {
 					account: 1,
 					proposal_index: 0,
 					proposal_hash: hash,
+					proposal,
 					threshold: 1,
 					meta: None,
 				})),
@@ -963,6 +969,7 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 					account: 1,
 					proposal_index: 0,
 					proposal_hash: hash,
+					proposal: proposal.clone(),
 					threshold: 1,
 					meta: None,
 				})),
@@ -1031,6 +1038,7 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 					account: 1,
 					proposal_index: 1,
 					proposal_hash: hash,
+					proposal,
 					threshold: 1,
 					meta: None,
 				})),
@@ -1113,6 +1121,7 @@ fn motions_disapproval_works() {
 					account: 1,
 					proposal_index: 0,
 					proposal_hash: hash,
+					proposal,
 					threshold: 1,
 					meta: None,
 				})),
@@ -1179,6 +1188,7 @@ fn motions_approval_works() {
 					account: 1,
 					proposal_index: 0,
 					proposal_hash: hash,
+					proposal,
 					threshold: 1,
 					meta: None,
 				})),
@@ -1238,6 +1248,7 @@ fn motion_with_no_votes_closes_with_disapproval() {
 				account: 1,
 				proposal_index: 0,
 				proposal_hash: hash,
+				proposal,
 				threshold: 1,
 				meta: None,
 			}))
@@ -1345,6 +1356,7 @@ fn disapprove_proposal_works() {
 					account: 1,
 					proposal_index: 0,
 					proposal_hash: hash,
+					proposal,
 					threshold: 1,
 					meta: None,
 				})),

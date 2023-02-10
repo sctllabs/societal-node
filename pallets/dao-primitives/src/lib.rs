@@ -15,6 +15,28 @@ use sp_std::prelude::*;
 
 pub type DispatchResultWithDaoOrigin<T> = Result<DaoOrigin<T>, DispatchError>;
 
+pub const DAY_IN_BLOCKS: u32 = 24 * 60 * 60 / 6;
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize, MaxEncodedLen,
+)]
+pub struct BountyPayoutDelay(pub u32);
+impl Default for BountyPayoutDelay {
+	fn default() -> Self {
+		BountyPayoutDelay(DAY_IN_BLOCKS)
+	}
+}
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize, MaxEncodedLen,
+)]
+pub struct BountyUpdatePeriod(pub u32);
+impl Default for BountyUpdatePeriod {
+	fn default() -> Self {
+		BountyUpdatePeriod(DAY_IN_BLOCKS)
+	}
+}
+
 #[derive(
 	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
@@ -77,6 +99,14 @@ pub struct DaoPolicy {
 	/// Governance settings
 	#[serde(default)]
 	pub governance: Option<DaoGovernance>,
+	/// The delay period for which a bounty beneficiary need to wait before claim the payout.
+	/// By default - 1 day. Considering the block time is set to 6 seconds - .
+	#[serde(default)]
+	pub bounty_payout_delay: BountyPayoutDelay,
+	/// Bounty duration in blocks.
+	/// Same as payout delay by default.
+	#[serde(default)]
+	pub bounty_update_period: BountyUpdatePeriod,
 }
 
 #[derive(

@@ -953,8 +953,8 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	// Removes a proposal from the pallet, cleaning up votes and the vector of proposals.
 	fn remove_proposal(dao_id: DaoId, proposal_hash: T::Hash) -> u32 {
 		// remove proposal and vote
-		ProposalOf::<T, I>::remove(dao_id, &proposal_hash);
-		Voting::<T, I>::remove(dao_id, &proposal_hash);
+		ProposalOf::<T, I>::remove(dao_id, proposal_hash);
+		Voting::<T, I>::remove(dao_id, proposal_hash);
 		let num_proposals = Proposals::<T, I>::mutate(dao_id, |proposals| {
 			proposals.retain(|h| h != &proposal_hash);
 			proposals.len() + 1 // calculate weight based on original length

@@ -4848,6 +4848,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-dao-bounties"
+version = "4.0.0-dev"
+dependencies = [
+ "dao-primitives",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-balances",
+ "pallet-dao-assets",
+ "pallet-dao-treasury",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-dao-collective"
 version = "4.0.0-dev"
 dependencies = [

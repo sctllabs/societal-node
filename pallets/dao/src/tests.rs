@@ -1,5 +1,7 @@
 use crate::{mock::*, BoundedVec, Config, Dao, DaoConfig, DaoPolicy, Error};
-use dao_primitives::{DaoPolicyProportion, DaoStatus, DaoToken};
+use dao_primitives::{
+	BountyPayoutDelay, BountyUpdatePeriod, DaoPolicyProportion, DaoStatus, DaoToken,
+};
 use frame_benchmarking::account;
 use frame_support::{
 	assert_noop, assert_ok,
@@ -181,7 +183,9 @@ fn create_dao_works() {
 			DaoPolicy {
 				proposal_period: 100,
 				approve_origin: DaoPolicyProportion::AtLeast((1, 2)),
-				governance: None
+				governance: None,
+				bounty_payout_delay: BountyPayoutDelay(14400),
+				bounty_update_period: BountyUpdatePeriod(14400),
 			}
 		);
 	});

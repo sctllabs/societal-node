@@ -9,7 +9,9 @@ use sp_runtime::{
 	traits::{AccountIdConversion, BlakeTwo256, IdentityLookup},
 };
 
-use dao_primitives::{AccountTokenBalance, DaoPolicyProportion, DaoToken};
+use dao_primitives::{
+	AccountTokenBalance, BountyPayoutDelay, BountyUpdatePeriod, DaoPolicyProportion, DaoToken,
+};
 use frame_support::{
 	ord_parameter_types, parameter_types,
 	traits::{AsEnsureOriginWithArg, ConstU32, ConstU64},
@@ -121,6 +123,8 @@ impl DaoProvider<H256> for TestDaoProvider {
 			proposal_period: 100,
 			approve_origin: DaoPolicyProportion::AtLeast((3, 5)),
 			governance: None,
+			bounty_payout_delay: BountyPayoutDelay(10),
+			bounty_update_period: BountyUpdatePeriod(10),
 		})
 	}
 
