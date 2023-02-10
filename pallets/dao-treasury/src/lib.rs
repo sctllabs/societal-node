@@ -408,14 +408,6 @@ pub mod pallet {
 impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	// Add public immutables and private mutables.
 
-	/// The account ID of the treasury pot.
-	///
-	/// This actually does computation. If you need to keep using it, then make sure you cache the
-	/// value and only call this once.
-	pub fn account_id() -> T::AccountId {
-		T::PalletId::get().into_account_truncating()
-	}
-
 	pub fn u128_to_balance_of(cost: u128) -> BalanceOf<T, I> {
 		TryInto::<BalanceOf<T, I>>::try_into(cost).ok().unwrap()
 	}
@@ -523,16 +515,5 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		T::ApproveOrigin::ensure_origin(origin, &dao_origin)?;
 
 		Ok(dao_origin)
-	}
-}
-
-impl<T: Config<I>, I: 'static> OnUnbalanced<NegativeImbalanceOf<T, I>> for Pallet<T, I> {
-	// TODO: revise for dao_id
-	fn on_nonzero_unbalanced(amount: NegativeImbalanceOf<T, I>) {
-		let numeric_amount = amount.peek();
-
-		T::Currency::resolve_creating(&Self::account_id(), amount);
-
-		Self::deposit_event(Event::Deposit { value: numeric_amount });
 	}
 }

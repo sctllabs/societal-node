@@ -3,6 +3,7 @@ members = [
     "node",
     "pallets/dao",
     "pallets/dao-assets",
+    "pallets/dao-bounties",
     "pallets/dao-collective",
     "pallets/dao-democracy",
     "pallets/dao-eth-governance",
