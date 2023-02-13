@@ -5,6 +5,9 @@ description = "Utils to write EVM precompiles."
 edition = "2021"
 version = "0.1.0"
 
+[lib]
+doctest = false
+
 [dependencies]
 affix = "0.1.2"
 hex = { version = "0.4.3", default-features = false }
