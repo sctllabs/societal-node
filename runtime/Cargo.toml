@@ -115,6 +115,7 @@ hex-literal = { version = "0.3.4", optional = true }
 # Local Dependencies
 pallet-dao = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao" }
 pallet-dao-assets = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-assets" }
+pallet-dao-bounties = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-bounties" }
 pallet-dao-collective = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-collective" }
 pallet-dao-collective-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao-collective" }
 pallet-dao-democracy = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-democracy" }
@@ -160,6 +161,7 @@ std = [
 	"pallet-conviction-voting/std",
 	"pallet-dao/std",
 	"pallet-dao-assets/std",
+	"pallet-dao-bounties/std",
 	"pallet-dao-collective/std",
 	"pallet-dao-democracy/std",
 	"pallet-dao-eth-governance/std",
@@ -236,6 +238,7 @@ runtime-benchmarks = [
 	"pallet-conviction-voting/runtime-benchmarks",
 	"pallet-democracy/runtime-benchmarks",
 	"pallet-dao/runtime-benchmarks",
+	"pallet-dao-bounties/runtime-benchmarks",
 	"pallet-dao-collective/runtime-benchmarks",
 	"pallet-dao-democracy/runtime-benchmarks",
 	"pallet-dao-membership/runtime-benchmarks",
@@ -272,6 +275,7 @@ try-runtime = [
 	"pallet-sudo/try-runtime",
 	"pallet-dao/try-runtime",
 	"pallet-dao-assets/try-runtime",
+	"pallet-dao-bounties/try-runtime",
 	"pallet-dao-collective/try-runtime",
 	"pallet-dao-membership/try-runtime",
 	"pallet-dao-treasury/try-runtime",

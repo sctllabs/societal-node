@@ -695,7 +695,7 @@ impl pallet_dao_treasury::Config for Runtime {
 	type SpendPeriod = SpendPeriod;
 	type Burn = Burn;
 	type BurnDestination = ();
-	type SpendFunds = ();
+	type SpendFunds = DaoBounties;
 	type WeightInfo = pallet_dao_treasury::weights::SubstrateWeight<Runtime>;
 	type MaxApprovals = MaxApprovals;
 	type DaoProvider = Dao;
@@ -1595,6 +1595,18 @@ impl pallet_dao_eth_governance::Config for Runtime {
 	type Preimages = Preimage;
 }
 
+parameter_types! {
+	pub const DaoMaximumReasonLength: u32 = 100;
+}
+
+impl pallet_dao_bounties::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Assets = Assets;
+	type MaximumReasonLength = DaoMaximumReasonLength;
+	type WeightInfo = pallet_dao_bounties::weights::SubstrateWeight<Runtime>;
+	type ChildBountyManager = ();
+}
+
 impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime
 where
 	RuntimeCall: From<LocalCall>,
@@ -1710,6 +1722,7 @@ construct_runtime!(
 		DaoTechnicalCommitteeMembers: pallet_dao_membership::<Instance2>,
 		DaoDemocracy: pallet_dao_democracy,
 		DaoEthGovernance: pallet_dao_eth_governance,
+		DaoBounties: pallet_dao_bounties,
 		Preimage: pallet_preimage,
 		Utility: pallet_utility,
 	}

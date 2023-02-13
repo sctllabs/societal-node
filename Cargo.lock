@@ -8524,6 +8524,7 @@ dependencies = [
  "pallet-conviction-voting",
  "pallet-dao",
  "pallet-dao-assets",
+ "pallet-dao-bounties",
  "pallet-dao-collective",
  "pallet-dao-collective-precompile",
  "pallet-dao-democracy",
