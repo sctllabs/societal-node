@@ -178,7 +178,6 @@ fn lowest_unbaked_zero() {
 
 // This test is currently failing. I believe it is caused by a bug in the underlying pallet. I've
 // asked about it in https://github.com/paritytech/substrate/issues/9739
-#[ignore]
 #[test]
 fn lowest_unbaked_non_zero() {
 	ExtBuilder::default()
@@ -861,7 +860,6 @@ fn undelegate_dne() {
 }
 
 #[test]
-#[ignore]
 fn unlock_works() {
 	ExtBuilder::default()
 		.with_balances(vec![(Alice.into(), 1000)])
