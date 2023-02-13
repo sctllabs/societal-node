@@ -45,10 +45,13 @@ use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 
 use sp_runtime::{
-	traits::{AccountIdConversion, Saturating, StaticLookup, Zero},
+	traits::{Saturating, StaticLookup, Zero},
 	Permill, RuntimeDebug,
 };
 use sp_std::prelude::*;
+
+#[cfg(feature = "runtime-benchmarks")]
+use sp_runtime::traits::AccountIdConversion;
 
 use frame_support::{
 	pallet_prelude::*,
