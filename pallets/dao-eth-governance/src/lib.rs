@@ -30,9 +30,9 @@ use sp_core::{bounded::BoundedVec, Hasher, H160};
 use sp_runtime::traits::{BlockNumberProvider, IntegerSquareRoot, Zero};
 use sp_std::iter::Sum;
 
+use eth_primitives::EthRpcProvider;
 use frame_support::pallet_prelude::*;
 use frame_system::{offchain::AppCrypto, pallet_prelude::*};
-use http_primitives::EthRpcProvider;
 use serde::Deserialize;
 
 use crate::vote::{AccountVote, Vote};
@@ -103,8 +103,8 @@ struct IndexingData<Hash>(Vec<u8>, OffchainData<Hash, BlockNumber>);
 pub mod pallet {
 	use super::*;
 	use crate::vote::Vote;
+	use eth_primitives::EthRpcService;
 	use frame_system::offchain::{CreateSignedTransaction, SubmitTransaction};
-	use http_primitives::EthHttpService;
 	use serde_json::json;
 	use sp_runtime::offchain::storage::StorageValueRef;
 
@@ -162,7 +162,7 @@ pub mod pallet {
 		/// The identifier type for an offchain worker.
 		type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
 
-		type OffchainHttpService: EthHttpService;
+		type OffchainEthService: EthRpcService;
 	}
 
 	/// The hashes of the active proposals by Dao.
@@ -282,8 +282,8 @@ pub mod pallet {
 						hash,
 						length_bound: _,
 					} => {
-						let block_number = match T::OffchainHttpService::parse_block_number(
-							T::OffchainHttpService::fetch_from_eth(
+						let block_number = match T::OffchainEthService::parse_block_number(
+							T::OffchainEthService::fetch_from_eth(
 								token_address.clone(),
 								Some(json!("eth_blockNumber")),
 								None,
@@ -297,8 +297,8 @@ pub mod pallet {
 							},
 						};
 
-						let total_supply = match T::OffchainHttpService::parse_token_balance(
-							T::OffchainHttpService::fetch_token_total_supply(
+						let total_supply = match T::OffchainEthService::parse_token_balance(
+							T::OffchainEthService::fetch_token_total_supply(
 								token_address.clone(),
 								None,
 							),
@@ -311,8 +311,8 @@ pub mod pallet {
 							},
 						};
 
-						match T::OffchainHttpService::parse_token_balance(
-							T::OffchainHttpService::fetch_token_balance_of(
+						match T::OffchainEthService::parse_token_balance(
+							T::OffchainEthService::fetch_token_balance_of(
 								token_address,
 								account_id,
 								None,
@@ -347,8 +347,8 @@ pub mod pallet {
 						account_id,
 						hash,
 						block_number,
-					} => match T::OffchainHttpService::parse_token_balance(
-						T::OffchainHttpService::fetch_token_balance_of(
+					} => match T::OffchainEthService::parse_token_balance(
+						T::OffchainEthService::fetch_token_balance_of(
 							token_address,
 							account_id,
 							Some(block_number),

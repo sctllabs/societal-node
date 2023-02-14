@@ -29,11 +29,11 @@ pub struct EthRPCResponse {
 	pub result: Vec<u8>,
 }
 
-pub struct HttpService<B: BlockNumberProvider + EthRpcProvider> {
+pub struct EthService<B: BlockNumberProvider + EthRpcProvider> {
 	_phantom: PhantomData<B>,
 }
 
-impl<B: BlockNumberProvider + EthRpcProvider> EthHttpService for HttpService<B> {
+impl<B: BlockNumberProvider + EthRpcProvider> EthRpcService for EthService<B> {
 	fn parse_block_number(
 		response: Result<EthRPCResponse, DispatchError>,
 	) -> Result<u32, DispatchError> {
@@ -207,7 +207,7 @@ impl<B: BlockNumberProvider + EthRpcProvider> EthHttpService for HttpService<B> 
 	}
 }
 
-impl EthHttpService for () {
+impl EthRpcService for () {
 	fn parse_block_number(
 		_response: Result<EthRPCResponse, DispatchError>,
 	) -> Result<u32, DispatchError> {
@@ -256,7 +256,7 @@ impl EthHttpService for () {
 	}
 }
 
-pub trait EthHttpService {
+pub trait EthRpcService {
 	fn parse_block_number(
 		response: Result<EthRPCResponse, DispatchError>,
 	) -> Result<u32, DispatchError>;

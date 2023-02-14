@@ -311,7 +311,7 @@ impl pallet_dao::Config for Test {
 	type DaoMaxCouncilMembers = ConstU32<20>;
 	type DaoMaxTechnicalCommitteeMembers = ConstU32<20>;
 	type TechnicalCommitteeProvider = TestTechnicalCommitteeProvider;
-	type OffchainHttpService = ();
+	type OffchainEthService = ();
 }
 
 // Build genesis storage according to the mock runtime.

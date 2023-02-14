@@ -118,7 +118,7 @@ pub use constants::{
 	time::*,
 	weight::MAXIMUM_BLOCK_WEIGHT,
 };
-use http_primitives::HttpService;
+use eth_primitives::EthService;
 
 mod precompiles;
 use precompiles::FrontierPrecompiles;
@@ -1576,7 +1576,7 @@ impl pallet_dao::Config for Runtime {
 	type TechnicalCommitteeProvider = DaoTechnicalCommitteeMembers;
 	type AssetProvider = Assets;
 	type AuthorityId = pallet_dao::crypto::TestAuthId;
-	type OffchainHttpService = HttpService<Dao>;
+	type OffchainEthService = EthService<Dao>;
 }
 
 parameter_types! {
@@ -1596,7 +1596,7 @@ impl pallet_dao_eth_governance::Config for Runtime {
 	type DaoProvider = Dao;
 	type Preimages = Preimage;
 	type AuthorityId = pallet_dao::crypto::TestAuthId;
-	type OffchainHttpService = HttpService<DaoEthGovernance>;
+	type OffchainEthService = EthService<DaoEthGovernance>;
 }
 
 impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime

@@ -1,5 +1,5 @@
 [package]
-name = "http-primitives"
+name = "eth-primitives"
 version = "4.0.0-dev"
 description = "Societal DAO HTTP Primitives"
 authors = ["Societal Labs <https://github.com/sctllabs"]

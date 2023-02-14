@@ -1637,6 +1637,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "eth-primitives"
+version = "4.0.0-dev"
+dependencies = [
+ "dao-primitives",
+ "frame-support",
+ "hex",
+ "log",
+ "node-primitives",
+ "parity-scale-codec",
+ "serde",
+ "serde_json",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "ethbloom"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2812,23 +2829,6 @@ dependencies = [
  "bytes",
  "http",
  "pin-project-lite 0.2.9",
-]
-
-[[package]]
-name = "http-primitives"
-version = "4.0.0-dev"
-dependencies = [
- "dao-primitives",
- "frame-support",
- "hex",
- "log",
- "node-primitives",
- "parity-scale-codec",
- "serde",
- "serde_json",
- "sp-io",
- "sp-runtime",
- "sp-std",
 ]
 
 [[package]]
@@ -4831,11 +4831,11 @@ name = "pallet-dao"
 version = "4.0.0-dev"
 dependencies = [
  "dao-primitives",
+ "eth-primitives",
  "frame-benchmarking",
  "frame-support",
  "frame-system",
  "hex",
- "http-primitives",
  "log",
  "pallet-balances",
  "parity-scale-codec",
@@ -4973,11 +4973,11 @@ name = "pallet-dao-eth-governance"
 version = "4.0.0-dev"
 dependencies = [
  "dao-primitives",
+ "eth-primitives",
  "frame-benchmarking",
  "frame-support",
  "frame-system",
  "hex",
- "http-primitives",
  "log",
  "pallet-dao-democracy",
  "parity-scale-codec",
@@ -8515,6 +8515,7 @@ dependencies = [
 name = "societal-node-runtime"
 version = "4.0.0-dev"
 dependencies = [
+ "eth-primitives",
  "fp-rpc",
  "fp-self-contained",
  "frame-benchmarking",
@@ -8526,7 +8527,6 @@ dependencies = [
  "frame-system-rpc-runtime-api",
  "frame-try-runtime",
  "hex-literal",
- "http-primitives",
  "log",
  "node-primitives",
  "pallet-asset-tx-payment",

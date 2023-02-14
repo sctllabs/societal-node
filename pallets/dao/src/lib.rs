@@ -24,7 +24,7 @@ use sp_runtime::{
 use sp_std::{prelude::*, str};
 
 use dao_primitives::*;
-use http_primitives::EthRpcProvider;
+use eth_primitives::EthRpcProvider;
 
 #[cfg(test)]
 mod mock;
@@ -123,11 +123,11 @@ struct IndexingData<Hash>(Vec<u8>, OffchainData<Hash>);
 #[frame_support::pallet]
 pub mod pallet {
 	pub use super::*;
+	use eth_primitives::EthRpcService;
 	use frame_system::{
 		offchain::{AppCrypto, CreateSignedTransaction, SubmitTransaction},
 		pallet_prelude::*,
 	};
-	use http_primitives::EthHttpService;
 	use sp_runtime::{
 		offchain::storage::StorageValueRef,
 		traits::{Hash, Zero},
@@ -211,7 +211,7 @@ pub mod pallet {
 		/// The identifier type for an offchain worker.
 		type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
 
-		type OffchainHttpService: EthHttpService;
+		type OffchainEthService: EthRpcService;
 	}
 
 	/// Origin for the dao pallet.
@@ -281,8 +281,8 @@ pub mod pallet {
 				let mut call = None;
 				if let OffchainData::ApproveDao { dao_hash, token_address } = offchain_data.clone()
 				{
-					match T::OffchainHttpService::parse_token_balance(
-						T::OffchainHttpService::fetch_token_total_supply(token_address, None),
+					match T::OffchainEthService::parse_token_balance(
+						T::OffchainEthService::fetch_token_total_supply(token_address, None),
 					) {
 						Ok(total_supply) => {
 							call = Some(Call::approve_dao { dao_hash, approve: total_supply > 0 });
