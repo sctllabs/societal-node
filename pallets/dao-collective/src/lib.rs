@@ -269,6 +269,7 @@ pub mod pallet {
 		Voted {
 			dao_id: DaoId,
 			account: T::AccountId,
+			proposal_index: ProposalIndex,
 			proposal_hash: T::Hash,
 			voted: bool,
 			yes: MemberCount,
@@ -285,8 +286,6 @@ pub mod pallet {
 			proposal_hash: T::Hash,
 			result: DispatchResult,
 		},
-		/// A single member did some action; result will be `Ok` if it returned without error.
-		MemberExecuted { dao_id: DaoId, proposal_hash: T::Hash, result: DispatchResult },
 		/// A proposal was closed because its threshold was reached or after its duration was up.
 		Closed {
 			dao_id: DaoId,
@@ -727,6 +726,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		Self::deposit_event(Event::Voted {
 			dao_id,
 			account: who,
+			proposal_index: index,
 			proposal_hash: proposal,
 			voted: approve,
 			yes: yes_votes,
