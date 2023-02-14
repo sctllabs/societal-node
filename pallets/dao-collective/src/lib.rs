@@ -407,55 +407,6 @@ pub mod pallet {
 			.into())
 		}
 
-		/// Dispatch a proposal from a member using the `Member` origin.
-		///
-		/// Origin must be a member of the collective.
-		///
-		/// # <weight>
-		/// ## Weight
-		/// - `O(M + P)` where `M` members-count (code-bounded) and `P` complexity of dispatching
-		///   `proposal`
-		/// - DB: 1 read (codec `O(M)`) + DB access of `proposal`
-		/// - 1 event
-		/// # </weight>
-		#[pallet::weight((
-			T::WeightInfo::execute(
-				*length_bound, // B
-				T::MaxMembers::get(), // M
-			).saturating_add(proposal.get_dispatch_info().weight), // P
-			DispatchClass::Operational
-		))]
-		pub fn execute(
-			origin: OriginFor<T>,
-			dao_id: DaoId,
-			proposal: Box<<T as Config<I>>::Proposal>,
-			#[pallet::compact] length_bound: u32,
-		) -> DispatchResultWithPostInfo {
-			let who = ensure_signed(origin)?;
-			let members = Self::members(dao_id);
-			ensure!(members.contains(&who), Error::<T, I>::NotMember);
-			let proposal_len = proposal.encoded_size();
-			ensure!(proposal_len <= length_bound as usize, Error::<T, I>::WrongProposalLength);
-
-			let proposal_hash = T::Hashing::hash_of(&proposal);
-			let result = proposal.dispatch(RawOrigin::Member(who).into());
-			Self::deposit_event(Event::MemberExecuted {
-				dao_id,
-				proposal_hash,
-				result: result.map(|_| ()).map_err(|e| e.error),
-			});
-
-			Ok(get_result_weight(result)
-				.map(|w| {
-					T::WeightInfo::execute(
-						proposal_len as u32,  // B
-						members.len() as u32, // M
-					)
-					.saturating_add(w) // P
-				})
-				.into())
-		}
-
 		/// Add a new proposal to either be voted on or executed directly.
 		///
 		/// Requires the sender to be member.

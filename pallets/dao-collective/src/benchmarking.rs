@@ -105,35 +105,6 @@ benchmarks_instance_pallet! {
 		assert_eq!(Collective::<T, I>::members(0), new_members);
 	}
 
-	execute {
-		let b in 1 .. MAX_BYTES;
-		let m in 1 .. T::MaxMembers::get();
-
-		let bytes_in_storage = b + size_of::<u32>() as u32;
-
-		// Construct `members`.
-		let mut members = vec![];
-		for i in 0 .. m - 1 {
-			let member = account::<T::AccountId>("member", i, SEED);
-			members.push(member);
-		}
-
-		let caller: T::AccountId = whitelisted_caller();
-		members.push(caller.clone());
-
-		Collective::<T, I>::set_members(SystemOrigin::Root.into(), 0, members, T::MaxMembers::get())?;
-
-		let proposal: T::Proposal = SystemCall::<T>::remark { remark: vec![1; b as usize] }.into();
-
-	}: _(SystemOrigin::Signed(caller), 0, Box::new(proposal.clone()), bytes_in_storage)
-	verify {
-		let proposal_hash = T::Hashing::hash_of(&proposal);
-		// Note that execution fails due to mis-matched origin
-		assert_last_event::<T, I>(
-			Event::MemberExecuted { dao_id: 0, proposal_hash, result: Err(DispatchError::BadOrigin) }.into()
-		);
-	}
-
 	// This tests when execution would happen immediately after proposal
 	propose_execute {
 		let b in 1 .. MAX_BYTES;
