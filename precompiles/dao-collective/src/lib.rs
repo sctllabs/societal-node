@@ -101,44 +101,6 @@ where
 	H256: From<<Runtime as frame_system::Config>::Hash>
 		+ Into<<Runtime as frame_system::Config>::Hash>,
 {
-	#[precompile::public("execute(uint32,bytes)")]
-	fn execute(
-		handle: &mut impl PrecompileHandle,
-		dao_id: DaoId,
-		proposal: BoundedBytes<GetProposalLimit>,
-	) -> EvmResult {
-		let proposal: Vec<_> = proposal.into();
-		let proposal_hash: H256 = hash::<Runtime>(&proposal);
-		let proposal_length: u32 = proposal.len().try_into().map_err(|_| {
-			RevertReason::value_is_too_large("uint32")
-				.in_field("length")
-				.in_field("proposal")
-		})?;
-
-		let proposal = Runtime::RuntimeCall::decode(&mut &*proposal)
-			.map_err(|_| RevertReason::custom("Failed to decode proposal").in_field("proposal"))?
-			.into();
-		let proposal = Box::new(proposal);
-
-		let origin = Runtime::AddressMapping::into_account_id(handle.context().caller);
-		RuntimeHelper::<Runtime>::try_dispatch(
-			handle,
-			Some(origin).into(),
-			pallet_dao_collective::Call::<Runtime, Instance>::execute {
-				dao_id,
-				proposal,
-				length_bound: proposal_length,
-			},
-		)?;
-
-		let log = log_executed(handle.context().address, dao_id, proposal_hash);
-
-		handle.record_log_costs(&[&log])?;
-		log.record(handle)?;
-
-		Ok(())
-	}
-
 	#[precompile::public("propose(uint32,bytes)")]
 	fn propose(
 		handle: &mut impl PrecompileHandle,

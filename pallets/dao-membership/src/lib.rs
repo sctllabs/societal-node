@@ -123,11 +123,11 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config<I>, I: 'static = ()> {
 		/// The given member was added; see the transaction for who.
-		MemberAdded,
+		MemberAdded { dao_id: DaoId, member: T::AccountId },
 		/// The given member was removed; see the transaction for who.
-		MemberRemoved,
+		MemberRemoved { dao_id: DaoId, member: T::AccountId },
 		/// Two members were swapped; see the transaction for who.
-		MembersSwapped,
+		MembersSwapped { dao_id: DaoId, remove: T::AccountId, add: T::AccountId },
 		/// The membership was reset; see the transaction for who the new set is.
 		MembersReset,
 		/// One of the members' keys changed.
@@ -167,9 +167,9 @@ pub mod pallet {
 
 			<Members<T, I>>::insert(dao_id, &members);
 
-			T::MembershipChanged::change_members_sorted(dao_id, &[who], &[], &members[..]);
+			T::MembershipChanged::change_members_sorted(dao_id, &[who.clone()], &[], &members[..]);
 
-			Self::deposit_event(Event::MemberAdded);
+			Self::deposit_event(Event::MemberAdded { dao_id, member: who });
 			Ok(())
 		}
 
@@ -190,9 +190,9 @@ pub mod pallet {
 
 			<Members<T, I>>::insert(dao_id, &members);
 
-			T::MembershipChanged::change_members_sorted(dao_id, &[], &[who], &members[..]);
+			T::MembershipChanged::change_members_sorted(dao_id, &[], &[who.clone()], &members[..]);
 
-			Self::deposit_event(Event::MemberRemoved);
+			Self::deposit_event(Event::MemberRemoved { dao_id, member: who });
 			Ok(())
 		}
 
@@ -220,9 +220,14 @@ pub mod pallet {
 
 			<Members<T, I>>::insert(dao_id, &members);
 
-			T::MembershipChanged::change_members_sorted(dao_id, &[add], &[remove], &members[..]);
+			T::MembershipChanged::change_members_sorted(
+				dao_id,
+				&[add.clone()],
+				&[remove.clone()],
+				&members[..],
+			);
 
-			Self::deposit_event(Event::MembersSwapped);
+			Self::deposit_event(Event::MembersSwapped { dao_id, remove, add });
 			Ok(())
 		}
 

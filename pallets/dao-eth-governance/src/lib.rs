@@ -459,34 +459,33 @@ pub mod pallet {
 		Voted {
 			dao_id: DaoId,
 			account: T::AccountId,
+			proposal_index: ProposalIndex,
 			proposal_hash: T::Hash,
 			vote: Vote<BalanceOf<T>>,
 		},
 		/// A motion was approved by the required threshold.
 		Approved {
 			dao_id: DaoId,
+			proposal_index: ProposalIndex,
 			proposal_hash: T::Hash,
 		},
 		/// A motion was not approved by the required threshold.
 		Disapproved {
 			dao_id: DaoId,
+			proposal_index: ProposalIndex,
 			proposal_hash: T::Hash,
 		},
 		/// A motion was executed; result will be `Ok` if it returned without error.
 		Executed {
 			dao_id: DaoId,
-			proposal_hash: T::Hash,
-			result: DispatchResult,
-		},
-		/// A single member did some action; result will be `Ok` if it returned without error.
-		MemberExecuted {
-			dao_id: DaoId,
+			proposal_index: ProposalIndex,
 			proposal_hash: T::Hash,
 			result: DispatchResult,
 		},
 		/// A proposal was closed because its threshold was reached or after its duration was up.
 		Closed {
 			dao_id: DaoId,
+			proposal_index: ProposalIndex,
 			proposal_hash: T::Hash,
 			ayes: BalanceOf<T>,
 			nays: BalanceOf<T>,
@@ -830,7 +829,13 @@ impl<T: Config> Pallet<T> {
 			}
 		}
 
-		Self::deposit_event(Event::Voted { dao_id, account: who, proposal_hash: proposal, vote });
+		Self::deposit_event(Event::Voted {
+			dao_id,
+			account: who,
+			proposal_index: index,
+			proposal_hash: proposal,
+			vote,
+		});
 
 		Voting::<T>::insert(dao_id, proposal, voting);
 
@@ -872,21 +877,23 @@ impl<T: Config> Pallet<T> {
 			Self::deposit_event(Event::Closed {
 				dao_id,
 				proposal_hash,
+				proposal_index: index,
 				ayes: ayes_balance,
 				nays: nays_balance,
 			});
 			let (_proposal_weight, _proposal_count) =
-				Self::do_approve_proposal(dao_id, proposal_hash, proposal);
+				Self::do_approve_proposal(dao_id, index, proposal_hash, proposal);
 			return Ok((Some(Weight::from_ref_time(0)), Pays::Yes).into())
 		} else if disapproved {
 			Self::deposit_event(Event::Closed {
 				dao_id,
+				proposal_index: index,
 				proposal_hash,
 				ayes: ayes_balance,
 				nays: nays_balance,
 			});
 
-			let _proposal_count = Self::do_disapprove_proposal(dao_id, proposal_hash);
+			let _proposal_count = Self::do_disapprove_proposal(dao_id, index, proposal_hash);
 			return Ok((Some(Weight::from_ref_time(0)), Pays::No).into())
 		}
 
@@ -936,10 +943,11 @@ impl<T: Config> Pallet<T> {
 	/// - `P` is number of active proposals
 	fn do_approve_proposal(
 		dao_id: DaoId,
+		proposal_index: ProposalIndex,
 		proposal_hash: T::Hash,
 		proposal: <T as Config>::Proposal,
 	) -> (Weight, u32) {
-		Self::deposit_event(Event::Approved { dao_id, proposal_hash });
+		Self::deposit_event(Event::Approved { dao_id, proposal_index, proposal_hash });
 
 		let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
 
@@ -948,6 +956,7 @@ impl<T: Config> Pallet<T> {
 		let result = proposal.dispatch(origin);
 		Self::deposit_event(Event::Executed {
 			dao_id,
+			proposal_index,
 			proposal_hash,
 			result: result.map(|_| ()).map_err(|e| e.error),
 		});
@@ -959,9 +968,13 @@ impl<T: Config> Pallet<T> {
 	}
 
 	/// Removes a proposal from the pallet, and deposit the `Disapproved` event.
-	pub fn do_disapprove_proposal(dao_id: DaoId, proposal_hash: T::Hash) -> u32 {
+	pub fn do_disapprove_proposal(
+		dao_id: DaoId,
+		proposal_index: ProposalIndex,
+		proposal_hash: T::Hash,
+	) -> u32 {
 		// disapproved
-		Self::deposit_event(Event::Disapproved { dao_id, proposal_hash });
+		Self::deposit_event(Event::Disapproved { dao_id, proposal_index, proposal_hash });
 		Self::remove_proposal(dao_id, proposal_hash)
 	}
 
