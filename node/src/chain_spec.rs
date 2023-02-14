@@ -4,10 +4,11 @@ use sc_service::ChainType;
 use serde::{Deserialize, Serialize};
 use societal_node_runtime::{
 	opaque::Block, wasm_binary_unwrap, AccountId, AuthorityDiscoveryConfig, BabeConfig, Balance,
-	BalancesConfig, CouncilConfig, DaoConfig, DemocracyConfig, EVMChainIdConfig, EVMConfig,
-	ElectionsConfig, GenesisConfig, GrandpaConfig, ImOnlineConfig, IndicesConfig, MaxNominations,
-	NominationPoolsConfig, SessionConfig, SessionKeys, Signature, SocietyConfig, StakerStatus,
-	StakingConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, DOLLARS,
+	BalancesConfig, CouncilConfig, DaoConfig, DaoEthGovernanceConfig, DemocracyConfig,
+	EVMChainIdConfig, EVMConfig, ElectionsConfig, GenesisConfig, GrandpaConfig, ImOnlineConfig,
+	IndicesConfig, MaxNominations, NominationPoolsConfig, SessionConfig, SessionKeys, Signature,
+	SocietyConfig, StakerStatus, StakingConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig,
+	DOLLARS,
 };
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_consensus_babe::AuthorityId as BabeId;
@@ -379,6 +380,12 @@ pub fn testnet_genesis(
 		base_fee: Default::default(),
 		dao: {
 			DaoConfig { eth_rpc_url: eth_rpc_url.as_bytes().to_vec(), _phantom: Default::default() }
+		},
+		dao_eth_governance: {
+			DaoEthGovernanceConfig {
+				eth_rpc_url: eth_rpc_url.as_bytes().to_vec(),
+				_phantom: Default::default(),
+			}
 		},
 	}
 }

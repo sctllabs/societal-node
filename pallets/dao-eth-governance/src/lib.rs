@@ -7,9 +7,10 @@ use sp_runtime::{traits::Hash, Saturating};
 use sp_std::{prelude::*, str};
 
 use dao_primitives::{
-	AccountTokenBalance, ApprovePropose, ApproveVote, DaoPolicy, DaoProvider, PendingProposal,
-	PendingVote, RawOrigin,
+	AccountTokenBalance, DaoPolicy, DaoProvider, DaoToken, PendingProposal, PendingVote, RawOrigin,
 };
+
+use sp_io::offchain_index;
 
 // TODO
 use pallet_dao_democracy::vote_threshold::compare_rationals;
@@ -26,8 +27,13 @@ use frame_support::{
 	Parameter,
 };
 use sp_core::{bounded::BoundedVec, Hasher, H160};
-use sp_runtime::traits::{IntegerSquareRoot, Zero};
+use sp_runtime::traits::{BlockNumberProvider, IntegerSquareRoot, Zero};
 use sp_std::iter::Sum;
+
+use eth_primitives::EthRpcProvider;
+use frame_support::pallet_prelude::*;
+use frame_system::{offchain::AppCrypto, pallet_prelude::*};
+use serde::Deserialize;
 
 use crate::vote::{AccountVote, Vote};
 pub use pallet::*;
@@ -45,7 +51,33 @@ pub type TokenSupply = u128;
 /// Simple index type for proposal counting.
 pub type ProposalIndex = u32;
 
+pub type BlockNumber = u32;
+
 pub type BoundedProposal<T> = Bounded<<T as Config>::Proposal>;
+
+const UNSIGNED_TXS_PRIORITY: u64 = 100;
+
+const ONCHAIN_TX_KEY: &[u8] = b"societal-dao-eth-gov::storage::tx";
+
+#[derive(Debug, Encode, Decode, Clone, Default, Deserialize, PartialEq, Eq)]
+pub enum OffchainData<Hash, BlockNumber> {
+	#[default]
+	Default,
+	ApproveProposal {
+		dao_id: u32,
+		token_address: Vec<u8>,
+		account_id: Vec<u8>,
+		hash: Hash,
+		length_bound: u32,
+	},
+	ApproveVote {
+		dao_id: u32,
+		token_address: Vec<u8>,
+		account_id: Vec<u8>,
+		hash: Hash,
+		block_number: BlockNumber,
+	},
+}
 
 /// Info for keeping track of a motion being voted on.
 #[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen)]
@@ -64,12 +96,17 @@ pub struct Votes<BlockNumber, VotingSet> {
 	block_number: u32,
 }
 
+#[derive(Debug, Deserialize, Encode, Decode, Default)]
+struct IndexingData<Hash>(Vec<u8>, OffchainData<Hash, BlockNumber>);
+
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 	use crate::vote::Vote;
-	use frame_support::pallet_prelude::*;
-	use frame_system::pallet_prelude::*;
+	use eth_primitives::EthRpcService;
+	use frame_system::offchain::{CreateSignedTransaction, SubmitTransaction};
+	use serde_json::json;
+	use sp_runtime::offchain::storage::StorageValueRef;
 
 	/// The current storage version.
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
@@ -81,7 +118,7 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
 		/// The outer event type.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -102,6 +139,9 @@ pub mod pallet {
 		#[pallet::constant]
 		type ProposalMetadataLimit: Get<u32>;
 
+		#[pallet::constant]
+		type EthRpcUrlLimit: Get<u32>;
+
 		/// Maximum number of proposals allowed to be active in parallel.
 		type MaxProposals: Get<ProposalIndex>;
 
@@ -118,6 +158,11 @@ pub mod pallet {
 
 		/// The preimage provider with which we look up call hashes to get the call.
 		type Preimages: QueryPreimage + StorePreimage;
+
+		/// The identifier type for an offchain worker.
+		type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
+
+		type OffchainEthService: EthRpcService;
 	}
 
 	/// The hashes of the active proposals by Dao.
@@ -185,6 +230,202 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn proposal_count)]
 	pub type ProposalCount<T: Config> = StorageMap<_, Twox64Concat, DaoId, u32, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn eth_rpc_url)]
+	pub type EthRpcUrl<T> =
+		StorageValue<_, BoundedVec<u8, <T as Config>::EthRpcUrlLimit>, ValueQuery>;
+
+	#[pallet::genesis_config]
+	pub struct GenesisConfig<T: Config> {
+		pub eth_rpc_url: Vec<u8>,
+		pub _phantom: PhantomData<T>,
+	}
+
+	#[cfg(feature = "std")]
+	impl<T: Config> Default for GenesisConfig<T> {
+		fn default() -> Self {
+			GenesisConfig { eth_rpc_url: Default::default(), _phantom: Default::default() }
+		}
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
+		fn build(&self) {
+			EthRpcUrl::<T>::put(
+				BoundedVec::<u8, T::EthRpcUrlLimit>::try_from(self.eth_rpc_url.clone()).unwrap(),
+			);
+		}
+	}
+
+	#[pallet::hooks]
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn offchain_worker(block_number: T::BlockNumber) {
+			let key = Self::derived_key(block_number);
+			let storage_ref = StorageValueRef::persistent(&key);
+
+			if let Ok(Some(data)) = storage_ref.get::<IndexingData<T::Hash>>() {
+				log::info!(
+					"off-chain indexing data: {:?}, {:?}",
+					str::from_utf8(&data.0).unwrap_or("error"),
+					data.1
+				);
+
+				let offchain_data = data.1;
+
+				let mut call = None;
+				match offchain_data.clone() {
+					OffchainData::ApproveProposal {
+						dao_id,
+						token_address,
+						account_id,
+						hash,
+						length_bound: _,
+					} => {
+						let block_number = match T::OffchainEthService::parse_block_number(
+							T::OffchainEthService::fetch_from_eth(
+								token_address.clone(),
+								Some(json!("eth_blockNumber")),
+								None,
+							),
+						) {
+							Ok(block_number) => block_number,
+							Err(e) => {
+								log::error!("offchain_worker error: {:?}", e);
+
+								0
+							},
+						};
+
+						let total_supply = match T::OffchainEthService::parse_token_balance(
+							T::OffchainEthService::fetch_token_total_supply(
+								token_address.clone(),
+								None,
+							),
+						) {
+							Ok(total_supply) => total_supply,
+							Err(e) => {
+								log::error!("offchain_worker error: {:?}", e);
+
+								0
+							},
+						};
+
+						match T::OffchainEthService::parse_token_balance(
+							T::OffchainEthService::fetch_token_balance_of(
+								token_address,
+								account_id,
+								None,
+							),
+						) {
+							Ok(token_balance) => {
+								call = Some(Call::approve_propose {
+									dao_id,
+									threshold: total_supply,
+									block_number,
+									hash,
+									// TODO: add to DAO settings?
+									approve: total_supply > 0 && token_balance > 0,
+								});
+							},
+							Err(e) => {
+								log::error!("offchain_worker error: {:?}", e);
+
+								call = Some(Call::approve_propose {
+									dao_id,
+									threshold: total_supply,
+									block_number,
+									hash,
+									approve: false,
+								});
+							},
+						}
+					},
+					OffchainData::ApproveVote {
+						dao_id,
+						token_address,
+						account_id,
+						hash,
+						block_number,
+					} => match T::OffchainEthService::parse_token_balance(
+						T::OffchainEthService::fetch_token_balance_of(
+							token_address,
+							account_id,
+							Some(block_number),
+						),
+					) {
+						Ok(token_balance) => {
+							call = Some(Call::approve_vote {
+								dao_id,
+								hash,
+								approve: token_balance > 0,
+							});
+						},
+						Err(e) => {
+							log::error!("offchain_worker error: {:?}", e);
+
+							call = Some(Call::approve_vote { dao_id, hash, approve: false });
+						},
+					},
+					_ => {},
+				};
+
+				if call.is_none() {
+					return
+				}
+
+				let result = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(
+					call.unwrap().into(),
+				)
+				.map_err(|_| {
+					log::error!("Failed in offchain_unsigned_tx");
+					<Error<T>>::OffchainUnsignedTxError
+				});
+
+				if result.is_err() {
+					match offchain_data {
+						OffchainData::ApproveProposal { dao_id, hash, .. } => {
+							log::error!(
+								"proposal approval error: dao_id: {:?}, proposal_hash: {:?}",
+								dao_id,
+								hash
+							);
+						},
+						OffchainData::ApproveVote { dao_id, hash, .. } => {
+							log::error!(
+								"vote approval error: dao_id: {:?}, proposal_hash: {:?}",
+								dao_id,
+								hash
+							);
+						},
+						_ => {},
+					}
+				}
+			}
+		}
+	}
+
+	#[pallet::validate_unsigned]
+	impl<T: Config> frame_support::unsigned::ValidateUnsigned for Pallet<T> {
+		type Call = Call<T>;
+
+		fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+			let valid_tx = |provide| {
+				ValidTransaction::with_tag_prefix("societal-node")
+					.priority(UNSIGNED_TXS_PRIORITY)
+					.and_provides([&provide])
+					.longevity(3)
+					.propagate(true)
+					.build()
+			};
+
+			match call {
+				Call::approve_propose { .. } => valid_tx(b"approve_propose".to_vec()),
+				Call::approve_vote { .. } => valid_tx(b"approve_vote".to_vec()),
+				_ => InvalidTransaction::Call.into(),
+			}
+		}
+	}
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -285,6 +526,8 @@ pub mod pallet {
 		InvalidInput,
 		/// Metadata size exceeds the limits
 		MetadataTooLong,
+		OffchainUnsignedTxError,
+		NotSupported,
 	}
 
 	#[pallet::call]
@@ -319,12 +562,8 @@ pub mod pallet {
 
 			let proposal_hash = T::Hashing::hash_of(&proposal);
 
-			let account_token_balance = T::DaoProvider::ensure_eth_proposal_allowed(
-				dao_id,
-				account_id,
-				proposal_hash,
-				length_bound,
-			)?;
+			let account_token_balance =
+				Self::ensure_proposal_allowed(dao_id, account_id, proposal_hash, length_bound)?;
 
 			let meta = match meta.clone() {
 				Some(metadata) => BoundedVec::<u8, T::ProposalMetadataLimit>::try_from(metadata)
@@ -384,7 +623,7 @@ pub mod pallet {
 
 			let pending_vote_hash = T::Hashing::hash_of(&pending_vote);
 
-			let account_token_balance = T::DaoProvider::ensure_eth_voting_allowed(
+			let account_token_balance = Self::ensure_voting_allowed(
 				dao_id,
 				account_id,
 				pending_vote_hash,
@@ -437,6 +676,36 @@ pub mod pallet {
 			let _ = ensure_signed(origin)?;
 
 			Self::do_close(dao_id, proposal_hash, index, proposal_weight_bound, length_bound)
+		}
+
+		#[pallet::weight(10_000)]
+		pub fn approve_propose(
+			origin: OriginFor<T>,
+			dao_id: u32,
+			threshold: u128,
+			block_number: u32,
+			hash: T::Hash,
+			approve: bool,
+		) -> DispatchResult {
+			ensure_none(origin)?;
+
+			Self::do_approve_propose(dao_id, threshold, block_number, hash, approve)?;
+
+			Ok(())
+		}
+
+		#[pallet::weight(10_000)]
+		pub fn approve_vote(
+			origin: OriginFor<T>,
+			dao_id: u32,
+			hash: T::Hash,
+			approve: bool,
+		) -> DispatchResult {
+			ensure_none(origin)?;
+
+			Self::do_approve_vote(dao_id, hash, approve)?;
+
+			Ok(())
 		}
 	}
 }
@@ -708,6 +977,18 @@ impl<T: Config> Pallet<T> {
 		num_proposals as u32
 	}
 
+	#[deny(clippy::clone_double_ref)]
+	pub(crate) fn derived_key(block_number: T::BlockNumber) -> Vec<u8> {
+		block_number.using_encoded(|encoded_bn| {
+			ONCHAIN_TX_KEY
+				.iter()
+				.chain(b"/".iter())
+				.chain(encoded_bn)
+				.copied()
+				.collect::<Vec<u8>>()
+		})
+	}
+
 	/// Validating account_id provided as an argument against call signer
 	fn validate_account(
 		signer: T::AccountId,
@@ -732,10 +1013,8 @@ impl<T: Config> Pallet<T> {
 
 		Ok(account_id_stripped.as_bytes().to_vec())
 	}
-}
 
-impl<T: Config> ApprovePropose<DaoId, T::AccountId, TokenSupply, T::Hash> for Pallet<T> {
-	fn approve_propose(
+	fn do_approve_propose(
 		dao_id: DaoId,
 		threshold: TokenSupply,
 		block_number: u32,
@@ -761,10 +1040,8 @@ impl<T: Config> ApprovePropose<DaoId, T::AccountId, TokenSupply, T::Hash> for Pa
 
 		Ok(())
 	}
-}
 
-impl<T: Config> ApproveVote<DaoId, T::AccountId, T::Hash> for Pallet<T> {
-	fn approve_vote(dao_id: DaoId, hash: T::Hash, approve: bool) -> Result<(), DispatchError> {
+	fn do_approve_vote(dao_id: DaoId, hash: T::Hash, approve: bool) -> Result<(), DispatchError> {
 		let PendingVote { who, proposal_hash, proposal_index, aye, balance } =
 			<PendingVoting<T>>::take(dao_id, hash).expect("Pending Vote not found");
 
@@ -773,5 +1050,84 @@ impl<T: Config> ApproveVote<DaoId, T::AccountId, T::Hash> for Pallet<T> {
 		}
 
 		Ok(())
+	}
+
+	fn ensure_proposal_allowed(
+		id: DaoId,
+		account_id: Vec<u8>,
+		hash: T::Hash,
+		length_bound: u32,
+	) -> Result<AccountTokenBalance, DispatchError> {
+		let token_balance = Self::ensure_token_balance(id)?;
+
+		if let AccountTokenBalance::Offchain { token_address } = token_balance.clone() {
+			let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
+
+			let data: IndexingData<T::Hash> = IndexingData(
+				b"approve_propose".to_vec(),
+				OffchainData::ApproveProposal {
+					dao_id: id,
+					token_address,
+					account_id,
+					hash,
+					length_bound,
+				},
+			);
+
+			offchain_index::set(&key, &data.encode());
+		}
+
+		Ok(token_balance)
+	}
+
+	fn ensure_voting_allowed(
+		id: DaoId,
+		account_id: Vec<u8>,
+		hash: T::Hash,
+		block_number: u32,
+	) -> Result<AccountTokenBalance, DispatchError> {
+		let token_balance = Self::ensure_token_balance(id)?;
+
+		if let AccountTokenBalance::Offchain { token_address } = token_balance.clone() {
+			let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
+
+			let data: IndexingData<T::Hash> = IndexingData(
+				b"approve_proposal_vote".to_vec(),
+				OffchainData::ApproveVote {
+					dao_id: id,
+					token_address,
+					account_id,
+					hash,
+					block_number,
+				},
+			);
+
+			offchain_index::set(&key, &data.encode());
+		}
+
+		Ok(token_balance)
+	}
+
+	fn ensure_token_balance(id: DaoId) -> Result<AccountTokenBalance, DispatchError> {
+		let dao_token = T::DaoProvider::dao_token(id)?;
+
+		match dao_token {
+			DaoToken::FungibleToken(_) => Err(Error::<T>::NotSupported.into()),
+			DaoToken::EthTokenAddress(token_address) =>
+				Ok(AccountTokenBalance::Offchain { token_address: token_address.to_vec() }),
+		}
+	}
+}
+
+impl<T: Config> BlockNumberProvider for Pallet<T> {
+	type BlockNumber = T::BlockNumber;
+	fn current_block_number() -> Self::BlockNumber {
+		<frame_system::Pallet<T>>::block_number()
+	}
+}
+
+impl<T: Config> EthRpcProvider for Pallet<T> {
+	fn get_rpc_url() -> Vec<u8> {
+		EthRpcUrl::<T>::get().to_vec()
 	}
 }

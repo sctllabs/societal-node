@@ -1,0 +1,44 @@
+[package]
+name = "eth-primitives"
+version = "4.0.0-dev"
+description = "Societal DAO HTTP Primitives"
+authors = ["Societal Labs <https://github.com/sctllabs"]
+homepage = "https://www.sctl.xyz"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+repository = "https://github.com/sctllabs/societal-node"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+
+# Third-party dependencies
+codec = { package = "parity-scale-codec", version = "3.0.0", default-features = false, features = [
+	"derive",
+] }
+hex = { version = "0.4.3", default-features = false }
+log = { version = "0.4.17" }
+serde = { version = "1.0.136", features = ["derive"], default-features = false }
+serde_json = { version = "1.0.79", features = ["alloc"], default-features = false }
+
+# Primitives
+sp-io = { version = "6.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
+sp-runtime = { version = "6.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
+sp-std = { version = "4.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
+
+# Frame dependencies
+frame-support = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
+node-primitives = { version = "2.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
+
+# Local dependencies
+dao-primitives = { version = "4.0.0-dev", default-features = false, path = "../dao" }
+
+[features]
+default = ["std"]
+std = [
+	"codec/std",
+	"frame-support/std",
+]
+try-runtime = ["frame-support/try-runtime"]

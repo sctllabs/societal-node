@@ -35,7 +35,7 @@ frame-system = { version = "4.0.0-dev", default-features = false, git = "https:/
 pallet-balances = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
 
 # Local Dependencies
-dao-primitives = { version = "4.0.0-dev", default-features = false, path = "../dao-primitives" }
+dao-primitives = { version = "4.0.0-dev", default-features = false, path = "../../primitives/dao" }
 
 [dev-dependencies]
 sp-core = { version = "6.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }

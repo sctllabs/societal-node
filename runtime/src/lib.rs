@@ -118,6 +118,7 @@ pub use constants::{
 	time::*,
 	weight::MAXIMUM_BLOCK_WEIGHT,
 };
+use eth_primitives::EthService;
 
 mod precompiles;
 use precompiles::FrontierPrecompiles;
@@ -1572,10 +1573,10 @@ impl pallet_dao::Config for Runtime {
 	type AssetId = AssetId;
 	type Balance = Balance;
 	type CouncilProvider = DaoCouncilMembers;
-	type GovernanceApproveProvider = DaoEthGovernance;
 	type TechnicalCommitteeProvider = DaoTechnicalCommitteeMembers;
 	type AssetProvider = Assets;
 	type AuthorityId = pallet_dao::crypto::TestAuthId;
+	type OffchainEthService = EthService<Dao>;
 }
 
 parameter_types! {
@@ -1589,10 +1590,13 @@ impl pallet_dao_eth_governance::Config for Runtime {
 	type Balance = Balance;
 	type Proposal = RuntimeCall;
 	type ProposalMetadataLimit = DaoMetadataLimit;
+	type EthRpcUrlLimit = DaoStringLimit;
 	type MaxProposals = EthGovernanceMaxProposals;
 	type MaxVotes = EthGovernanceMaxVotes;
 	type DaoProvider = Dao;
 	type Preimages = Preimage;
+	type AuthorityId = pallet_dao::crypto::TestAuthId;
+	type OffchainEthService = EthService<DaoEthGovernance>;
 }
 
 parameter_types! {
