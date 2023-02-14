@@ -107,38 +107,18 @@ pub mod crypto {
 	}
 }
 
-#[derive(Deserialize, Encode, Decode)]
-pub struct EthRPCResponse {
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	pub result: Vec<u8>,
-}
-
 #[derive(Debug, Encode, Decode, Clone, Default, Deserialize, PartialEq, Eq)]
-pub enum OffchainData<Hash, BlockNumber> {
+pub enum OffchainData<Hash> {
 	#[default]
 	Default,
 	ApproveDao {
 		dao_hash: Hash,
 		token_address: Vec<u8>,
 	},
-	ApproveProposal {
-		dao_id: u32,
-		token_address: Vec<u8>,
-		account_id: Vec<u8>,
-		hash: Hash,
-		length_bound: u32,
-	},
-	ApproveVote {
-		dao_id: u32,
-		token_address: Vec<u8>,
-		account_id: Vec<u8>,
-		hash: Hash,
-		block_number: BlockNumber,
-	},
 }
 
 #[derive(Debug, Deserialize, Encode, Decode, Default)]
-struct IndexingData<Hash>(Vec<u8>, OffchainData<Hash, BlockNumber>);
+struct IndexingData<Hash>(Vec<u8>, OffchainData<Hash>);
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -148,7 +128,6 @@ pub mod pallet {
 		pallet_prelude::*,
 	};
 	use http_primitives::EthHttpService;
-	use serde_json::json;
 	use sp_runtime::{
 		offchain::storage::StorageValueRef,
 		traits::{Hash, Zero},
@@ -208,9 +187,6 @@ pub mod pallet {
 		type CouncilProvider: InitializeDaoMembers<u32, Self::AccountId>
 			+ ContainsDaoMember<u32, Self::AccountId>;
 
-		type GovernanceApproveProvider: ApprovePropose<u32, Self::AccountId, TokenSupply, Self::Hash>
-			+ ApproveVote<u32, Self::AccountId, Self::Hash>;
-
 		type TechnicalCommitteeProvider: InitializeDaoMembers<u32, Self::AccountId>
 			+ ContainsDaoMember<u32, Self::AccountId>;
 
@@ -260,7 +236,6 @@ pub mod pallet {
 	pub(super) type Policies<T: Config> =
 		StorageMap<_, Blake2_128Concat, u32, PolicyOf, OptionQuery>;
 
-	/// The ideal number of staking participants.
 	#[pallet::storage]
 	#[pallet::getter(fn eth_rpc_url)]
 	pub type EthRpcUrl<T> =
@@ -304,116 +279,21 @@ pub mod pallet {
 				let offchain_data = data.1;
 
 				let mut call = None;
-				match offchain_data.clone() {
-					OffchainData::ApproveDao { dao_hash, token_address } =>
-						match T::OffchainHttpService::parse_token_balance(
-							T::OffchainHttpService::fetch_token_total_supply(token_address, None),
-						) {
-							Ok(total_supply) => {
-								call =
-									Some(Call::approve_dao { dao_hash, approve: total_supply > 0 });
-							},
-							Err(e) => {
-								log::error!("offchain_worker error: {:?}", e);
-
-								call = Some(Call::approve_dao { dao_hash, approve: false });
-							},
-						},
-					OffchainData::ApproveProposal {
-						dao_id,
-						token_address,
-						account_id,
-						hash,
-						length_bound: _,
-					} => {
-						let block_number = match T::OffchainHttpService::parse_block_number(
-							T::OffchainHttpService::fetch_from_eth(
-								token_address.clone(),
-								Some(json!("eth_blockNumber")),
-								None,
-							),
-						) {
-							Ok(block_number) => block_number,
-							Err(e) => {
-								log::error!("offchain_worker error: {:?}", e);
-
-								0
-							},
-						};
-
-						let total_supply = match T::OffchainHttpService::parse_token_balance(
-							T::OffchainHttpService::fetch_token_total_supply(
-								token_address.clone(),
-								None,
-							),
-						) {
-							Ok(total_supply) => total_supply,
-							Err(e) => {
-								log::error!("offchain_worker error: {:?}", e);
-
-								0
-							},
-						};
-
-						match T::OffchainHttpService::parse_token_balance(
-							T::OffchainHttpService::fetch_token_balance_of(
-								token_address,
-								account_id,
-								None,
-							),
-						) {
-							Ok(token_balance) => {
-								call = Some(Call::approve_propose {
-									dao_id,
-									threshold: total_supply,
-									block_number,
-									hash,
-									// TODO: add to DAO settings?
-									approve: total_supply > 0 && token_balance > 0,
-								});
-							},
-							Err(e) => {
-								log::error!("offchain_worker error: {:?}", e);
-
-								call = Some(Call::approve_propose {
-									dao_id,
-									threshold: total_supply,
-									block_number,
-									hash,
-									approve: false,
-								});
-							},
-						}
-					},
-					OffchainData::ApproveVote {
-						dao_id,
-						token_address,
-						account_id,
-						hash,
-						block_number,
-					} => match T::OffchainHttpService::parse_token_balance(
-						T::OffchainHttpService::fetch_token_balance_of(
-							token_address,
-							account_id,
-							Some(block_number),
-						),
+				if let OffchainData::ApproveDao { dao_hash, token_address } = offchain_data.clone()
+				{
+					match T::OffchainHttpService::parse_token_balance(
+						T::OffchainHttpService::fetch_token_total_supply(token_address, None),
 					) {
-						Ok(token_balance) => {
-							call = Some(Call::approve_proposal_vote {
-								dao_id,
-								hash,
-								approve: token_balance > 0,
-							});
+						Ok(total_supply) => {
+							call = Some(Call::approve_dao { dao_hash, approve: total_supply > 0 });
 						},
 						Err(e) => {
 							log::error!("offchain_worker error: {:?}", e);
 
-							call =
-								Some(Call::approve_proposal_vote { dao_id, hash, approve: false });
+							call = Some(Call::approve_dao { dao_hash, approve: false });
 						},
-					},
-					_ => {},
-				};
+					}
+				}
 
 				if call.is_none() {
 					return
@@ -428,18 +308,8 @@ pub mod pallet {
 				});
 
 				if result.is_err() {
-					match offchain_data {
-						OffchainData::ApproveDao { dao_hash, .. } => {
-							log::error!("dao approval error: {:?}", dao_hash);
-						},
-						OffchainData::ApproveProposal { dao_id, hash, .. } => {
-							log::error!(
-								"proposal approval error: dao_id: {:?}, proposal_hash: {:?}",
-								dao_id,
-								hash
-							);
-						},
-						_ => {},
+					if let OffchainData::ApproveDao { dao_hash, .. } = offchain_data {
+						log::error!("dao approval error: {:?}", dao_hash);
 					}
 				}
 			}
@@ -462,8 +332,6 @@ pub mod pallet {
 
 			match call {
 				Call::approve_dao { .. } => valid_tx(b"approve_dao".to_vec()),
-				Call::approve_propose { .. } => valid_tx(b"approve_propose".to_vec()),
-				Call::approve_proposal_vote { .. } => valid_tx(b"approve_proposal_vote".to_vec()),
 				_ => InvalidTransaction::Call.into(),
 			}
 		}
@@ -519,10 +387,7 @@ pub mod pallet {
 		TokenAddressInvalid,
 		InvalidInput,
 		PolicyNotExist,
-		// Error returned when fetching http
-		HttpFetchingError,
 		OffchainUnsignedTxError,
-		RpcUrlTooLong,
 		NotSupported,
 	}
 
@@ -729,42 +594,6 @@ pub mod pallet {
 
 			Ok(())
 		}
-
-		#[pallet::weight(10_000)]
-		pub fn approve_propose(
-			origin: OriginFor<T>,
-			dao_id: u32,
-			threshold: u128,
-			block_number: u32,
-			hash: T::Hash,
-			approve: bool,
-		) -> DispatchResult {
-			ensure_none(origin)?;
-
-			T::GovernanceApproveProvider::approve_propose(
-				dao_id,
-				threshold,
-				block_number,
-				hash,
-				approve,
-			)?;
-
-			Ok(())
-		}
-
-		#[pallet::weight(10_000)]
-		pub fn approve_proposal_vote(
-			origin: OriginFor<T>,
-			dao_id: u32,
-			hash: T::Hash,
-			approve: bool,
-		) -> DispatchResult {
-			ensure_none(origin)?;
-
-			T::GovernanceApproveProvider::approve_vote(dao_id, hash, approve)?;
-
-			Ok(())
-		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -861,72 +690,6 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 
 	fn ensure_member(id: Self::Id, who: &T::AccountId) -> Result<bool, DispatchError> {
 		T::CouncilProvider::contains(id, who)
-	}
-
-	fn ensure_eth_proposal_allowed(
-		id: Self::Id,
-		account_id: Vec<u8>,
-		hash: T::Hash,
-		length_bound: u32,
-	) -> Result<AccountTokenBalance, DispatchError> {
-		let token_balance = Self::ensure_eth_token_balance(id)?;
-
-		if let AccountTokenBalance::Offchain { token_address } = token_balance.clone() {
-			let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
-
-			let data: IndexingData<T::Hash> = IndexingData(
-				b"approve_propose".to_vec(),
-				OffchainData::ApproveProposal {
-					dao_id: id,
-					token_address,
-					account_id,
-					hash,
-					length_bound,
-				},
-			);
-
-			offchain_index::set(&key, &data.encode());
-		}
-
-		Ok(token_balance)
-	}
-
-	fn ensure_eth_voting_allowed(
-		id: Self::Id,
-		account_id: Vec<u8>,
-		hash: T::Hash,
-		block_number: u32,
-	) -> Result<AccountTokenBalance, DispatchError> {
-		let token_balance = Self::ensure_eth_token_balance(id)?;
-
-		if let AccountTokenBalance::Offchain { token_address } = token_balance.clone() {
-			let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
-
-			let data: IndexingData<T::Hash> = IndexingData(
-				b"approve_proposal_vote".to_vec(),
-				OffchainData::ApproveVote {
-					dao_id: id,
-					token_address,
-					account_id,
-					hash,
-					block_number,
-				},
-			);
-
-			offchain_index::set(&key, &data.encode());
-		}
-
-		Ok(token_balance)
-	}
-
-	fn ensure_eth_token_balance(id: Self::Id) -> Result<AccountTokenBalance, DispatchError> {
-		let dao = Daos::<T>::get(id).ok_or(Error::<T>::DaoNotExist)?;
-
-		match dao.token {
-			DaoToken::FungibleToken(_) => Err(Error::<T>::NotSupported.into()),
-			DaoToken::EthTokenAddress(token_address) =>
-				Ok(AccountTokenBalance::Offchain { token_address: token_address.to_vec() }),
-		}
 	}
 
 	fn dao_account_id(id: Self::Id) -> Self::AccountId {

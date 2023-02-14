@@ -9,7 +9,6 @@ pub use node_primitives::Balance;
 
 use scale_info::TypeInfo;
 use serde::{self, Deserialize, Deserializer, Serialize};
-use sp_core::{crypto::AccountId32, H256};
 use sp_runtime::RuntimeDebug;
 use sp_std::prelude::*;
 
@@ -297,19 +296,6 @@ pub trait DaoProvider<Hash> {
 	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError>;
 	fn count() -> u32;
 	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError>;
-	fn ensure_eth_proposal_allowed(
-		id: Self::Id,
-		account_id: Vec<u8>,
-		hash: Hash,
-		length_bound: u32,
-	) -> Result<AccountTokenBalance, DispatchError>;
-	fn ensure_eth_voting_allowed(
-		id: Self::Id,
-		account_id: Vec<u8>,
-		hash: Hash,
-		block_number: u32,
-	) -> Result<AccountTokenBalance, DispatchError>;
-	fn ensure_eth_token_balance(id: Self::Id) -> Result<AccountTokenBalance, DispatchError>;
 }
 
 pub trait InitializeDaoMembers<DaoId, AccountId> {
@@ -318,38 +304,6 @@ pub trait InitializeDaoMembers<DaoId, AccountId> {
 
 pub trait ContainsDaoMember<DaoId, AccountId> {
 	fn contains(dao_id: DaoId, who: &AccountId) -> Result<bool, DispatchError>;
-}
-
-pub trait ApprovePropose<DaoId, AccountId, TokenSupply, Hash> {
-	fn approve_propose(
-		dao_id: DaoId,
-		threshold: TokenSupply,
-		block_number: u32,
-		hash: Hash,
-		approve: bool,
-	) -> Result<(), DispatchError>;
-}
-
-impl ApprovePropose<u32, AccountId32, u128, H256> for () {
-	fn approve_propose(
-		_dao_id: u32,
-		_threshold: u128,
-		_block_number: u32,
-		_hash: H256,
-		_approve: bool,
-	) -> Result<(), DispatchError> {
-		Ok(())
-	}
-}
-
-pub trait ApproveVote<DaoId, AccountId, Hash> {
-	fn approve_vote(dao_id: DaoId, hash: Hash, approve: bool) -> Result<(), DispatchError>;
-}
-
-impl ApproveVote<u32, AccountId32, H256> for () {
-	fn approve_vote(_dao_id: u32, _hash: H256, _approve: bool) -> Result<(), DispatchError> {
-		Ok(())
-	}
 }
 
 /// Trait for type that can handle incremental changes to a set of account IDs.

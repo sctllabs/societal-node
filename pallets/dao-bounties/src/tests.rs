@@ -161,28 +161,6 @@ impl DaoProvider<H256> for TestDaoProvider {
 	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError> {
 		Ok(true)
 	}
-
-	fn ensure_eth_proposal_allowed(
-		id: Self::Id,
-		account_id: Vec<u8>,
-		hash: H256,
-		length_bound: u32,
-	) -> Result<AccountTokenBalance, DispatchError> {
-		Ok(AccountTokenBalance::Sufficient)
-	}
-
-	fn ensure_eth_voting_allowed(
-		id: Self::Id,
-		account_id: Vec<u8>,
-		hash: H256,
-		block_number: u32,
-	) -> Result<AccountTokenBalance, DispatchError> {
-		Ok(AccountTokenBalance::Sufficient)
-	}
-
-	fn ensure_eth_token_balance(id: Self::Id) -> Result<AccountTokenBalance, DispatchError> {
-		Ok(AccountTokenBalance::Sufficient)
-	}
 }
 
 parameter_types! {
@@ -240,8 +218,6 @@ impl Config<Instance1> for Test {
 	type WeightInfo = ();
 	type ChildBountyManager = ();
 }
-
-type TreasuryError = pallet_dao_treasury::Error<Test>;
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
 	let mut ext: sp_io::TestExternalities = GenesisConfig {

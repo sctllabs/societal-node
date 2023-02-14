@@ -207,6 +207,55 @@ impl<B: BlockNumberProvider + EthRpcProvider> EthHttpService for HttpService<B> 
 	}
 }
 
+impl EthHttpService for () {
+	fn parse_block_number(
+		_response: Result<EthRPCResponse, DispatchError>,
+	) -> Result<u32, DispatchError> {
+		Ok(0)
+	}
+
+	fn parse_token_balance(
+		_response: Result<EthRPCResponse, DispatchError>,
+	) -> Result<u128, DispatchError> {
+		Ok(0)
+	}
+
+	fn fetch_token_balance_of(
+		_token_address: Vec<u8>,
+		_account_id: Vec<u8>,
+		_block_number: Option<u32>,
+	) -> Result<EthRPCResponse, DispatchError> {
+		Ok(EthRPCResponse { result: vec![] })
+	}
+
+	fn fetch_token_total_supply(
+		_token_address: Vec<u8>,
+		_block_number: Option<u32>,
+	) -> Result<EthRPCResponse, DispatchError> {
+		Ok(EthRPCResponse { result: vec![] })
+	}
+
+	fn fetch_from_eth(
+		_token_address: Vec<u8>,
+		_method: Option<Value>,
+		_params: Option<Value>,
+	) -> Result<EthRPCResponse, DispatchError> {
+		Ok(EthRPCResponse { result: vec![] })
+	}
+
+	fn fetch_n_parse(_body: Vec<&[u8]>) -> Result<EthRPCResponse, DispatchError> {
+		Ok(EthRPCResponse { result: vec![] })
+	}
+
+	fn fetch_from_remote(_body: Vec<&[u8]>) -> Result<Vec<u8>, DispatchError> {
+		Ok(vec![])
+	}
+
+	fn block_number(_block_number: Option<u32>) -> Value {
+		json!(0)
+	}
+}
+
 pub trait EthHttpService {
 	fn parse_block_number(
 		response: Result<EthRPCResponse, DispatchError>,

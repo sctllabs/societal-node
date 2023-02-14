@@ -1,5 +1,5 @@
 use crate as pallet_dao;
-use dao_primitives::{ApprovePropose, ApproveVote, ContainsDaoMember, InitializeDaoMembers};
+use dao_primitives::{ContainsDaoMember, InitializeDaoMembers};
 use frame_support::{
 	dispatch::{DispatchError, DispatchResult},
 	parameter_types,
@@ -154,24 +154,6 @@ impl ContainsDaoMember<u32, AccountId> for TestCouncilProvider {
 	}
 }
 
-impl ApproveVote<u32, AccountId, H256> for TestCouncilProvider {
-	fn approve_vote(dao_id: u32, hash: H256, approve: bool) -> Result<(), DispatchError> {
-		Ok(())
-	}
-}
-
-impl ApprovePropose<u32, AccountId, u128, H256> for TestCouncilProvider {
-	fn approve_propose(
-		dao_id: u32,
-		threshold: u128,
-		block_number: u32,
-		hash: H256,
-		approve: bool,
-	) -> Result<(), DispatchError> {
-		Ok(())
-	}
-}
-
 pub struct TestTechnicalCommitteeProvider;
 impl InitializeDaoMembers<u32, AccountId> for TestTechnicalCommitteeProvider {
 	fn initialize_members(
@@ -190,24 +172,6 @@ impl InitializeDaoMembers<u32, AccountId> for TestTechnicalCommitteeProvider {
 impl ContainsDaoMember<u32, AccountId> for TestTechnicalCommitteeProvider {
 	fn contains(dao_id: u32, who: &AccountId) -> Result<bool, DispatchError> {
 		Ok(true)
-	}
-}
-
-impl ApproveVote<u32, AccountId, H256> for TestTechnicalCommitteeProvider {
-	fn approve_vote(dao_id: u32, hash: H256, approve: bool) -> Result<(), DispatchError> {
-		Ok(())
-	}
-}
-
-impl ApprovePropose<u32, AccountId, u128, H256> for TestTechnicalCommitteeProvider {
-	fn approve_propose(
-		dao_id: u32,
-		threshold: u128,
-		block_number: u32,
-		hash: H256,
-		approve: bool,
-	) -> Result<(), DispatchError> {
-		Ok(())
 	}
 }
 
@@ -343,11 +307,11 @@ impl pallet_dao::Config for Test {
 	type Balance = u128;
 	type CouncilProvider = TestCouncilProvider;
 	type AssetProvider = TestAssetProvider;
-	type GovernanceApproveProvider = TestCouncilProvider;
 	type AuthorityId = crypto::TestAuthId;
 	type DaoMaxCouncilMembers = ConstU32<20>;
 	type DaoMaxTechnicalCommitteeMembers = ConstU32<20>;
 	type TechnicalCommitteeProvider = TestTechnicalCommitteeProvider;
+	type OffchainHttpService = ();
 }
 
 // Build genesis storage according to the mock runtime.

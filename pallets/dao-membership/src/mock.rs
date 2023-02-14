@@ -139,28 +139,6 @@ impl DaoProvider<H256> for TestDaoProvider {
 	fn dao_token(id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
 		todo!()
 	}
-
-	fn ensure_eth_proposal_allowed(
-		id: Self::Id,
-		account_id: Vec<u8>,
-		hash: H256,
-		length_bound: u32,
-	) -> Result<AccountTokenBalance, DispatchError> {
-		Ok(AccountTokenBalance::Sufficient)
-	}
-
-	fn ensure_eth_voting_allowed(
-		id: Self::Id,
-		account_id: Vec<u8>,
-		hash: H256,
-		block_number: u32,
-	) -> Result<AccountTokenBalance, DispatchError> {
-		Ok(AccountTokenBalance::Sufficient)
-	}
-
-	fn ensure_eth_token_balance(id: Self::Id) -> Result<AccountTokenBalance, DispatchError> {
-		Ok(AccountTokenBalance::Sufficient)
-	}
 }
 
 impl Config for Test {
