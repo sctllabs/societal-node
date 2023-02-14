@@ -34,7 +34,7 @@ frame-system = { version = "4.0.0-dev", default-features = false, git = "https:/
 scale-info = { version = "2.1.1", default-features = false, features = ["derive"] }
 
 # Local Dependencies
-dao-primitives = { version = "4.0.0-dev", default-features = false, path = "../dao-primitives" }
+dao-primitives = { version = "4.0.0-dev", default-features = false, path = "../../primitives/dao" }
 pallet-dao-assets = { version = "4.0.0-dev", default-features = false, path = "../dao-assets" }
 
 [dev-dependencies]

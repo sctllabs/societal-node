@@ -8,7 +8,6 @@ members = [
     "pallets/dao-democracy",
     "pallets/dao-eth-governance",
     "pallets/dao-membership",
-    "pallets/dao-primitives",
     "pallets/dao-treasury",
 	"precompiles/dao",
 	"precompiles/dao-collective",
@@ -18,6 +17,7 @@ members = [
 	"precompiles/dao-treasury",
 	"precompiles/utils",
 	"precompiles/utils/macro",
+	"primitives/dao",
     "runtime",
 ]
 

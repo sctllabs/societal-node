@@ -32,7 +32,7 @@ frame-support = { version = "4.0.0-dev", default-features = false, git = "https:
 frame-system = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.32" }
 
 # Local dependencies
-dao-primitives = { version = "4.0.0-dev", default-features = false, path = "../dao-primitives" }
+dao-primitives = { version = "4.0.0-dev", default-features = false, path = "../../primitives/dao" }
 pallet-dao-democracy = { version = "4.0.0-dev", default-features = false, path = "../dao-democracy" }
 
 [features]
