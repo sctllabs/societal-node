@@ -160,7 +160,7 @@ benchmarks_instance_pallet! {
 		let proposal_hash = T::Hashing::hash_of(&proposal);
 		// Note that execution fails due to mis-matched origin
 		assert_last_event::<T, I>(
-			Event::Executed { dao_id: 0, proposal_hash, result: Err(DispatchError::BadOrigin) }.into()
+			Event::Executed { dao_id: 0, proposal_index: 0, proposal_hash, result: Err(DispatchError::BadOrigin) }.into()
 		);
 	}
 
@@ -359,7 +359,7 @@ benchmarks_instance_pallet! {
 	verify {
 		// The last proposal is removed.
 		assert_eq!(Collective::<T, I>::proposals(0).len(), (p - 1) as usize);
-		assert_last_event::<T, I>(Event::Disapproved { dao_id: 0, proposal_hash: last_hash }.into());
+		assert_last_event::<T, I>(Event::Disapproved { dao_id: 0, proposal_index: p - 1, proposal_hash: last_hash }.into());
 	}
 
 	close_early_approved {
@@ -441,7 +441,7 @@ benchmarks_instance_pallet! {
 	verify {
 		// The last proposal is removed.
 		assert_eq!(Collective::<T, I>::proposals(0).len(), (p - 1) as usize);
-		assert_last_event::<T, I>(Event::Executed { dao_id: 0, proposal_hash: last_hash, result: Err(DispatchError::BadOrigin) }.into());
+		assert_last_event::<T, I>(Event::Executed { dao_id: 0, proposal_index: p - 1, proposal_hash: last_hash, result: Err(DispatchError::BadOrigin) }.into());
 	}
 
 	// TODO: get back to it in case if prime member returned back
@@ -513,7 +513,7 @@ benchmarks_instance_pallet! {
 	}: close(SystemOrigin::Signed(caller), 0, last_hash, index, Weight::max_value(), bytes_in_storage)
 	verify {
 		assert_eq!(Collective::<T, I>::proposals(0).len(), (p - 1) as usize);
-		assert_last_event::<T, I>(Event::Disapproved { dao_id: 0, proposal_hash: last_hash }.into());
+		assert_last_event::<T, I>(Event::Disapproved { dao_id: 0, proposal_index: p - 1, proposal_hash: last_hash }.into());
 	}
 
 	close_approved {
@@ -581,52 +581,7 @@ benchmarks_instance_pallet! {
 	}: close(SystemOrigin::Signed(caller), 0, last_hash, p - 1, Weight::max_value(), bytes_in_storage)
 	verify {
 		assert_eq!(Collective::<T, I>::proposals(0).len(), (p - 1) as usize);
-		assert_last_event::<T, I>(Event::Executed { dao_id: 0, proposal_hash: last_hash, result: Err(DispatchError::BadOrigin) }.into());
-	}
-
-	disapprove_proposal {
-		let p in 1 .. T::MaxProposals::get();
-
-		let m = 3;
-		let b = MAX_BYTES;
-		let bytes_in_storage = b + size_of::<u32>() as u32;
-
-		// Construct `members`.
-		let mut members = vec![];
-		for i in 0 .. m - 1 {
-			let member = account::<T::AccountId>("member", i, SEED);
-			members.push(member);
-		}
-		let caller = account::<T::AccountId>("caller", 0, SEED);
-		members.push(caller.clone());
-		Collective::<T, I>::set_members(
-			SystemOrigin::Root.into(),
-			0,
-			members.clone(),
-			T::MaxMembers::get(),
-		)?;
-
-		// Add proposals
-		let mut last_hash = T::Hash::default();
-		for i in 0 .. p {
-			// Proposals should be different so that different proposal hashes are generated
-			let proposal: T::Proposal = SystemCall::<T>::remark { remark: vec![i as u8; b as usize] }.into();
-			Collective::<T, I>::propose(
-				SystemOrigin::Signed(caller.clone()).into(),
-				0,
-				Box::new(proposal.clone()),
-				bytes_in_storage,
-			)?;
-			last_hash = T::Hashing::hash_of(&proposal);
-		}
-
-		System::<T>::set_block_number(T::BlockNumber::max_value());
-		assert_eq!(Collective::<T, I>::proposals(0).len(), p as usize);
-
-	}: _(SystemOrigin::Root, 0, last_hash)
-	verify {
-		assert_eq!(Collective::<T, I>::proposals(0).len(), (p - 1) as usize);
-		assert_last_event::<T, I>(Event::Disapproved { dao_id: 0,proposal_hash: last_hash }.into());
+		assert_last_event::<T, I>(Event::Executed { dao_id: 0, proposal_index: p - 1, proposal_hash: last_hash, result: Err(DispatchError::BadOrigin) }.into());
 	}
 
 	impl_benchmark_test_suite!(Collective, crate::tests::new_test_ext(), crate::tests::Test);

@@ -275,15 +275,26 @@ pub mod pallet {
 			no: MemberCount,
 		},
 		/// A motion was approved by the required threshold.
-		Approved { dao_id: DaoId, proposal_hash: T::Hash },
+		Approved { dao_id: DaoId, proposal_index: ProposalIndex, proposal_hash: T::Hash },
 		/// A motion was not approved by the required threshold.
-		Disapproved { dao_id: DaoId, proposal_hash: T::Hash },
+		Disapproved { dao_id: DaoId, proposal_index: ProposalIndex, proposal_hash: T::Hash },
 		/// A motion was executed; result will be `Ok` if it returned without error.
-		Executed { dao_id: DaoId, proposal_hash: T::Hash, result: DispatchResult },
+		Executed {
+			dao_id: DaoId,
+			proposal_index: ProposalIndex,
+			proposal_hash: T::Hash,
+			result: DispatchResult,
+		},
 		/// A single member did some action; result will be `Ok` if it returned without error.
 		MemberExecuted { dao_id: DaoId, proposal_hash: T::Hash, result: DispatchResult },
 		/// A proposal was closed because its threshold was reached or after its duration was up.
-		Closed { dao_id: DaoId, proposal_hash: T::Hash, yes: MemberCount, no: MemberCount },
+		Closed {
+			dao_id: DaoId,
+			proposal_index: ProposalIndex,
+			proposal_hash: T::Hash,
+			yes: MemberCount,
+			no: MemberCount,
+		},
 	}
 
 	#[pallet::error]
@@ -598,32 +609,6 @@ pub mod pallet {
 
 			Self::do_close(dao_id, proposal_hash, index, proposal_weight_bound, length_bound)
 		}
-
-		// TODO: no roots allowed - remove or re-work for DAO purposes
-		/// Disapprove a proposal, close, and remove it from the system, regardless of its current
-		/// state.
-		///
-		/// Must be called by the Root origin.
-		///
-		/// Parameters:
-		/// * `proposal_hash`: The hash of the proposal that should be disapproved.
-		///
-		/// # <weight>
-		/// Complexity: O(P) where P is the number of max proposals
-		/// DB Weight:
-		/// * Reads: Proposals
-		/// * Writes: Voting, Proposals, ProposalOf
-		/// # </weight>
-		#[pallet::weight(T::WeightInfo::disapprove_proposal(T::MaxProposals::get()))]
-		pub fn disapprove_proposal(
-			origin: OriginFor<T>,
-			dao_id: DaoId,
-			proposal_hash: T::Hash,
-		) -> DispatchResultWithPostInfo {
-			ensure_root(origin)?;
-			let proposal_count = Self::do_disapprove_proposal(dao_id, proposal_hash);
-			Ok(Some(T::WeightInfo::disapprove_proposal(proposal_count)).into())
-		}
 	}
 }
 
@@ -643,31 +628,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		// Note: The dispatchables *do not* use this to check membership so make sure
 		// to update those if this is changed.
 		Self::members(dao_id).contains(who)
-	}
-
-	/// Execute immediately when adding a new proposal.
-	pub fn do_propose_execute(
-		dao_id: DaoId,
-		proposal: Box<<T as Config<I>>::Proposal>,
-		length_bound: MemberCount,
-	) -> Result<(u32, DispatchResultWithPostInfo), DispatchError> {
-		let proposal_len = proposal.encoded_size();
-		ensure!(proposal_len <= length_bound as usize, Error::<T, I>::WrongProposalLength);
-
-		let proposal_hash = T::Hashing::hash_of(&proposal);
-		ensure!(
-			!<ProposalOf<T, I>>::contains_key(dao_id, proposal_hash),
-			Error::<T, I>::DuplicateProposal
-		);
-
-		let seats = Self::members(dao_id).len() as MemberCount;
-		let result = proposal.dispatch(RawOrigin::Members(1, seats).into());
-		Self::deposit_event(Event::Executed {
-			dao_id,
-			proposal_hash,
-			result: result.map(|_| ()).map_err(|e| e.error),
-		});
-		Ok((proposal_len as u32, result))
 	}
 
 	/// Add a new proposal to be voted.
@@ -805,12 +765,13 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			)?;
 			Self::deposit_event(Event::Closed {
 				dao_id,
+				proposal_index: index,
 				proposal_hash,
 				yes: yes_votes,
 				no: no_votes,
 			});
 			let (proposal_weight, proposal_count) =
-				Self::do_approve_proposal(dao_id, seats, yes_votes, proposal_hash, proposal);
+				Self::do_approve_proposal(dao_id, seats, yes_votes, index, proposal_hash, proposal);
 			return Ok((
 				Some(
 					T::WeightInfo::close_early_approved(len as u32, seats, proposal_count)
@@ -822,11 +783,12 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		} else if disapproved {
 			Self::deposit_event(Event::Closed {
 				dao_id,
+				proposal_index: index,
 				proposal_hash,
 				yes: yes_votes,
 				no: no_votes,
 			});
-			let proposal_count = Self::do_disapprove_proposal(dao_id, proposal_hash);
+			let proposal_count = Self::do_disapprove_proposal(dao_id, index, proposal_hash);
 			return Ok((
 				Some(T::WeightInfo::close_early_disapproved(seats, proposal_count)),
 				Pays::No,
@@ -856,12 +818,13 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			)?;
 			Self::deposit_event(Event::Closed {
 				dao_id,
+				proposal_index: index,
 				proposal_hash,
 				yes: yes_votes,
 				no: no_votes,
 			});
 			let (proposal_weight, proposal_count) =
-				Self::do_approve_proposal(dao_id, seats, yes_votes, proposal_hash, proposal);
+				Self::do_approve_proposal(dao_id, seats, yes_votes, index, proposal_hash, proposal);
 			Ok((
 				Some(
 					T::WeightInfo::close_approved(len as u32, seats, proposal_count)
@@ -874,10 +837,11 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			Self::deposit_event(Event::Closed {
 				dao_id,
 				proposal_hash,
+				proposal_index: index,
 				yes: yes_votes,
 				no: no_votes,
 			});
-			let proposal_count = Self::do_disapprove_proposal(dao_id, proposal_hash);
+			let proposal_count = Self::do_disapprove_proposal(dao_id, index, proposal_hash);
 			Ok((Some(T::WeightInfo::close_disapproved(seats, proposal_count)), Pays::No).into())
 		}
 	}
@@ -923,16 +887,18 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		dao_id: DaoId,
 		seats: MemberCount,
 		yes_votes: MemberCount,
+		proposal_index: ProposalIndex,
 		proposal_hash: T::Hash,
 		proposal: <T as Config<I>>::Proposal,
 	) -> (Weight, u32) {
-		Self::deposit_event(Event::Approved { dao_id, proposal_hash });
+		Self::deposit_event(Event::Approved { dao_id, proposal_index, proposal_hash });
 
 		let dispatch_weight = proposal.get_dispatch_info().weight;
 		let origin = RawOrigin::Members(yes_votes, seats).into();
 		let result = proposal.dispatch(origin);
 		Self::deposit_event(Event::Executed {
 			dao_id,
+			proposal_index,
 			proposal_hash,
 			result: result.map(|_| ()).map_err(|e| e.error),
 		});
@@ -944,9 +910,13 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	}
 
 	/// Removes a proposal from the pallet, and deposit the `Disapproved` event.
-	pub fn do_disapprove_proposal(dao_id: DaoId, proposal_hash: T::Hash) -> u32 {
+	pub fn do_disapprove_proposal(
+		dao_id: DaoId,
+		proposal_index: ProposalIndex,
+		proposal_hash: T::Hash,
+	) -> u32 {
 		// disapproved
-		Self::deposit_event(Event::Disapproved { dao_id, proposal_hash });
+		Self::deposit_event(Event::Disapproved { dao_id, proposal_index, proposal_hash });
 		Self::remove_proposal(dao_id, proposal_hash)
 	}
 
