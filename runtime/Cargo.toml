@@ -113,6 +113,7 @@ frame-system-benchmarking = { version = "4.0.0-dev", default-features = false, g
 hex-literal = { version = "0.3.4", optional = true }
 
 # Local Dependencies
+http-primitives = { version = "4.0.0-dev", default-features = false, path = "../primitives/http" }
 pallet-dao = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao" }
 pallet-dao-assets = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-assets" }
 pallet-dao-collective = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-collective" }

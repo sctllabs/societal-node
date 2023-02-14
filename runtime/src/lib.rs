@@ -118,6 +118,7 @@ pub use constants::{
 	time::*,
 	weight::MAXIMUM_BLOCK_WEIGHT,
 };
+use http_primitives::HttpService;
 
 mod precompiles;
 use precompiles::FrontierPrecompiles;
@@ -1576,6 +1577,7 @@ impl pallet_dao::Config for Runtime {
 	type TechnicalCommitteeProvider = DaoTechnicalCommitteeMembers;
 	type AssetProvider = Assets;
 	type AuthorityId = pallet_dao::crypto::TestAuthId;
+	type OffchainHttpService = HttpService<Dao>;
 }
 
 parameter_types! {

@@ -2815,6 +2815,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "http-primitives"
+version = "4.0.0-dev"
+dependencies = [
+ "dao-primitives",
+ "frame-support",
+ "hex",
+ "log",
+ "node-primitives",
+ "parity-scale-codec",
+ "serde",
+ "serde_json",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "httparse"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4818,6 +4835,7 @@ dependencies = [
  "frame-support",
  "frame-system",
  "hex",
+ "http-primitives",
  "log",
  "pallet-balances",
  "parity-scale-codec",
@@ -8505,6 +8523,7 @@ dependencies = [
  "frame-system-rpc-runtime-api",
  "frame-try-runtime",
  "hex-literal",
+ "http-primitives",
  "log",
  "node-primitives",
  "pallet-asset-tx-payment",
