@@ -15,8 +15,6 @@ members = [
 	"precompiles/dao-eth-governance",
 	"precompiles/dao-membership",
 	"precompiles/dao-treasury",
-	"precompiles/utils",
-	"precompiles/utils/macro",
 	"primitives/dao",
 	"primitives/eth",
     "runtime",
