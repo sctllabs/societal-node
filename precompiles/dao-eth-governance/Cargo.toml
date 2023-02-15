@@ -27,7 +27,7 @@ pallet-evm = { git = "https://github.com/sctllabs/frontier", branch = "polkadot-
 # Local Dependencies
 pallet-dao-eth-governance = { version = "4.0.0-dev", default-features = false, path = "../../pallets/dao-eth-governance" }
 # From Moonbeam
-precompile-utils = { path = "../utils", default-features = false }
+precompile-utils = { version = "0.1.0", default-features = false, git = "https://github.com/sctllabs/moonbeam.git", branch = "moonbeam-polkadot-v0.9.32" }
 
 [features]
 default = [ "std" ]

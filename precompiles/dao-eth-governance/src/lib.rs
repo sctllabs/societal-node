@@ -10,9 +10,10 @@ use frame_support::{
 use pallet_dao_eth_governance::vote::Vote;
 use pallet_evm::AddressMapping;
 use parity_scale_codec::Decode;
-use precompile_utils::{helpers::hash, prelude::*};
+use precompile_utils::prelude::*;
 use sp_core::{ConstU32, H160, H256};
-use sp_std::{boxed::Box, marker::PhantomData, vec::Vec};
+use sp_runtime::traits::Hash;
+use sp_std::{boxed::Box, marker::PhantomData, vec, vec::Vec};
 
 /// Dao ID. Just a `u32`.
 pub type DaoId = u32;
@@ -261,5 +262,31 @@ where
 		value
 			.try_into()
 			.map_err(|_| RevertReason::value_is_too_large("balance type").into())
+	}
+}
+
+pub fn hash<Runtime>(data: &[u8]) -> H256
+where
+	Runtime: frame_system::Config,
+	H256: From<<Runtime as frame_system::Config>::Hash>,
+{
+	<Runtime as frame_system::Config>::Hashing::hash(data).into()
+}
+
+/// Create a 5-topics log.
+#[must_use]
+pub fn log5(
+	address: impl Into<H160>,
+	topic0: impl Into<H256>,
+	topic1: impl Into<H256>,
+	topic2: impl Into<H256>,
+	topic3: impl Into<H256>,
+	topic4: impl Into<H256>,
+	data: impl Into<Vec<u8>>,
+) -> Log {
+	Log {
+		address: address.into(),
+		topics: vec![topic0.into(), topic1.into(), topic2.into(), topic3.into(), topic4.into()],
+		data: data.into(),
 	}
 }

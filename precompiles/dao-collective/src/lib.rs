@@ -9,8 +9,9 @@ use frame_support::{
 };
 use pallet_evm::AddressMapping;
 use parity_scale_codec::Decode;
-use precompile_utils::{helpers::hash, prelude::*};
+use precompile_utils::prelude::*;
 use sp_core::{ConstU32, H160, H256};
+use sp_runtime::traits::Hash;
 use sp_std::{boxed::Box, marker::PhantomData, vec::Vec};
 
 /// Dao ID. Just a `u32`.
@@ -282,4 +283,12 @@ where
 
 		Ok(is_member)
 	}
+}
+
+pub fn hash<Runtime>(data: &[u8]) -> H256
+where
+	Runtime: frame_system::Config,
+	H256: From<<Runtime as frame_system::Config>::Hash>,
+{
+	<Runtime as frame_system::Config>::Hashing::hash(data).into()
 }
