@@ -130,7 +130,7 @@ pub struct TestDaoProvider;
 impl DaoProvider<H256> for TestDaoProvider {
 	type Id = u32;
 	type AccountId = u128;
-	type AssetId = u32;
+	type AssetId = u128;
 	type Policy = DaoPolicy;
 
 	fn exists(_id: Self::Id) -> Result<(), DispatchError> {
@@ -177,7 +177,7 @@ impl Create<AccountId> for TestAssetProvider {
 }
 
 impl Inspect<AccountId> for TestAssetProvider {
-	type AssetId = u32;
+	type AssetId = u128;
 	type Balance = u128;
 
 	fn total_issuance(asset: Self::AssetId) -> Self::Balance {
@@ -293,7 +293,7 @@ impl Transfer<AccountId> for TestAssetProvider {
 impl Config for Test {
 	type PalletId = TreasuryPalletId;
 	type Currency = pallet_balances::Pallet<Test>;
-	type AssetId = u32;
+	type AssetId = u128;
 	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();

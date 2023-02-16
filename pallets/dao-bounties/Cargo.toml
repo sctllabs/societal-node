@@ -34,7 +34,7 @@ frame-system = { version = "4.0.0-dev", default-features = false, git = "https:/
 
 # Local Dependencies
 dao-primitives = { version = "4.0.0-dev", default-features = false, path = "../../primitives/dao" }
-pallet-dao-assets = { version = "4.0.0-dev", default-features = false, path = "../dao-assets" }
+pallet-dao-assets = { version = "4.0.0-dev", default-features = false, git = "https://github.com/sctllabs/societal-node", branch = "main" }
 pallet-dao-treasury = { version = "4.0.0-dev", default-features = false, path = "../dao-treasury" }
 
 [dev-dependencies]

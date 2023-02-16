@@ -188,7 +188,7 @@ impl Create<AccountId> for TestAssetProvider {
 }
 
 impl Inspect<AccountId> for TestAssetProvider {
-	type AssetId = u32;
+	type AssetId = u128;
 	type Balance = u128;
 
 	fn total_issuance(asset: Self::AssetId) -> Self::Balance {
@@ -303,7 +303,7 @@ impl pallet_dao::Config for Test {
 	type Currency = pallet_balances::Pallet<Test>;
 	type DaoStringLimit = ConstU32<20>;
 	type DaoMetadataLimit = ConstU32<20>;
-	type AssetId = u32;
+	type AssetId = u128;
 	type Balance = u128;
 	type CouncilProvider = TestCouncilProvider;
 	type AssetProvider = TestAssetProvider;

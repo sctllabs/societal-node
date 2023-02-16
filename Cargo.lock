@@ -817,9 +817,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.1.4"
+version = "4.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f13b9c79b5d1dd500d20ef541215a6423c75829ef43117e1b4d17fd8af0b5d76"
+checksum = "ec0b0588d44d4d63a87dbd75c136c166bbfd9a86a31cb89e09906521c7d3f5e3"
 dependencies = [
  "bitflags",
  "clap_derive",
@@ -1214,9 +1214,9 @@ dependencies = [
 
 [[package]]
 name = "cxx"
-version = "1.0.90"
+version = "1.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90d59d9acd2a682b4e40605a242f6670eaa58c5957471cbf85e8aa6a0b97a5e8"
+checksum = "86d3488e7665a7a483b57e25bdd90d0aeb2bc7608c8d0346acf2ad3f1caf1d62"
 dependencies = [
  "cc",
  "cxxbridge-flags",
@@ -1226,9 +1226,9 @@ dependencies = [
 
 [[package]]
 name = "cxx-build"
-version = "1.0.90"
+version = "1.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebfa40bda659dd5c864e65f4c9a2b0aff19bea56b017b9b77c73d3766a453a38"
+checksum = "48fcaf066a053a41a81dfb14d57d99738b767febb8b735c3016e469fac5da690"
 dependencies = [
  "cc",
  "codespan-reporting",
@@ -1241,15 +1241,15 @@ dependencies = [
 
 [[package]]
 name = "cxxbridge-flags"
-version = "1.0.90"
+version = "1.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "457ce6757c5c70dc6ecdbda6925b958aae7f959bda7d8fb9bde889e34a09dc03"
+checksum = "a2ef98b8b717a829ca5603af80e1f9e2e48013ab227b68ef37872ef84ee479bf"
 
 [[package]]
 name = "cxxbridge-macro"
-version = "1.0.90"
+version = "1.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebf883b7aacd7b2aeb2a7b338648ee19f57c140d4ee8e52c68979c6b2f7f2263"
+checksum = "086c685979a698443656e5cf7856c95c642295a38599f12fb1ff76fb28d19892"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1752,6 +1752,12 @@ name = "fallible-iterator"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
+
+[[package]]
+name = "faster-hex"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51e2ce894d53b295cf97b05685aa077950ff3e8541af83217fc720a6437169f8"
 
 [[package]]
 name = "fastrand"
@@ -4817,6 +4823,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-dao-assets"
+version = "4.0.0-dev"
+source = "git+https://github.com/sctllabs/societal-node?branch=main#30071aefbe937d8c0f700092ad71074a0ac3058a"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-dao-bounties"
 version = "4.0.0-dev"
 dependencies = [
@@ -4826,7 +4848,7 @@ dependencies = [
  "frame-system",
  "log",
  "pallet-balances",
- "pallet-dao-assets",
+ "pallet-dao-assets 4.0.0-dev (git+https://github.com/sctllabs/societal-node?branch=main)",
  "pallet-dao-treasury",
  "parity-scale-codec",
  "scale-info",
@@ -4864,7 +4886,7 @@ dependencies = [
  "pallet-dao-collective",
  "pallet-evm",
  "parity-scale-codec",
- "precompile-utils",
+ "precompile-utils 0.1.0 (git+https://github.com/sctllabs/moonbeam.git?branch=moonbeam-polkadot-v0.9.32)",
  "sp-core",
  "sp-runtime",
  "sp-std",
@@ -4880,7 +4902,7 @@ dependencies = [
  "frame-system",
  "log",
  "pallet-balances",
- "pallet-dao-assets",
+ "pallet-dao-assets 4.0.0-dev (git+https://github.com/sctllabs/societal-node?branch=main)",
  "pallet-preimage",
  "pallet-scheduler",
  "parity-scale-codec",
@@ -4910,7 +4932,7 @@ dependencies = [
  "pallet-scheduler",
  "pallet-timestamp",
  "parity-scale-codec",
- "precompile-utils",
+ "precompile-utils 0.1.0 (git+https://github.com/sctllabs/moonbeam.git?branch=moonbeam-polkadot-v0.9.32)",
  "scale-info",
  "serde",
  "sp-core",
@@ -4952,7 +4974,7 @@ dependencies = [
  "pallet-dao-eth-governance",
  "pallet-evm",
  "parity-scale-codec",
- "precompile-utils",
+ "precompile-utils 0.1.0 (git+https://github.com/sctllabs/moonbeam.git?branch=moonbeam-polkadot-v0.9.32)",
  "sp-core",
  "sp-runtime",
  "sp-std",
@@ -4986,7 +5008,7 @@ dependencies = [
  "pallet-dao-membership",
  "pallet-evm",
  "parity-scale-codec",
- "precompile-utils",
+ "precompile-utils 0.1.0 (git+https://github.com/sctllabs/moonbeam.git?branch=moonbeam-polkadot-v0.9.32)",
  "sp-core",
  "sp-runtime",
  "sp-std",
@@ -5003,7 +5025,7 @@ dependencies = [
  "pallet-dao",
  "pallet-evm",
  "parity-scale-codec",
- "precompile-utils",
+ "precompile-utils 0.1.0 (git+https://github.com/sctllabs/moonbeam.git?branch=moonbeam-polkadot-v0.9.32)",
  "sp-core",
  "sp-runtime",
  "sp-std",
@@ -5040,7 +5062,7 @@ dependencies = [
  "pallet-dao-treasury",
  "pallet-evm",
  "parity-scale-codec",
- "precompile-utils",
+ "precompile-utils 0.1.0 (git+https://github.com/sctllabs/moonbeam.git?branch=moonbeam-polkadot-v0.9.32)",
  "sp-core",
  "sp-runtime",
  "sp-std",
@@ -5256,6 +5278,31 @@ dependencies = [
  "fp-evm",
  "ripemd",
  "sp-io",
+]
+
+[[package]]
+name = "pallet-evm-precompileset-assets-erc20"
+version = "0.1.0"
+source = "git+https://github.com/sctllabs/moonbeam.git?branch=moonbeam-polkadot-v0.9.32-asset-manager#da5001aeccb3bf9f2d3b890a550dcc70824adc29"
+dependencies = [
+ "fp-evm",
+ "frame-support",
+ "frame-system",
+ "log",
+ "num_enum",
+ "pallet-balances",
+ "pallet-dao-assets 4.0.0-dev (git+https://github.com/sctllabs/societal-node?branch=main)",
+ "pallet-evm",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "paste",
+ "precompile-utils 0.1.0 (git+https://github.com/sctllabs/moonbeam.git?branch=moonbeam-polkadot-v0.9.32-asset-manager)",
+ "scale-info",
+ "slices",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
 ]
 
 [[package]]
@@ -6114,7 +6161,32 @@ dependencies = [
  "pallet-evm",
  "parity-scale-codec",
  "paste",
- "precompile-utils-macro",
+ "precompile-utils-macro 0.1.0 (git+https://github.com/sctllabs/moonbeam.git?branch=moonbeam-polkadot-v0.9.32)",
+ "sha3 0.9.1",
+ "sp-core",
+ "sp-io",
+ "sp-std",
+ "xcm",
+]
+
+[[package]]
+name = "precompile-utils"
+version = "0.1.0"
+source = "git+https://github.com/sctllabs/moonbeam.git?branch=moonbeam-polkadot-v0.9.32-asset-manager#da5001aeccb3bf9f2d3b890a550dcc70824adc29"
+dependencies = [
+ "affix",
+ "evm",
+ "fp-evm",
+ "frame-support",
+ "frame-system",
+ "hex",
+ "impl-trait-for-tuples",
+ "log",
+ "num_enum",
+ "pallet-evm",
+ "parity-scale-codec",
+ "paste",
+ "precompile-utils-macro 0.1.0 (git+https://github.com/sctllabs/moonbeam.git?branch=moonbeam-polkadot-v0.9.32-asset-manager)",
  "sha3 0.9.1",
  "sp-core",
  "sp-io",
@@ -6126,6 +6198,20 @@ dependencies = [
 name = "precompile-utils-macro"
 version = "0.1.0"
 source = "git+https://github.com/sctllabs/moonbeam.git?branch=moonbeam-polkadot-v0.9.32#4bb2b50d305584046678cb402446d622abfc6d3f"
+dependencies = [
+ "case",
+ "num_enum",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "sha3 0.8.2",
+ "syn",
+]
+
+[[package]]
+name = "precompile-utils-macro"
+version = "0.1.0"
+source = "git+https://github.com/sctllabs/moonbeam.git?branch=moonbeam-polkadot-v0.9.32-asset-manager#da5001aeccb3bf9f2d3b890a550dcc70824adc29"
 dependencies = [
  "case",
  "num_enum",
@@ -8319,6 +8405,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03b634d87b960ab1a38c4fe143b508576f075e7c978bfad18217645ebfdfa2ec"
 
 [[package]]
+name = "slices"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2086e458a369cdca838e9f6ed04b4cc2e3ce636d99abb80c9e2eada107749cf"
+dependencies = [
+ "faster-hex",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "smallvec"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8468,7 +8566,7 @@ dependencies = [
  "pallet-contracts-primitives",
  "pallet-conviction-voting",
  "pallet-dao",
- "pallet-dao-assets",
+ "pallet-dao-assets 4.0.0-dev (git+https://github.com/sctllabs/societal-node?branch=main)",
  "pallet-dao-bounties",
  "pallet-dao-collective",
  "pallet-dao-collective-precompile",
@@ -8494,6 +8592,7 @@ dependencies = [
  "pallet-evm-precompile-modexp",
  "pallet-evm-precompile-sha3fips",
  "pallet-evm-precompile-simple",
+ "pallet-evm-precompileset-assets-erc20",
  "pallet-grandpa",
  "pallet-hotfix-sufficients",
  "pallet-im-online",
@@ -8522,7 +8621,7 @@ dependencies = [
  "pallet-utility",
  "pallet-vesting",
  "parity-scale-codec",
- "precompile-utils",
+ "precompile-utils 0.1.0 (git+https://github.com/sctllabs/moonbeam.git?branch=moonbeam-polkadot-v0.9.32)",
  "scale-info",
  "sp-api",
  "sp-authority-discovery",

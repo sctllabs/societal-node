@@ -247,7 +247,7 @@ pub mod pallet {
 
 		type Assets: LockableAsset<
 				Self::AccountId,
-				AssetId = u32,
+				AssetId = u128,
 				Moment = Self::BlockNumber,
 				Balance = BalanceOf<Self>,
 			> + Inspect<Self::AccountId>
@@ -333,7 +333,7 @@ pub mod pallet {
 			<Self as frame_system::Config>::Hash,
 			Id = u32,
 			AccountId = Self::AccountId,
-			AssetId = u32,
+			AssetId = u128,
 			Policy = DaoPolicy,
 		>;
 	}
@@ -1617,7 +1617,7 @@ impl<T: Config> Pallet<T> {
 
 	/// Rejig the lock on an account. It will never get more stringent (since that would indicate
 	/// a security hole) but may be reduced from what they are currently.
-	fn update_lock(dao_id: DaoId, who: &T::AccountId, dao_token: DaoToken<u32, Vec<u8>>) {
+	fn update_lock(dao_id: DaoId, who: &T::AccountId, dao_token: DaoToken<u128, Vec<u8>>) {
 		let lock_needed = VotingOf::<T>::mutate(dao_id, who, |voting| {
 			voting.rejig(frame_system::Pallet::<T>::block_number());
 			voting.locked_balance()

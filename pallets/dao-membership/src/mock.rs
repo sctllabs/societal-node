@@ -107,7 +107,7 @@ pub struct TestDaoProvider;
 impl DaoProvider<H256> for TestDaoProvider {
 	type Id = u32;
 	type AccountId = u64;
-	type AssetId = u32;
+	type AssetId = u128;
 	type Policy = DaoPolicy;
 
 	fn exists(_id: Self::Id) -> Result<(), DispatchError> {

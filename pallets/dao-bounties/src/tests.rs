@@ -112,7 +112,7 @@ impl pallet_dao_assets::Config for Test {
 	type Balance = Balance;
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
-	type AssetId = u32;
+	type AssetId = u128;
 	type Currency = pallet_balances::Pallet<Test>;
 	type ForceOrigin = EnsureRoot<AccountId>;
 	type AssetDeposit = AssetDeposit;
@@ -129,7 +129,7 @@ pub struct TestDaoProvider;
 impl DaoProvider<H256> for TestDaoProvider {
 	type Id = u32;
 	type AccountId = u128;
-	type AssetId = u32;
+	type AssetId = u128;
 	type Policy = DaoPolicy;
 
 	fn exists(_id: Self::Id) -> Result<(), DispatchError> {
@@ -181,7 +181,7 @@ impl pallet_dao_treasury::Config for Test {
 	type WeightInfo = ();
 	type SpendFunds = Bounties;
 	type MaxApprovals = ConstU32<100>;
-	type AssetId = u32;
+	type AssetId = u128;
 	type DaoProvider = TestDaoProvider;
 	type AssetProvider = Assets;
 }
@@ -198,7 +198,7 @@ impl pallet_dao_treasury::Config<Instance1> for Test {
 	type WeightInfo = ();
 	type SpendFunds = Bounties1;
 	type MaxApprovals = ConstU32<100>;
-	type AssetId = u32;
+	type AssetId = u128;
 	type DaoProvider = TestDaoProvider;
 	type AssetProvider = Assets;
 }
