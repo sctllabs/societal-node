@@ -102,6 +102,7 @@ use pallet_ethereum::{Call::transact, Transaction as EthereumTransaction};
 use pallet_evm::{
 	Account as EVMAccount, EnsureAddressTruncated, FeeCalculator, HashedAddressMapping, Runner,
 };
+use pallet_evm_precompileset_assets_erc20::AddressAssetIdConversion;
 
 /// Import the template pallet.
 pub use pallet_dao;
@@ -121,6 +122,9 @@ pub use constants::{
 use eth_primitives::EthService;
 
 mod precompiles;
+use crate::precompiles::{
+	FOREIGN_ASSET_PRECOMPILE_ADDRESS_PREFIX, LOCAL_ASSET_PRECOMPILE_ADDRESS_PREFIX,
+};
 use precompiles::FrontierPrecompiles;
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
@@ -1070,8 +1074,8 @@ parameter_types! {
 	pub const MaxLocks: u32 = 10;
 }
 
-// TODO - Update settings
-impl pallet_dao_assets::Config for Runtime {
+type LocalAssetInstance = pallet_assets::Instance1;
+impl pallet_dao_assets::Config<LocalAssetInstance> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Balance = Balance;
 	type AssetId = AssetId;
@@ -1087,6 +1091,24 @@ impl pallet_dao_assets::Config for Runtime {
 	type Extra = ();
 	type WeightInfo = pallet_dao_assets::weights::SubstrateWeight<Runtime>;
 	type MaxLocks = MaxLocks;
+}
+
+pub struct H160FromAccountId32(H160);
+
+impl AddressAssetIdConversion<AccountId, AssetId> for Runtime {
+	fn address_to_asset_id(address: H160) -> Option<(Vec<u8>, AssetId)> {
+		let mut data = [0u8; 16];
+		let (prefix_part, id_part) = address.as_fixed_bytes().split_at(4);
+		if prefix_part == FOREIGN_ASSET_PRECOMPILE_ADDRESS_PREFIX ||
+			prefix_part == LOCAL_ASSET_PRECOMPILE_ADDRESS_PREFIX
+		{
+			data.copy_from_slice(id_part);
+			let asset_id: AssetId = u128::from_be_bytes(data);
+			Some((prefix_part.to_vec(), asset_id))
+		} else {
+			None
+		}
+	}
 }
 
 parameter_types! {
@@ -1705,7 +1727,7 @@ construct_runtime!(
 		TechnicalMembership: pallet_membership::<Instance1>,
 		Referenda: pallet_referenda,
 		ConvictionVoting: pallet_conviction_voting,
-		Assets: pallet_dao_assets,
+		Assets: pallet_dao_assets::<Instance1>,
 		Democracy: pallet_democracy,
 		Indices: pallet_indices,
 		Elections: pallet_elections_phragmen,
