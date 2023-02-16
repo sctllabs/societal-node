@@ -155,7 +155,7 @@ pub mod pallet {
 			+ MaybeSerializeDeserialize
 			+ MaxEncodedLen
 			+ TypeInfo
-			+ From<u32>
+			+ From<u128>
 			+ Ord;
 
 		type Balance: Member
@@ -457,7 +457,7 @@ pub mod pallet {
 			let mut has_token_id: Option<AssetId<T>> = None;
 
 			if let Some(token) = token {
-				let token_id = Self::u32_to_asset_id(token.token_id);
+				let token_id = Self::u128_to_asset_id(token.token_id);
 				has_token_id = Some(token_id);
 
 				let metadata = token.metadata;
@@ -509,7 +509,7 @@ pub mod pallet {
 
 			if has_token_id.is_none() {
 				if let Some(id) = token_id {
-					let token_id = Self::u32_to_asset_id(id);
+					let token_id = Self::u128_to_asset_id(id);
 					has_token_id = Some(token_id);
 
 					let issuance =
@@ -601,7 +601,7 @@ pub mod pallet {
 			T::PalletId::get().into_sub_account_truncating(dao_id)
 		}
 
-		fn u32_to_asset_id(asset_id: u32) -> AssetId<T> {
+		fn u128_to_asset_id(asset_id: u128) -> AssetId<T> {
 			asset_id.try_into().ok().unwrap()
 		}
 

@@ -149,7 +149,7 @@ pub mod pallet {
 			+ MaybeSerializeDeserialize
 			+ MaxEncodedLen
 			+ TypeInfo
-			+ From<u32>
+			+ From<u128>
 			+ Ord;
 
 		/// Origin from which approvals must come.

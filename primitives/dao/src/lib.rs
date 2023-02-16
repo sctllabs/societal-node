@@ -51,7 +51,7 @@ pub struct DaoTokenMetadata {
 	Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize,
 )]
 pub struct DaoGovernanceToken {
-	pub token_id: u32,
+	pub token_id: u128,
 	pub metadata: DaoTokenMetadata,
 	#[serde(default)]
 	#[serde(deserialize_with = "de_option_string_to_u128")]
@@ -70,7 +70,7 @@ pub struct DaoPayload {
 	#[serde(deserialize_with = "de_string_to_bytes")]
 	pub metadata: Vec<u8>,
 	pub token: Option<DaoGovernanceToken>,
-	pub token_id: Option<u32>,
+	pub token_id: Option<u128>,
 	#[serde(default)]
 	#[serde(deserialize_with = "de_option_string_to_bytes")]
 	pub token_address: Option<Vec<u8>>,

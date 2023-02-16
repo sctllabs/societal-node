@@ -681,7 +681,7 @@ impl pallet_treasury::Config for Runtime {
 	type SpendOrigin = frame_support::traits::NeverEnsureOrigin<u128>;
 }
 
-pub type AssetId = u32;
+pub type AssetId = u128;
 
 impl pallet_dao_treasury::Config for Runtime {
 	type PalletId = DaoTreasuryPalletId;

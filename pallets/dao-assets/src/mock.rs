@@ -87,7 +87,7 @@ impl pallet_balances::Config for Test {
 impl Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type Balance = u64;
-	type AssetId = u32;
+	type AssetId = u128;
 	type Currency = Balances;
 	type ForceOrigin = frame_system::EnsureRoot<u64>;
 	type AssetDeposit = ConstU64<1>;
