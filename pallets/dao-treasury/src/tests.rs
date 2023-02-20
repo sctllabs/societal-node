@@ -101,7 +101,7 @@ parameter_types! {
 	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
 	pub const DaoPalletId: PalletId = PalletId(*b"py/sctld");
 
-	pub TokenId: u32 = 0;
+	pub TokenId: u128 = 0;
 	pub TokenName: String = "dao_token".into();
 	pub TokenSymbol: String = "sctl".into();
 	pub TokenDecimals: u8 = 3;
@@ -167,7 +167,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 pub struct TestAssetProvider;
 impl Create<AccountId> for TestAssetProvider {
 	fn create(
-		_id: u32,
+		_id: u128,
 		_admin: AccountId,
 		_is_sufficient: bool,
 		_min_balance: u128,
@@ -227,21 +227,21 @@ impl Inspect<AccountId> for TestAssetProvider {
 }
 
 impl Mutate<AccountId> for TestAssetProvider {
-	fn mint_into(_asset: u32, _who: &AccountId, _amount: u128) -> DispatchResult {
+	fn mint_into(_asset: u128, _who: &AccountId, _amount: u128) -> DispatchResult {
 		Ok(())
 	}
 
-	fn burn_from(_asset: u32, _who: &AccountId, _amount: u128) -> Result<u128, DispatchError> {
+	fn burn_from(_asset: u128, _who: &AccountId, _amount: u128) -> Result<u128, DispatchError> {
 		Ok(0)
 	}
 
-	fn slash(_asset: u32, _who: &AccountId, _amount: u128) -> Result<u128, DispatchError> {
+	fn slash(_asset: u128, _who: &AccountId, _amount: u128) -> Result<u128, DispatchError> {
 		Ok(0)
 	}
 }
 
 impl MetadataInspect<AccountId> for TestAssetProvider {
-	fn name(asset: u32) -> Vec<u8> {
+	fn name(asset: u128) -> Vec<u8> {
 		if asset == TokenId::get() {
 			return TokenName::get().as_bytes().to_vec()
 		}
@@ -249,7 +249,7 @@ impl MetadataInspect<AccountId> for TestAssetProvider {
 		vec![]
 	}
 
-	fn symbol(asset: u32) -> Vec<u8> {
+	fn symbol(asset: u128) -> Vec<u8> {
 		if asset == TokenId::get() {
 			return TokenSymbol::get().as_bytes().to_vec()
 		}
@@ -257,7 +257,7 @@ impl MetadataInspect<AccountId> for TestAssetProvider {
 		vec![]
 	}
 
-	fn decimals(asset: u32) -> u8 {
+	fn decimals(asset: u128) -> u8 {
 		if asset == TokenId::get() {
 			return TokenDecimals::get()
 		}
@@ -268,7 +268,7 @@ impl MetadataInspect<AccountId> for TestAssetProvider {
 
 impl MetadataMutate<AccountId> for TestAssetProvider {
 	fn set(
-		_asset: u32,
+		_asset: u128,
 		_from: &AccountId,
 		_name: Vec<u8>,
 		_symbol: Vec<u8>,
@@ -280,7 +280,7 @@ impl MetadataMutate<AccountId> for TestAssetProvider {
 
 impl Transfer<AccountId> for TestAssetProvider {
 	fn transfer(
-		asset: u32,
+		asset: u128,
 		source: &AccountId,
 		dest: &AccountId,
 		amount: u128,

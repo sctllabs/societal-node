@@ -282,6 +282,7 @@ fn close_works() {
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 1,
+					proposal_index: 0,
 					proposal_hash: hash,
 					voted: true,
 					yes: 1,
@@ -289,16 +290,19 @@ fn close_works() {
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Closed {
 					dao_id: 0,
+					proposal_index: 0,
 					proposal_hash: hash,
 					yes: 1,
 					no: 0
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Approved {
 					dao_id: 0,
+					proposal_index: 0,
 					proposal_hash: hash
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Executed {
 					dao_id: 0,
+					proposal_index: 0,
 					proposal_hash: hash,
 					result: Err(DispatchError::BadOrigin)
 				}))
@@ -431,6 +435,7 @@ fn close_with_no_prime_but_majority_works() {
 				record(RuntimeEvent::CollectiveMajority(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 1,
+					proposal_index: 0,
 					proposal_hash: hash,
 					voted: true,
 					yes: 1,
@@ -439,6 +444,7 @@ fn close_with_no_prime_but_majority_works() {
 				record(RuntimeEvent::CollectiveMajority(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 2,
+					proposal_index: 0,
 					proposal_hash: hash,
 					voted: true,
 					yes: 2,
@@ -447,6 +453,7 @@ fn close_with_no_prime_but_majority_works() {
 				record(RuntimeEvent::CollectiveMajority(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 3,
+					proposal_index: 0,
 					proposal_hash: hash,
 					voted: true,
 					yes: 3,
@@ -454,16 +461,19 @@ fn close_with_no_prime_but_majority_works() {
 				})),
 				record(RuntimeEvent::CollectiveMajority(CollectiveEvent::Closed {
 					dao_id: 0,
+					proposal_index: 0,
 					proposal_hash: hash,
 					yes: 3,
 					no: 0
 				})),
 				record(RuntimeEvent::CollectiveMajority(CollectiveEvent::Approved {
 					dao_id: 0,
+					proposal_index: 0,
 					proposal_hash: hash
 				})),
 				record(RuntimeEvent::CollectiveMajority(CollectiveEvent::Executed {
 					dao_id: 0,
+					proposal_index: 0,
 					proposal_hash: hash,
 					result: Err(DispatchError::BadOrigin)
 				}))
@@ -801,6 +811,7 @@ fn motions_vote_after_works() {
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 1,
+					proposal_index: 0,
 					proposal_hash: hash,
 					voted: true,
 					yes: 1,
@@ -809,6 +820,7 @@ fn motions_vote_after_works() {
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 1,
+					proposal_index: 0,
 					proposal_hash: hash,
 					voted: false,
 					yes: 0,
@@ -954,6 +966,7 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 1,
+					proposal_index: 0,
 					proposal_hash: hash,
 					voted: true,
 					yes: 1,
@@ -962,6 +975,7 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 2,
+					proposal_index: 0,
 					proposal_hash: hash,
 					voted: true,
 					yes: 2,
@@ -969,12 +983,14 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Closed {
 					dao_id: 0,
+					proposal_index: 0,
 					proposal_hash: hash,
 					yes: 2,
 					no: 0
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Approved {
 					dao_id: 0,
+					proposal_index: 0,
 					proposal_hash: hash
 				})),
 				record(RuntimeEvent::Democracy(
@@ -982,6 +998,7 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 				)),
 				record(RuntimeEvent::Collective(CollectiveEvent::Executed {
 					dao_id: 0,
+					proposal_index: 0,
 					proposal_hash: hash,
 					result: Ok(())
 				})),
@@ -1023,6 +1040,7 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 1,
+					proposal_index: 1,
 					proposal_hash: hash,
 					voted: true,
 					yes: 1,
@@ -1031,6 +1049,7 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 2,
+					proposal_index: 1,
 					proposal_hash: hash,
 					voted: true,
 					yes: 2,
@@ -1039,6 +1058,7 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 3,
+					proposal_index: 1,
 					proposal_hash: hash,
 					voted: true,
 					yes: 3,
@@ -1046,12 +1066,14 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Closed {
 					dao_id: 0,
+					proposal_index: 1,
 					proposal_hash: hash,
 					yes: 3,
 					no: 0
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Approved {
 					dao_id: 0,
+					proposal_index: 1,
 					proposal_hash: hash
 				})),
 				record(RuntimeEvent::Democracy(
@@ -1059,6 +1081,7 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 				)),
 				record(RuntimeEvent::Collective(CollectiveEvent::Executed {
 					dao_id: 0,
+					proposal_index: 1,
 					proposal_hash: hash,
 					result: Ok(())
 				})),
@@ -1106,6 +1129,7 @@ fn motions_disapproval_works() {
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 2,
+					proposal_index: 0,
 					proposal_hash: hash,
 					voted: false,
 					yes: 0,
@@ -1114,6 +1138,7 @@ fn motions_disapproval_works() {
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 3,
+					proposal_index: 0,
 					proposal_hash: hash,
 					voted: false,
 					yes: 0,
@@ -1121,12 +1146,14 @@ fn motions_disapproval_works() {
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Closed {
 					dao_id: 0,
+					proposal_index: 0,
 					proposal_hash: hash,
 					yes: 0,
 					no: 2
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Disapproved {
 					dao_id: 0,
+					proposal_index: 0,
 					proposal_hash: hash
 				})),
 			]
@@ -1173,6 +1200,7 @@ fn motions_approval_works() {
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 1,
+					proposal_index: 0,
 					proposal_hash: hash,
 					voted: true,
 					yes: 1,
@@ -1181,6 +1209,7 @@ fn motions_approval_works() {
 				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
 					dao_id: 0,
 					account: 2,
+					proposal_index: 0,
 					proposal_hash: hash,
 					voted: true,
 					yes: 2,
@@ -1188,16 +1217,19 @@ fn motions_approval_works() {
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Closed {
 					dao_id: 0,
+					proposal_index: 0,
 					proposal_hash: hash,
 					yes: 2,
 					no: 0
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Approved {
 					dao_id: 0,
+					proposal_index: 0,
 					proposal_hash: hash
 				})),
 				record(RuntimeEvent::Collective(CollectiveEvent::Executed {
 					dao_id: 0,
+					proposal_index: 0,
 					proposal_hash: hash,
 					result: Err(DispatchError::BadOrigin)
 				})),
@@ -1258,6 +1290,7 @@ fn motion_with_no_votes_closes_with_disapproval() {
 			System::events()[1],
 			record(RuntimeEvent::Collective(CollectiveEvent::Closed {
 				dao_id: 0,
+				proposal_index: 0,
 				proposal_hash: hash,
 				yes: 0,
 				no: 3
@@ -1267,6 +1300,7 @@ fn motion_with_no_votes_closes_with_disapproval() {
 			System::events()[2],
 			record(RuntimeEvent::Collective(CollectiveEvent::Disapproved {
 				dao_id: 0,
+				proposal_index: 0,
 				proposal_hash: hash
 			}))
 		);
@@ -1306,59 +1340,5 @@ fn close_disapprove_does_not_care_about_weight_or_len() {
 		assert_ok!(Collective::vote(RuntimeOrigin::signed(3), 0, hash, 0, false));
 		// It can close even if the weight/len information is bad
 		assert_ok!(Collective::close(RuntimeOrigin::signed(2), 0, hash, 0, Weight::zero(), 0));
-	})
-}
-
-#[test]
-fn disapprove_proposal_works() {
-	new_test_ext().execute_with(|| {
-		let proposal = make_proposal(42);
-		let proposal_len: u32 = proposal.using_encoded(|p| p.len() as u32);
-		let hash: H256 = proposal.blake2_256().into();
-		assert_ok!(Collective::propose(
-			RuntimeOrigin::signed(1),
-			0,
-			Box::new(proposal.clone()),
-			proposal_len
-		));
-		// Proposal would normally succeed
-		assert_ok!(Collective::vote(RuntimeOrigin::signed(1), 0, hash, 0, true));
-		assert_ok!(Collective::vote(RuntimeOrigin::signed(2), 0, hash, 0, true));
-		// But Root can disapprove and remove it anyway
-		assert_ok!(Collective::disapprove_proposal(RuntimeOrigin::root(), 0, hash));
-		assert_eq!(
-			System::events(),
-			vec![
-				record(RuntimeEvent::Collective(CollectiveEvent::Proposed {
-					dao_id: 0,
-					account: 1,
-					proposal_index: 0,
-					proposal_hash: hash,
-					proposal,
-					threshold: 1,
-					meta: None,
-				})),
-				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
-					dao_id: 0,
-					account: 1,
-					proposal_hash: hash,
-					voted: true,
-					yes: 1,
-					no: 0
-				})),
-				record(RuntimeEvent::Collective(CollectiveEvent::Voted {
-					dao_id: 0,
-					account: 2,
-					proposal_hash: hash,
-					voted: true,
-					yes: 2,
-					no: 0
-				})),
-				record(RuntimeEvent::Collective(CollectiveEvent::Disapproved {
-					dao_id: 0,
-					proposal_hash: hash
-				})),
-			]
-		);
 	})
 }

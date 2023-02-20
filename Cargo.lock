@@ -4825,7 +4825,7 @@ dependencies = [
 [[package]]
 name = "pallet-dao-assets"
 version = "4.0.0-dev"
-source = "git+https://github.com/sctllabs/societal-node?branch=main#30071aefbe937d8c0f700092ad71074a0ac3058a"
+source = "git+https://github.com/sctllabs/societal-node?branch=main#d9e6c8ee93336c5aaa60fd21e7104777489190b1"
 dependencies = [
  "frame-benchmarking",
  "frame-support",

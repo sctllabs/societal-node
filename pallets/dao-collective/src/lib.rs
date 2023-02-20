@@ -703,8 +703,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		let mut no_votes = voting.nays.len() as MemberCount;
 		let mut yes_votes = voting.ayes.len() as MemberCount;
 		let seats = Self::members(dao_id).len() as MemberCount;
-		// TODO: re-visit this
-		let approved = yes_votes >= voting.threshold;
+		let approved = yes_votes > 0 && yes_votes >= voting.threshold;
 		let disapproved = seats.saturating_sub(no_votes) <= voting.threshold;
 		// Allow (dis-)approving the proposal as soon as there are enough votes.
 		if approved {
