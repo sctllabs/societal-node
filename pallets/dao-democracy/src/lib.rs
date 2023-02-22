@@ -444,6 +444,7 @@ pub mod pallet {
 		/// A motion has been proposed by a public account.
 		Proposed {
 			dao_id: DaoId,
+			account: T::AccountId,
 			proposal_index: PropIndex,
 			proposal: BoundedCallOf<T>,
 			deposit: BalanceOf<T>,
@@ -613,11 +614,12 @@ pub mod pallet {
 
 			PublicPropCount::<T>::insert(dao_id, index + 1);
 
-			PublicProps::<T>::try_append(dao_id, (index, proposal.clone(), who))
+			PublicProps::<T>::try_append(dao_id, (index, proposal.clone(), who.clone()))
 				.map_err(|_| Error::<T>::TooMany)?;
 
 			Self::deposit_event(Event::<T>::Proposed {
 				dao_id,
+				account: who,
 				proposal_index: index,
 				proposal,
 				deposit: value,
