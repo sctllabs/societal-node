@@ -217,11 +217,13 @@ type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup
 pub mod pallet {
 	use super::{DispatchResult, *};
 	use frame_support::{
+		dispatch::{GetDispatchInfo, PostDispatchInfo},
 		pallet_prelude::*,
 		traits::{EnsureOriginWithArg, TryDrop},
 	};
 	use frame_system::pallet_prelude::*;
 	use sp_core::H256;
+	use sp_runtime::traits::Dispatchable;
 
 	/// The current storage version.
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
@@ -254,6 +256,14 @@ pub mod pallet {
 			+ InspectHold<Self::AccountId>
 			+ MutateHold<Self::AccountId>
 			+ BalancedHold<Self::AccountId>;
+
+		type Proposal: Parameter
+			+ Dispatchable<
+				RuntimeOrigin = <Self as frame_system::Config>::RuntimeOrigin,
+				PostInfo = PostDispatchInfo,
+			> + From<frame_system::Call<Self>>
+			+ From<<Self as frame_system::Config>::RuntimeCall>
+			+ GetDispatchInfo;
 
 		/// The maximum number of votes for an account.
 		///
@@ -446,7 +456,7 @@ pub mod pallet {
 			dao_id: DaoId,
 			account: T::AccountId,
 			proposal_index: PropIndex,
-			proposal: BoundedCallOf<T>,
+			proposal: T::Proposal,
 			deposit: BalanceOf<T>,
 			meta: Option<Vec<u8>>,
 		},
@@ -455,7 +465,12 @@ pub mod pallet {
 		/// An external proposal has been tabled.
 		ExternalTabled,
 		/// A referendum has begun.
-		Started { dao_id: DaoId, ref_index: ReferendumIndex, threshold: VoteThreshold },
+		Started {
+			dao_id: DaoId,
+			ref_index: ReferendumIndex,
+			prop_index: PropIndex,
+			threshold: VoteThreshold,
+		},
 		/// A proposal has been approved by referendum.
 		Passed { dao_id: DaoId, ref_index: ReferendumIndex },
 		/// A proposal has been rejected by referendum.
@@ -609,6 +624,9 @@ pub mod pallet {
 				DaoToken::EthTokenAddress(_) => {},
 			}
 
+			// Make sure using Inline type of Bounded
+			let (proposal_dispatch_data, _) = T::Preimages::peek(&proposal)?;
+
 			let depositors = BoundedVec::<_, T::MaxDeposits>::truncate_from(vec![who.clone()]);
 			DepositOf::<T>::insert(dao_id, index, (depositors, value));
 
@@ -621,7 +639,7 @@ pub mod pallet {
 				dao_id,
 				account: who,
 				proposal_index: index,
-				proposal,
+				proposal: proposal_dispatch_data.into(),
 				deposit: value,
 				meta,
 			});
@@ -875,6 +893,7 @@ pub mod pallet {
 			Self::inject_referendum(
 				dao_id,
 				now.saturating_add(voting_period),
+				0,
 				ext_proposal,
 				threshold,
 				delay,
@@ -1640,6 +1659,7 @@ impl<T: Config> Pallet<T> {
 	fn inject_referendum(
 		dao_id: DaoId,
 		end: T::BlockNumber,
+		prop_index: PropIndex,
 		proposal: BoundedCallOf<T>,
 		threshold: VoteThreshold,
 		delay: T::BlockNumber,
@@ -1650,7 +1670,7 @@ impl<T: Config> Pallet<T> {
 			ReferendumStatus { end, proposal, threshold, delay, tally: Default::default() };
 		let item = ReferendumInfo::Ongoing(status);
 		<ReferendumInfoOf<T>>::insert(dao_id, ref_index, item);
-		Self::deposit_event(Event::<T>::Started { dao_id, ref_index, threshold });
+		Self::deposit_event(Event::<T>::Started { dao_id, ref_index, prop_index, threshold });
 		ref_index
 	}
 
@@ -1675,6 +1695,7 @@ impl<T: Config> Pallet<T> {
 			Self::inject_referendum(
 				dao_id,
 				now.saturating_add(Self::u32_to_block_number(voting_period)),
+				0, // dummy value - external proposal are not indexed
 				proposal,
 				threshold,
 				Self::u32_to_block_number(enactment_period),
@@ -1717,6 +1738,7 @@ impl<T: Config> Pallet<T> {
 				Self::inject_referendum(
 					dao_id,
 					now.saturating_add(Self::u32_to_block_number(voting_period)),
+					prop_index,
 					proposal,
 					VoteThreshold::SuperMajorityApprove,
 					Self::u32_to_block_number(enactment_period),

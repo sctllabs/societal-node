@@ -1193,6 +1193,7 @@ impl pallet_dao_democracy::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
 	type Assets = Assets;
+	type Proposal = RuntimeCall;
 
 	/// A straight majority of the council can decide what their next motion is.
 	type ExternalOrigin =

@@ -67,6 +67,7 @@ fn add_referendum<T: Config>(n: u32) -> (ReferendumIndex, H256) {
 		Democracy::<T>::inject_referendum(
 			0,
 			T::BlockNumber::min_value(),
+			0u32,
 			proposal,
 			vote_threshold,
 			0u32.into(),
