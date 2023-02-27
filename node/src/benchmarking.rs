@@ -20,7 +20,10 @@
 //!
 //! Should only be used for benchmarking as it may break in other contexts.
 
+#[cfg(not(any(feature = "parachain", feature = "runtime-benchmarks")))]
 use crate::service::FullClient;
+#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+use crate::para_service::FullClient;
 
 use runtime::{AccountId, Balance, BalancesCall, SystemCall};
 use sc_cli::Result;
