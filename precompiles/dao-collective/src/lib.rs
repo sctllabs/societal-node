@@ -111,7 +111,7 @@ where
 		Self::propose_with_meta(handle, dao_id, proposal, BoundedBytes::from(""))
 	}
 
-	#[precompile::public("propose(uint32,bytes,bytes)")]
+	#[precompile::public("propose_with_meta(uint32,bytes,bytes)")]
 	fn propose_with_meta(
 		handle: &mut impl PrecompileHandle,
 		dao_id: DaoId,

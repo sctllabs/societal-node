@@ -190,7 +190,7 @@ where
 	}
 
 	// The dispatchable wrappers are next. They dispatch a Substrate inner Call.
-	#[precompile::public("propose(uint32,bytes32,uint256,bytes)")]
+	#[precompile::public("propose_with_meta(uint32,bytes32,uint256,bytes)")]
 	fn propose_with_meta(
 		handle: &mut impl PrecompileHandle,
 		dao_id: DaoId,
