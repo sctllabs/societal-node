@@ -1,0 +1,21 @@
+image:
+  repository: societal/societal-node
+  tag: latest
+
+node:
+  chain: local
+
+  role: validator
+
+  command: societal-node
+
+  customChainspecPath: ""
+
+  allowUnsafeRpcMethods: Unsafe
+
+  chainData:
+    volumeSize: 20Gi
+    storageClass: gp2
+
+  chainKeystore:
+    storageClass: gp2
