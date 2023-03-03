@@ -1,0 +1,43 @@
+name: 'Docker Build Publish'
+runs:
+  using: 'composite'
+  steps:
+  - name: Cache Docker layers
+    uses: actions/cache@v2
+    with:
+      path: /tmp/.buildx-cache-societal-node
+      key: ${{ runner.os }}-societal-node-${{ github.sha }}
+      restore-keys: |
+        ${{ runner.os }}-societal-node
+
+  - name: Docker meta
+    id: meta
+    uses: docker/metadata-action@v3
+    with:
+      images: |
+        ${{ env.DOCKER_REPO }}
+      tags: |
+        type=raw,value=latest
+        type=raw,value=${{ env.DOCKER_ENV_TAG }}
+        type=ref,event=branch,suffix=-latest
+        type=sha,prefix=,format=long
+
+  - name: Set up Docker Buildx
+    uses: docker/setup-buildx-action@v1
+
+  - name: Build And Push
+    uses: docker/build-push-action@v2
+    with:
+      context: .
+      file: Dockerfile
+      platforms: linux/amd64
+      tags: ${{ steps.meta.outputs.tags }}
+      push: true
+      cache-from: type=local,src=/tmp/.buildx-cache-societal-node
+      cache-to: type=local,mode=max,dest=/tmp/.buildx-cache-societal-node-new
+
+  - name: Move cache
+    shell: bash
+    run: |
+      rm -rf /tmp/.buildx-cache-societal-node
+      mv /tmp/.buildx-cache-societal-node-new /tmp/.buildx-cache-societal-node
