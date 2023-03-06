@@ -44,10 +44,5 @@ jobs:
         id: rev
         run: echo "value=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      # Build and push 2 images, One with the version tag and the other with latest tag
-      - name: Build and push Docker images
-        uses: docker/build-push-action@v3.2.0
-        with:
-          context: .
-          push: true
-          tags: ${{ env.DOCKER_REPO }}:v${{ steps.rev.outputs.value }}, ${{ env.DOCKER_REPO }}:latest
+      - name: Docker Build Publish
+        uses: ./.github/actions/docker-build-publish
