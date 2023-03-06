@@ -17,6 +17,9 @@ LABEL description="Multistage Docker image for Societal Node" \
   image.source="https://github.com/sctllabs/societal-node" \
   image.documentation="https://github.com/sctllabs/societal-node"
 
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
+RUN update-ca-certificates
+
 # Copy the node binary.
 COPY --from=builder /societal-node/target/release/societal-node /usr/local/bin
 
