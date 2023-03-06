@@ -24,8 +24,6 @@ RUN useradd -m -u 1000 -U -s /bin/sh -d /node-dev node-dev && \
   mkdir -p /chain-data /node-dev/.local/share && \
   chown -R node-dev:node-dev /chain-data && \
   ln -s /chain-data /node-dev/.local/share/societal-node && \
-  # unclutter and minimize the attack surface
-  rm -rf /usr/bin /usr/sbin && \
   # check if executable works in this container
   /usr/local/bin/societal-node --version
 
@@ -34,4 +32,4 @@ USER node-dev
 EXPOSE 30333 9933 9944 9615
 VOLUME ["/chain-data"]
 
-ENTRYPOINT ["/usr/local/bin/societal-node"]
+CMD ["/usr/local/bin/societal-node"]
