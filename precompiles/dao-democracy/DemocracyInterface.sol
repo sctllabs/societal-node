@@ -101,17 +101,17 @@ interface Democracy {
     /// @custom:selector 7824e7d1
     ///
     /// @param dao_id DAO ID
-    /// @param proposalHash The hash of the proposal you are making
+    /// @param proposal SCALE-encoded Substrate call.
     /// @param value The number of tokens to be locked behind this proposal.
-    function propose(uint32 dao_id, bytes32 proposalHash, uint256 value) external;
+    function propose(uint32 dao_id, bytes memory proposal, uint256 value) external;
 
     /// Same as 'propose' with additional 'meta' included.
     ///
     /// @param dao_id DAO ID
-    /// @param proposalHash The hash of the proposal you are making
+    /// @param proposal SCALE-encoded Substrate call.
     /// @param value The number of tokens to be locked behind this proposal.
     /// @param meta Proposal Metadata.
-    function propose_with_meta(uint32 dao_id, bytes32 proposalHash, uint256 value, bytes memory meta) external;
+    function propose_with_meta(uint32 dao_id, bytes memory proposal, uint256 value, bytes memory meta) external;
 
     /// Signal agreement with a proposal
     /// @custom:selector c7a76601
