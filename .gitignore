@@ -21,3 +21,6 @@
 
 #IntelliJ IDEA
 .idea
+
+# temp folder
+tmp
