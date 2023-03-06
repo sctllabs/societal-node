@@ -1,7 +1,11 @@
+## Image of Societal Node.
+##
 image:
   repository: societal/societal-node
   tag: latest
 
+## Deploy a substrate node
+## ref: https://docs.substrate.io/tutorials/v3/private-network/
 node:
   chain: local
 
@@ -13,9 +17,50 @@ node:
 
   allowUnsafeRpcMethods: Unsafe
 
+  # Enable Offchain Indexing.
+  # https://docs.substrate.io/fundamentals/offchain-operations/
+  offchainIndexing: true
+
   chainData:
     volumeSize: 20Gi
     storageClass: gp2
 
   chainKeystore:
     storageClass: gp2
+
+  ## Creates an ingress resource
+  ##
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-development
+      nginx.ingress.kubernetes.io/rewrite-target: /
+    rules:
+      - host: node-rpc.dev.sctl.link
+        http:
+          paths:
+            - path: /
+              pathType: ImplementationSpecific
+              backend:
+                service:
+                  name: societal-node
+                  port:
+                    number: 9933
+      - host: node-ws.dev.sctl.link
+        http:
+          paths:
+            - path: /
+              pathType: ImplementationSpecific
+              backend:
+                service:
+                  name: societal-node
+                  port:
+                    number: 9944
+    tls:
+      - hosts:
+          - node-rpc.dev.sctl.link
+        secretName: societal-node-rpc-tls-secret
+      - hosts:
+          - node-ws.dev.sctl.link
+        secretName: societal-node-ws-tls-secret
