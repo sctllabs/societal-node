@@ -5,7 +5,7 @@
 use fp_evm::PrecompileHandle;
 use frame_support::{
 	dispatch::{Dispatchable, GetDispatchInfo, PostDispatchInfo},
-	traits::{Bounded, ConstU32, Currency},
+	traits::{Bounded, BoundedInline, ConstU32, Currency},
 };
 use pallet_dao_democracy::{
 	AccountVote, Call as DemocracyCall, Conviction, ReferendumInfo, Vote, VoteThreshold,
@@ -19,6 +19,7 @@ use sp_std::{
 	convert::{TryFrom, TryInto},
 	fmt::Debug,
 	marker::PhantomData,
+	vec::Vec,
 };
 
 #[cfg(feature = "dao_democracy_tests")]
@@ -31,6 +32,7 @@ mod tests;
 /// Dao ID. Just a `u32`.
 pub type DaoId = u32;
 
+type GetProposalLimit = ConstU32<100>;
 type GetProposalMetaLimit = ConstU32<100>;
 
 type BalanceOf<Runtime> = <<Runtime as pallet_dao_democracy::Config>::Currency as Currency<
@@ -179,22 +181,22 @@ where
 	}
 
 	// The dispatchable wrappers are next. They dispatch a Substrate inner Call.
-	#[precompile::public("propose(uint32,bytes32,uint256)")]
+	#[precompile::public("propose(uint32,bytes,uint256)")]
 	fn propose(
 		handle: &mut impl PrecompileHandle,
 		dao_id: DaoId,
-		proposal_hash: H256,
+		proposal: BoundedBytes<GetProposalLimit>,
 		value: U256,
 	) -> EvmResult {
-		Self::propose_with_meta(handle, dao_id, proposal_hash, value, BoundedBytes::from(""))
+		Self::propose_with_meta(handle, dao_id, proposal, value, BoundedBytes::from(""))
 	}
 
 	// The dispatchable wrappers are next. They dispatch a Substrate inner Call.
-	#[precompile::public("propose_with_meta(uint32,bytes32,uint256,bytes)")]
+	#[precompile::public("propose_with_meta(uint32,bytes,uint256,bytes)")]
 	fn propose_with_meta(
 		handle: &mut impl PrecompileHandle,
 		dao_id: DaoId,
-		proposal_hash: H256,
+		proposal: BoundedBytes<GetProposalLimit>,
 		value: U256,
 		meta: BoundedBytes<GetProposalMetaLimit>,
 	) -> EvmResult {
@@ -208,19 +210,17 @@ where
 
 		log::trace!(
 			target: "democracy-precompile",
-			"Dao {:?}: Proposing with hash {:?}, and amount {:?}", dao_id, proposal_hash, value
+			"Dao {:?}: Proposing {:?}, and amount {:?}", dao_id, proposal, value
 		);
 
-		// TODO: should have length
-		let bounded = Bounded::Legacy::<pallet_dao_democracy::CallOf<Runtime>> {
-			hash: proposal_hash,
-			dummy: Default::default(),
-		};
+		let proposal: Vec<u8> = proposal.into();
+		let bounded = BoundedInline::try_from(proposal)
+			.map_err(|_| RevertReason::custom("Proposal is too long").in_field("proposal"))?;
 
 		let origin = Runtime::AddressMapping::into_account_id(handle.context().caller);
 		let call = DemocracyCall::<Runtime>::propose_with_meta {
 			dao_id,
-			proposal: bounded,
+			proposal: Bounded::Inline(bounded),
 			value,
 			meta: Some(meta.into()),
 		};
