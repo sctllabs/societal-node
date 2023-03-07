@@ -12,14 +12,7 @@ use serde_json::json;
 const SEED: u32 = 0;
 
 // Create the pre-requisite information needed to create a dao.
-fn setup_dao<T: Config>(
-	u: u32,
-) -> (
-	T::AccountId,
-	Vec<<T::Lookup as StaticLookup>::Source>,
-	Vec<<T::Lookup as StaticLookup>::Source>,
-	Vec<u8>,
-) {
+fn setup_dao<T: Config>(u: u32) -> (T::AccountId, Vec<T::AccountId>, Vec<T::AccountId>, Vec<u8>) {
 	let caller = account("caller", u, SEED);
 	let council_account = account("account", u, SEED);
 	let technical_committee_account = account("account", u, SEED);
