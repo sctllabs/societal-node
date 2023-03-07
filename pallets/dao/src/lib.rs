@@ -397,8 +397,8 @@ pub mod pallet {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(4).ref_time())]
 		pub fn create_dao(
 			origin: OriginFor<T>,
-			council: Vec<<T::Lookup as StaticLookup>::Source>,
-			technical_committee: Vec<<T::Lookup as StaticLookup>::Source>,
+			council: Vec<T::AccountId>,
+			technical_committee: Vec<T::AccountId>,
 			data: Vec<u8>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin.clone())?;
@@ -424,8 +424,7 @@ pub mod pallet {
 
 			// setting submitter as a Dao council by default
 			let mut council_members: Vec<T::AccountId> = vec![who.clone()];
-			for member in council {
-				let account = T::Lookup::lookup(member)?;
+			for account in council {
 				if council_members.contains(&account) {
 					continue
 				}
@@ -439,8 +438,10 @@ pub mod pallet {
 			.map_err(|_| Error::<T>::CouncilMembersOverflow)?;
 
 			let mut technical_committee_members: Vec<T::AccountId> = vec![];
-			for member in technical_committee.into_iter() {
-				let account = T::Lookup::lookup(member)?;
+			for account in technical_committee.into_iter() {
+				if technical_committee_members.contains(&account) {
+					continue
+				}
 
 				technical_committee_members.push(account);
 			}

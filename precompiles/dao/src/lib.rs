@@ -63,16 +63,12 @@ where
 
 		let council = Vec::from(council)
 			.into_iter()
-			.map(|address| {
-				Runtime::Lookup::unlookup(Runtime::AddressMapping::into_account_id(address.into()))
-			})
+			.map(|address| Runtime::AddressMapping::into_account_id(address.into()))
 			.collect();
 
 		let technical_committee = Vec::from(technical_committee)
 			.into_iter()
-			.map(|address| {
-				Runtime::Lookup::unlookup(Runtime::AddressMapping::into_account_id(address.into()))
-			})
+			.map(|address| Runtime::AddressMapping::into_account_id(address.into()))
 			.collect();
 
 		let call = pallet_dao::Call::<Runtime>::create_dao {
