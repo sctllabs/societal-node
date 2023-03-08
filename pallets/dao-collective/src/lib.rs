@@ -60,10 +60,14 @@ use frame_support::{
 		PostDispatchInfo,
 	},
 	ensure,
-	traits::{Backing, EnsureOrigin, EnsureOriginWithArg, Get, GetBacking, StorageVersion},
+	traits::{
+		Backing, Bounded, EnsureOrigin, EnsureOriginWithArg, Get, GetBacking, QueryPreimage,
+		StorageVersion,
+	},
 	weights::Weight,
 	Parameter,
 };
+use sp_core::bounded::BoundedVec;
 
 #[cfg(test)]
 mod tests;
@@ -86,6 +90,8 @@ pub type ProposalIndex = u32;
 /// This also serves as a number of voting members, and since for motions, each member may
 /// vote exactly once, therefore also the number of votes for any given motion.
 pub type MemberCount = u32;
+
+pub type BoundedProposal<T, I> = Bounded<<T as Config<I>>::Proposal>;
 
 /// Default voting strategy when a member is inactive.
 pub trait DefaultVote {
@@ -128,16 +134,16 @@ impl<AccountId, I> GetBacking for RawOrigin<AccountId, I> {
 }
 
 /// Info for keeping track of a motion being voted on.
-#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo)]
-pub struct Votes<AccountId, BlockNumber> {
+#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+pub struct Votes<BlockNumber, VotingSet> {
 	/// The proposal's unique index.
 	index: ProposalIndex,
 	/// The number of approval votes that are needed to pass the motion.
 	threshold: MemberCount,
 	/// The current set of voters that approved it.
-	ayes: Vec<AccountId>,
+	ayes: VotingSet,
 	/// The current set of voters that rejected it.
-	nays: Vec<AccountId>,
+	nays: VotingSet,
 	/// The hard end time of this vote.
 	end: BlockNumber,
 }
@@ -145,7 +151,10 @@ pub struct Votes<AccountId, BlockNumber> {
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use frame_support::pallet_prelude::*;
+	use frame_support::{
+		pallet_prelude::*,
+		traits::{QueryPreimage, StorePreimage},
+	};
 	use frame_system::pallet_prelude::*;
 
 	/// The current storage version.
@@ -154,7 +163,6 @@ pub mod pallet {
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
 	#[pallet::storage_version(STORAGE_VERSION)]
-	#[pallet::without_storage_info]
 	pub struct Pallet<T, I = ()>(PhantomData<(T, I)>);
 
 	#[pallet::config]
@@ -188,6 +196,10 @@ pub mod pallet {
 		/// + This pallet assumes that dependents keep to the limit without enforcing it.
 		type MaxMembers: Get<MemberCount>;
 
+		/// The maximum number of votes(ayes/nays) for a proposal.
+		#[pallet::constant]
+		type MaxVotes: Get<u32>;
+
 		/// Default vote strategy of this collective.
 		type DefaultVote: DefaultVote;
 
@@ -200,6 +212,9 @@ pub mod pallet {
 			AccountId = Self::AccountId,
 			Policy = DaoPolicy,
 		>;
+
+		/// The preimage provider with which we look up call hashes to get the call.
+		type Preimages: QueryPreimage + StorePreimage;
 	}
 
 	/// Origin for the collective pallet.
@@ -221,7 +236,7 @@ pub mod pallet {
 		DaoId,
 		Identity,
 		T::Hash,
-		<T as Config<I>>::Proposal,
+		BoundedProposal<T, I>,
 		OptionQuery,
 	>;
 
@@ -234,7 +249,7 @@ pub mod pallet {
 		DaoId,
 		Identity,
 		T::Hash,
-		Votes<T::AccountId, T::BlockNumber>,
+		Votes<T::BlockNumber, BoundedVec<T::AccountId, T::MaxVotes>>,
 		OptionQuery,
 	>;
 
@@ -248,7 +263,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn members)]
 	pub type Members<T: Config<I>, I: 'static = ()> =
-		StorageMap<_, Twox64Concat, DaoId, Vec<T::AccountId>, ValueQuery>;
+		StorageMap<_, Twox64Concat, DaoId, BoundedVec<T::AccountId, T::MaxMembers>, ValueQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -320,6 +335,10 @@ pub mod pallet {
 		WrongProposalLength,
 		/// Metadata size exceeds the limits
 		MetadataTooLong,
+		/// There can only be a maximum of `MaxVotes` votes for proposal.
+		TooManyVotes,
+		/// There can only be a maximum of `MaxMembers` votes for proposal.
+		TooManyMembers,
 	}
 
 	// Note that councillor operations are assigned to the operational class.
@@ -458,6 +477,8 @@ pub mod pallet {
 			let members = Self::members(dao_id);
 			ensure!(members.contains(&who), Error::<T, I>::NotMember);
 
+			let proposal = T::Preimages::bound(proposal)?.transmute();
+
 			if let Some(metadata) = meta.clone() {
 				ensure!(
 					BoundedVec::<u8, <T as Config<I>>::ProposalMetadataLimit>::try_from(metadata)
@@ -584,7 +605,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	pub fn do_propose_proposed(
 		who: T::AccountId,
 		dao_id: DaoId,
-		proposal: Box<<T as Config<I>>::Proposal>,
+		proposal: BoundedProposal<T, I>,
 		length_bound: MemberCount,
 		meta: Option<Vec<u8>>,
 	) -> Result<(u32, u32), DispatchError> {
@@ -613,12 +634,21 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 				Ok(proposals.len())
 			})?;
 
+		// Make sure using Inline type of Bounded
+		let (proposal_dispatch_data, _) = T::Preimages::peek(&proposal)?;
+
 		let index = Self::proposal_count(dao_id);
 		<ProposalCount<T, I>>::mutate(dao_id, |i| *i += 1);
-		<ProposalOf<T, I>>::insert(dao_id, proposal_hash, proposal.clone());
+		<ProposalOf<T, I>>::insert(dao_id, proposal_hash, proposal);
 		let votes = {
 			let end = frame_system::Pallet::<T>::block_number() + policy.proposal_period.into();
-			Votes { index, threshold, ayes: vec![], nays: vec![], end }
+			Votes {
+				index,
+				threshold,
+				ayes: BoundedVec::<T::AccountId, T::MaxVotes>::default(),
+				nays: BoundedVec::<T::AccountId, T::MaxVotes>::default(),
+				end,
+			}
 		};
 		<Voting<T, I>>::insert(dao_id, proposal_hash, votes);
 
@@ -627,7 +657,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			account: who,
 			proposal_index: index,
 			proposal_hash,
-			proposal: *proposal,
+			proposal: proposal_dispatch_data,
 			threshold,
 			meta,
 		});
@@ -654,7 +684,11 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 
 		if approve {
 			if position_yes.is_none() {
-				voting.ayes.push(who.clone());
+				let mut ayes = voting.ayes.to_vec();
+				ayes.push(who.clone());
+
+				voting.ayes = BoundedVec::<T::AccountId, T::MaxVotes>::try_from(ayes)
+					.map_err(|_| Error::<T, I>::TooManyVotes)?;
 			} else {
 				return Err(Error::<T, I>::DuplicateVote.into())
 			}
@@ -663,7 +697,11 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			}
 		} else {
 			if position_no.is_none() {
-				voting.nays.push(who.clone());
+				let mut nays = voting.nays.to_vec();
+				nays.push(who.clone());
+
+				voting.nays = BoundedVec::<T::AccountId, T::MaxVotes>::try_from(nays)
+					.map_err(|_| Error::<T, I>::TooManyVotes)?;
 			} else {
 				return Err(Error::<T, I>::DuplicateVote.into())
 			}
@@ -813,10 +851,16 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		ensure!(proposal_len <= length_bound, Error::<T, I>::WrongProposalLength);
 		let proposal =
 			ProposalOf::<T, I>::get(dao_id, hash).ok_or(Error::<T, I>::ProposalMissing)?;
-		let proposal_weight = proposal.get_dispatch_info().weight;
+
+		let (call, _lookup_len) = match T::Preimages::peek(&proposal) {
+			Ok(c) => c,
+			Err(_) => return Err(Error::<T, I>::ProposalMissing.into()),
+		};
+
+		let proposal_weight = call.get_dispatch_info().weight;
 
 		ensure!(proposal_weight.all_lte(weight_bound), Error::<T, I>::WrongProposalWeight);
-		Ok((proposal, proposal_len as usize))
+		Ok((call, proposal_len as usize))
 	}
 
 	/// Weight:
@@ -921,13 +965,27 @@ impl<T: Config<I>, I: 'static> ChangeDaoMembers<DaoId, T::AccountId> for Pallet<
 		for h in Self::proposals(dao_id).into_iter() {
 			<Voting<T, I>>::mutate(dao_id, h, |v| {
 				if let Some(mut votes) = v.take() {
-					votes.ayes.retain(|i| outgoing.binary_search(i).is_err());
-					votes.nays.retain(|i| outgoing.binary_search(i).is_err());
+					let ayes: Vec<T::AccountId> = votes
+						.ayes
+						.iter()
+						.cloned()
+						.filter(|i| outgoing.binary_search(i).is_err())
+						.collect();
+					votes.ayes = BoundedVec::<T::AccountId, T::MaxVotes>::try_from(ayes).unwrap();
+
+					let nays: Vec<T::AccountId> = votes
+						.nays
+						.iter()
+						.cloned()
+						.filter(|i| outgoing.binary_search(i).is_err())
+						.collect();
+					votes.nays = BoundedVec::<T::AccountId, T::MaxVotes>::try_from(nays).unwrap();
 					*v = Some(votes);
 				}
 			});
 		}
-		Members::<T, I>::insert(dao_id, new);
+		let members = BoundedVec::<T::AccountId, T::MaxMembers>::try_from(new.to_vec()).unwrap();
+		Members::<T, I>::insert(dao_id, members);
 	}
 }
 
@@ -1050,7 +1108,11 @@ impl<
 impl<T: Config<I>, I: 'static> InitializeDaoMembers<DaoId, T::AccountId> for Pallet<T, I> {
 	fn initialize_members(dao_id: DaoId, members: Vec<T::AccountId>) -> Result<(), DispatchError> {
 		// considering we've checked everything in membership pallet
-		<Members<T, I>>::insert(dao_id, members);
+		<Members<T, I>>::insert(
+			dao_id,
+			BoundedVec::<T::AccountId, T::MaxMembers>::try_from(members)
+				.map_err(|_| Error::<T, I>::TooManyMembers)?,
+		);
 
 		Ok(())
 	}
