@@ -56,7 +56,7 @@ pub use pallet::*;
 pub use weights::WeightInfo;
 
 use dao_primitives::{
-	ChangeDaoMembers, ContainsDaoMember, DaoOrigin, DaoPolicy, DaoProvider, InitializeDaoMembers,
+	ChangeDaoMembers, ContainsDaoMember, DaoPolicy, DaoProvider, InitializeDaoMembers,
 };
 
 /// Dao ID. Just a `u32`.
@@ -104,12 +104,12 @@ pub mod pallet {
 		/// Weight information for extrinsics in this pallet.
 		type WeightInfo: WeightInfo;
 
-		// TODO: rework providers
 		type DaoProvider: DaoProvider<
 			<Self as frame_system::Config>::Hash,
 			Id = u32,
 			AccountId = Self::AccountId,
 			Policy = DaoPolicy,
+			Origin = OriginFor<Self>,
 		>;
 	}
 
@@ -157,7 +157,7 @@ pub mod pallet {
 			dao_id: DaoId,
 			who: T::AccountId,
 		) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
+			T::DaoProvider::ensure_approved(origin, dao_id)?;
 
 			let mut members = <Members<T, I>>::get(dao_id);
 			let location = members.binary_search(&who).err().ok_or(Error::<T, I>::AlreadyMember)?;
@@ -182,7 +182,7 @@ pub mod pallet {
 			dao_id: DaoId,
 			who: T::AccountId,
 		) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
+			T::DaoProvider::ensure_approved(origin, dao_id)?;
 
 			let mut members = <Members<T, I>>::get(dao_id);
 			let location = members.binary_search(&who).ok().ok_or(Error::<T, I>::NotMember)?;
@@ -206,7 +206,7 @@ pub mod pallet {
 			remove: T::AccountId,
 			add: T::AccountId,
 		) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
+			T::DaoProvider::ensure_approved(origin, dao_id)?;
 
 			if remove == add {
 				return Ok(())
@@ -241,7 +241,7 @@ pub mod pallet {
 			dao_id: DaoId,
 			members: Vec<T::AccountId>,
 		) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
+			T::DaoProvider::ensure_approved(origin, dao_id)?;
 
 			let mut members: BoundedVec<T::AccountId, T::MaxMembers> =
 				BoundedVec::try_from(members).map_err(|_| Error::<T, I>::TooManyMembers)?;
@@ -294,17 +294,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	/// Check whether `who` is a member of the collective.
 	pub fn is_member(dao_id: DaoId, who: &T::AccountId) -> bool {
 		Self::sorted_members(dao_id).binary_search(who).is_ok()
-	}
-
-	pub fn ensure_approved(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
-		let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
-		let approve_origin = T::DaoProvider::policy(dao_id)?.approve_origin;
-		T::ApproveOrigin::ensure_origin(
-			origin,
-			&DaoOrigin { dao_account_id, proportion: approve_origin },
-		)?;
-
-		Ok(())
 	}
 }
 

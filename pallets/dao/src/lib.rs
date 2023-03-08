@@ -10,13 +10,14 @@ use frame_support::{
 	},
 	BoundedVec, PalletId,
 };
+use frame_system::pallet_prelude::OriginFor;
 pub use pallet::*;
 use scale_info::{prelude::*, TypeInfo};
 use serde::{self, Deserialize};
 use sp_core::crypto::KeyTypeId;
 use sp_io::offchain_index;
 use sp_runtime::{
-	traits::{AccountIdConversion, AtLeast32BitUnsigned, BlockNumberProvider, StaticLookup},
+	traits::{AccountIdConversion, AtLeast32BitUnsigned, BlockNumberProvider},
 	transaction_validity::{
 		InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
 	},
@@ -212,6 +213,8 @@ pub mod pallet {
 		type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
 
 		type OffchainEthService: EthRpcService;
+
+		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
 	}
 
 	/// Origin for the dao pallet.
@@ -595,6 +598,26 @@ pub mod pallet {
 
 			Ok(())
 		}
+
+		#[pallet::weight(10_000)]
+		pub fn update_dao_metadata(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			metadata: Vec<u8>,
+		) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			let dao_metadata = BoundedVec::<u8, T::DaoMetadataLimit>::try_from(metadata)
+				.map_err(|_| Error::<T>::MetadataTooLong)?;
+
+			Daos::<T>::mutate(dao_id, |maybe_dao| {
+				if let Some(dao) = maybe_dao {
+					dao.config.metadata = dao_metadata;
+				}
+			});
+
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -669,6 +692,8 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 	type AccountId = T::AccountId;
 	type AssetId = T::AssetId;
 	type Policy = PolicyOf;
+	type Origin = OriginFor<T>;
+	type ApproveOrigin = T::ApproveOrigin;
 
 	fn exists(id: Self::Id) -> Result<(), DispatchError> {
 		if !Daos::<T>::contains_key(id) {
@@ -706,6 +731,19 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 					DaoToken::EthTokenAddress(token_address.to_vec()),
 			}),
 		}
+	}
+
+	fn ensure_approved(
+		origin: OriginFor<T>,
+		dao_id: Self::Id,
+	) -> DispatchResultWithDaoOrigin<Self::AccountId> {
+		let dao_account_id = Self::dao_account_id(dao_id);
+		let approve_origin = Self::policy(dao_id)?.approve_origin;
+		let dao_origin = DaoOrigin { dao_account_id, proportion: approve_origin };
+
+		Self::ApproveOrigin::ensure_origin(origin, &dao_origin)?;
+
+		Ok(dao_origin)
 	}
 }
 

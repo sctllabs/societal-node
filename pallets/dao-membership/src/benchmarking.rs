@@ -21,7 +21,7 @@
 //! DAO Membership pallet benchmarking.
 
 use super::{Pallet as Membership, *};
-use dao_primitives::DaoPolicyProportion;
+use dao_primitives::{DaoOrigin, DaoPolicyProportion};
 use frame_benchmarking::{account, benchmarks_instance_pallet, whitelist};
 use frame_support::assert_ok;
 use frame_system::RawOrigin;

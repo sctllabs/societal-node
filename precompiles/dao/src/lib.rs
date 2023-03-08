@@ -7,7 +7,6 @@ use frame_support::dispatch::{Dispatchable, GetDispatchInfo, PostDispatchInfo};
 use pallet_evm::AddressMapping;
 use precompile_utils::{data::Address, prelude::*};
 use sp_core::{ConstU32, H160, H256};
-use sp_runtime::traits::StaticLookup;
 use sp_std::{marker::PhantomData, prelude::*};
 
 /// Dao ID. Just a `u32`.

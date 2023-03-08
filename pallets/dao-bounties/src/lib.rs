@@ -73,7 +73,7 @@ use pallet_dao_assets::LockableAsset;
 
 use frame_support::traits::{
 	fungibles::{BalancedHold, Inspect, InspectHold, MutateHold},
-	Currency, EnsureOriginWithArg,
+	Currency,
 	ExistenceRequirement::AllowDeath,
 	Get, Imbalance, ReservableCurrency,
 };
@@ -85,7 +85,7 @@ use sp_runtime::{
 
 use frame_support::dispatch::DispatchResultWithPostInfo;
 
-use dao_primitives::{DaoOrigin, DaoProvider, DaoToken, DispatchResultWithDaoOrigin};
+use dao_primitives::{DaoProvider, DaoToken};
 use frame_support::{pallet_prelude::*, traits::fungibles::Transfer};
 use frame_system::pallet_prelude::*;
 use scale_info::TypeInfo;
@@ -331,7 +331,7 @@ pub mod pallet {
 			#[pallet::compact] value: BalanceOf<T, I>,
 			description: Vec<u8>,
 		) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
+			T::DaoProvider::ensure_approved(origin, dao_id)?;
 
 			Self::do_create_bounty(dao_id, token_id, description, value)?;
 
@@ -353,7 +353,7 @@ pub mod pallet {
 			curator: AccountIdLookupOf<T>,
 			#[pallet::compact] fee: BalanceOf<T, I>,
 		) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
+			T::DaoProvider::ensure_approved(origin, dao_id)?;
 
 			let curator = T::Lookup::lookup(curator)?;
 			Bounties::<T, I>::try_mutate_exists(
@@ -403,7 +403,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let maybe_sender = ensure_signed(origin.clone())
 				.map(Some)
-				.or_else(|_| Self::ensure_approved(origin, dao_id).map(|_| None))?;
+				.or_else(|_| T::DaoProvider::ensure_approved(origin, dao_id).map(|_| None))?;
 
 			let dao_token_id = Self::dao_token_id(dao_id)?;
 			Bounties::<T, I>::try_mutate_exists(
@@ -690,7 +690,7 @@ pub mod pallet {
 			dao_id: DaoId,
 			#[pallet::compact] bounty_id: BountyIndex,
 		) -> DispatchResultWithPostInfo {
-			Self::ensure_approved(origin, dao_id)?;
+			T::DaoProvider::ensure_approved(origin, dao_id)?;
 
 			Bounties::<T, I>::try_mutate_exists(
 				dao_id,
@@ -859,18 +859,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		Self::deposit_event(Event::<T, I>::BountyCreated { dao_id, index });
 
 		Ok(())
-	}
-
-	pub fn ensure_approved(
-		origin: OriginFor<T>,
-		dao_id: DaoId,
-	) -> DispatchResultWithDaoOrigin<T::AccountId> {
-		let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
-		let approve_origin = T::DaoProvider::policy(dao_id)?.approve_origin;
-		let dao_origin = DaoOrigin { dao_account_id, proportion: approve_origin };
-		T::ApproveOrigin::ensure_origin(origin, &dao_origin)?;
-
-		Ok(dao_origin)
 	}
 
 	pub fn dao_token_id(dao_id: DaoId) -> Result<T::AssetId, DispatchError> {
