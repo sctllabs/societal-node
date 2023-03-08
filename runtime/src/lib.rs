@@ -17,40 +17,57 @@ pub fn wasm_binary_unwrap() -> &'static [u8] {
 }
 
 use codec::{Decode, Encode, MaxEncodedLen};
+
+// Frontier
+use fp_rpc::TransactionStatus;
+
 use frame_election_provider_support::{
 	onchain, BalancingConfig, ElectionDataProvider, SequentialPhragmen, VoteWeight,
 };
 use frame_support::{
+	construct_runtime,
 	dispatch::DispatchClass,
+	pallet_prelude::Get,
+	parameter_types,
 	traits::{
-		AsEnsureOriginWithArg, ConstU16, InstanceFilter, LockIdentifier, TotalIssuanceOf,
-		WithdrawReasons,
+		AsEnsureOriginWithArg, ConstU128, ConstU16, ConstU32, ConstU8, EitherOfDiverse,
+		EqualPrivilegeOnly, FindAuthor, InstanceFilter, KeyOwnerProofSystem, LockIdentifier,
+		TotalIssuanceOf, U128CurrencyToVote, WithdrawReasons,
+	},
+	weights::{
+		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight},
+		IdentityFee, Weight, WeightToFeeCoefficient, WeightToFeeCoefficients,
+		WeightToFeePolynomial,
 	},
 	PalletId, RuntimeDebugNoBound,
 };
-use frame_system::EnsureSigned;
+pub use frame_system::{
+	limits::{BlockLength, BlockWeights},
+	Call as SystemCall, EnsureRoot, EnsureSigned,
+};
 use node_primitives::AccountIndex;
 pub use node_primitives::{AccountId, Balance, BlockNumber, Hash, Index, Moment, Signature};
 use pallet_contracts::DefaultAddressGenerator;
-use pallet_grandpa::{
-	fg_primitives, AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList,
-};
+use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
-use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
-use sp_core::{crypto::KeyTypeId, OpaqueMetadata, H160, H256, U256};
+use sp_core::{
+	crypto::{ByteArray, KeyTypeId},
+	OpaqueMetadata, H160, H256, U256,
+};
+#[cfg(any(feature = "std", test))]
+pub use sp_runtime::BuildStorage;
 use sp_runtime::{
 	create_runtime_str,
 	curve::PiecewiseLinear,
 	generic, impl_opaque_keys,
 	traits::{
 		AccountIdLookup, BlakeTwo256, Block as BlockT, Convert, ConvertInto, DispatchInfoOf,
-		Dispatchable, NumberFor, OpaqueKeys, PostDispatchInfoOf, SaturatedConversion,
-		UniqueSaturatedInto,
+		Dispatchable, OpaqueKeys, PostDispatchInfoOf, SaturatedConversion, UniqueSaturatedInto,
 	},
 	transaction_validity::{
 		TransactionPriority, TransactionSource, TransactionValidity, TransactionValidityError,
 	},
-	ApplyExtrinsicResult, ConsensusEngineId, FixedU128, Percent,
+	ApplyExtrinsicResult, ConsensusEngineId, FixedU128, Perbill, Percent, Permill,
 };
 use sp_std::{marker::PhantomData, prelude::*};
 #[cfg(feature = "std")]
@@ -58,58 +75,37 @@ use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 use static_assertions::const_assert;
 
-use sp_core::crypto::ByteArray;
-
-use pallet_dao::EnsureDao;
-use pallet_dao_collective::EitherOfDiverseWithArg;
-
-// A few exports that help ease life for downstream crates.
-pub use frame_support::{
-	construct_runtime,
-	pallet_prelude::Get,
-	parameter_types,
-	traits::{
-		ConstU128, ConstU32, ConstU64, ConstU8, EitherOfDiverse, EqualPrivilegeOnly,
-		KeyOwnerProofSystem, Nothing, Randomness, StorageInfo, U128CurrencyToVote,
-	},
-	weights::{
-		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
-		IdentityFee, Weight,
-	},
-	StorageValue,
-};
-pub use frame_system::{
-	limits::{BlockLength, BlockWeights},
-	Call as SystemCall, EnsureRoot,
-};
 pub use pallet_balances::Call as BalancesCall;
-#[cfg(any(feature = "std", test))]
-pub use pallet_staking::StakerStatus;
-pub use pallet_timestamp::Call as TimestampCall;
-use pallet_transaction_payment::CurrencyAdapter;
-#[cfg(any(feature = "std", test))]
-pub use sp_runtime::BuildStorage;
-pub use sp_runtime::{Perbill, Permill};
-
+pub use pallet_dao;
+pub use pallet_dao_collective::EitherOfDiverseWithArg;
+pub use pallet_dao_treasury;
 use pallet_election_provider_multi_phase::SolutionAccuracyOf;
-use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
-use pallet_session::historical as pallet_session_historical;
-
-// Frontier
-use fp_rpc::TransactionStatus;
-use frame_support::traits::FindAuthor;
 use pallet_ethereum::{Call::transact, Transaction as EthereumTransaction};
 use pallet_evm::{
 	Account as EVMAccount, EnsureAddressTruncated, FeeCalculator, HashedAddressMapping, Runner,
 };
 use pallet_evm_precompileset_assets_erc20::AddressAssetIdConversion;
+use pallet_grandpa::{
+	fg_primitives, AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList,
+};
+use pallet_session::historical as pallet_session_historical;
+#[cfg(any(feature = "std", test))]
+pub use pallet_staking::StakerStatus;
+pub use pallet_timestamp::Call as TimestampCall;
+use pallet_transaction_payment::CurrencyAdapter;
 
-/// Import the template pallet.
-pub use pallet_dao;
-pub use pallet_dao_treasury;
+#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+use {
+	xcm_config::{XcmConfig, XcmOriginToTransactDispatchOrigin},
+	xcm_executor::XcmExecutor,
+};
 
 /// Generated voter bag information.
 mod voter_bags;
+
+// XCM Configuration.
+#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+pub mod xcm_config;
 
 /// Constant values used within the runtime.
 pub mod constants;
@@ -121,10 +117,11 @@ pub use constants::{
 };
 use eth_primitives::EthService;
 
-mod precompiles;
-use crate::precompiles::{
-	FOREIGN_ASSET_PRECOMPILE_ADDRESS_PREFIX, LOCAL_ASSET_PRECOMPILE_ADDRESS_PREFIX,
+use crate::{
+	constants::currency::MILLIUNIT,
+	precompiles::{FOREIGN_ASSET_PRECOMPILE_ADDRESS_PREFIX, LOCAL_ASSET_PRECOMPILE_ADDRESS_PREFIX},
 };
+mod precompiles;
 use precompiles::FrontierPrecompiles;
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
@@ -166,13 +163,6 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 const fn deposit(items: u32, bytes: u32) -> Balance {
 	items as Balance * 15 * CENTS + (bytes as Balance) * 6 * CENTS
 }
-
-/// The BABE epoch configuration at genesis.
-pub const BABE_GENESIS_EPOCH_CONFIG: sp_consensus_babe::BabeEpochConfiguration =
-	sp_consensus_babe::BabeEpochConfiguration {
-		c: PRIMARY_PROBABILITY,
-		allowed_slots: sp_consensus_babe::AllowedSlots::PrimaryAndSecondaryPlainSlots,
-	};
 
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
@@ -220,6 +210,34 @@ parameter_types! {
 
 	// Retry a scheduled item every 10 blocks (1 minute) until the preimage exists.
 	pub const NoPreimagePostponement: Option<u32> = Some(10);
+}
+
+/// Handles converting a weight scalar to a fee value, based on the scale and granularity of the
+/// node's balance type.
+///
+/// This should typically create a mapping between the following ranges:
+///   - `[0, MAXIMUM_BLOCK_WEIGHT]`
+///   - `[Balance::min, Balance::max]`
+///
+/// Yet, it can be used for any other sort of change to weight-fee. Some examples being:
+///   - Setting it to `0` will essentially disable the weight fee.
+///   - Setting it to `1` will cause the literal `#[weight = x]` values to be charged.
+pub struct WeightToFee;
+impl WeightToFeePolynomial for WeightToFee {
+	type Balance = Balance;
+	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
+		// TODO
+		// in Rococo, extrinsic base weight (smallest non-zero weight) is mapped to 1 MILLIUNIT:
+		// in our template, we map to 1/10 of that, or 1/10 MILLIUNIT
+		let p = MILLIUNIT / 10;
+		let q = 100 * Balance::from(ExtrinsicBaseWeight::get().ref_time());
+		smallvec![WeightToFeeCoefficient {
+			degree: 1,
+			negative: false,
+			coeff_frac: Perbill::from_rational(p % q, q),
+			coeff_integer: p / q,
+		}]
+	}
 }
 
 // Configure FRAME pallets to include in runtime.
@@ -272,6 +290,9 @@ impl frame_system::Config for Runtime {
 	/// This is used as an identifier of the chain. 42 is the generic substrate prefix.
 	type SS58Prefix = SS58Prefix;
 	/// The set code logic, just the default since we're not a parachain.
+	#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+	type OnSetCode = cumulus_pallet_parachain_system::ParachainSetCode<Self>;
+	#[cfg(not(any(feature = "parachain", feature = "runtime-benchmarks")))]
 	type OnSetCode = ();
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
@@ -280,7 +301,6 @@ impl pallet_randomness_collective_flip::Config for Runtime {}
 
 impl pallet_grandpa::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	// type RuntimeCall = RuntimeCall;
 
 	type KeyOwnerProofSystem = ();
 
@@ -304,7 +324,7 @@ parameter_types! {
 
 impl pallet_timestamp::Config for Runtime {
 	type Moment = Moment;
-	type OnTimestampSet = Babe;
+	type OnTimestampSet = ();
 	type MinimumPeriod = MinimumPeriod;
 	type WeightInfo = pallet_timestamp::weights::SubstrateWeight<Runtime>;
 }
@@ -380,31 +400,33 @@ parameter_types! {
 	pub const UncleGenerations: BlockNumber = 5;
 }
 
-// TODO - Update settings
 impl pallet_authorship::Config for Runtime {
-	type FindAuthor = pallet_session::FindAccountFromAuthorIndex<Self, Babe>;
+	type FindAuthor = pallet_session::FindAccountFromAuthorIndex<Self, Aura>;
 	type UncleGenerations = UncleGenerations;
 	type FilterUncle = ();
-	type EventHandler = (Staking, ImOnline);
+	type EventHandler = (CollatorSelection,);
 }
 
 impl_opaque_keys! {
 	pub struct SessionKeys {
 		pub grandpa: Grandpa,
-		pub babe: Babe,
-		pub im_online: ImOnline,
+		pub aura: Aura,
 		pub authority_discovery: AuthorityDiscovery,
 	}
 }
 
-// TODO - Update settings
+parameter_types! {
+	pub const Period: u32 = 6 * HOURS;
+	pub const Offset: u32 = 0;
+}
+
 impl pallet_session::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type ValidatorId = <Self as frame_system::Config>::AccountId;
-	type ValidatorIdOf = pallet_staking::StashOf<Self>;
-	type ShouldEndSession = Babe;
-	type NextSessionRotation = Babe;
-	type SessionManager = pallet_session::historical::NoteHistoricalRoot<Self, Staking>;
+	type ValidatorIdOf = pallet_collator_selection::IdentityCollator;
+	type ShouldEndSession = pallet_session::PeriodicSessions<Period, Offset>;
+	type NextSessionRotation = pallet_session::PeriodicSessions<Period, Offset>;
+	type SessionManager = CollatorSelection;
 	type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
 	type Keys = SessionKeys;
 	type WeightInfo = pallet_session::weights::SubstrateWeight<Runtime>;
@@ -528,30 +550,14 @@ parameter_types! {
 		BondingDuration::get() as u64 * SessionsPerEra::get() as u64 * EpochDuration::get();
 }
 
-// TODO - Update settings
-impl pallet_babe::Config for Runtime {
-	type EpochDuration = EpochDuration;
-	type ExpectedBlockTime = ExpectedBlockTime;
-	type EpochChangeTrigger = pallet_babe::ExternalTrigger;
-	type DisabledValidators = Session;
+use pallet_dao::EnsureDao;
+pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+use sp_runtime::traits::NumberFor;
 
-	type KeyOwnerProofSystem = Historical;
-
-	type KeyOwnerProof = <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(
-		KeyTypeId,
-		pallet_babe::AuthorityId,
-	)>>::Proof;
-
-	type KeyOwnerIdentification = <Self::KeyOwnerProofSystem as KeyOwnerProofSystem<(
-		KeyTypeId,
-		pallet_babe::AuthorityId,
-	)>>::IdentificationTuple;
-
-	type HandleEquivocation =
-		pallet_babe::EquivocationHandler<Self::KeyOwnerIdentification, Offences, ReportLongevity>;
-
-	type WeightInfo = ();
+impl pallet_aura::Config for Runtime {
+	type AuthorityId = AuraId;
 	type MaxAuthorities = MaxAuthorities;
+	type DisabledValidators = ();
 }
 
 parameter_types! {
@@ -628,20 +634,6 @@ where
 {
 	type Extrinsic = UncheckedExtrinsic;
 	type OverarchingCall = RuntimeCall;
-}
-
-// TODO - Update settings
-impl pallet_im_online::Config for Runtime {
-	type AuthorityId = ImOnlineId;
-	type RuntimeEvent = RuntimeEvent;
-	type NextSessionRotation = Babe;
-	type ValidatorSet = Historical;
-	type ReportUnresponsiveness = Offences;
-	type UnsignedPriority = ImOnlineUnsignedPriority;
-	type WeightInfo = pallet_im_online::weights::SubstrateWeight<Runtime>;
-	type MaxKeys = MaxKeys;
-	type MaxPeerInHeartbeats = MaxPeerInHeartbeats;
-	type MaxPeerDataEncodingSize = MaxPeerDataEncodingSize;
 }
 
 parameter_types! {
@@ -1261,7 +1253,10 @@ parameter_types! {
 	pub const DesiredRunnersUp: u32 = 7;
 	pub const ElectionsPhragmenPalletId: LockIdentifier = *b"phrelect";
 	pub const MaxCandidates: u32 = 10;
+	pub const MinCandidates: u32 = 5;
 	pub const MaxVoters: u32 = 100;
+	pub const MaxInvulnerables: u32 = 100;
+	pub const PotId: PalletId = PalletId(*b"PotStake");
 }
 
 // Make sure that there are no more than `MaxMembers` members elected via elections-phragmen.
@@ -1499,10 +1494,9 @@ impl<F: FindAuthor<u32>> FindAuthor<H160> for FindAuthorTruncated<F> {
 	where
 		I: 'a + IntoIterator<Item = (ConsensusEngineId, &'a [u8])>,
 	{
-		// TODO: check compatibility
 		if let Some(author_index) = F::find_author(digests) {
-			let authority_id = Babe::authorities()[author_index as usize].clone();
-			return Some(H160::from_slice(&authority_id.0.to_raw_vec()[4..24]))
+			let authority_id = Aura::authorities()[author_index as usize].clone();
+			return Some(H160::from_slice(&authority_id.to_raw_vec()[4..24]))
 		}
 		None
 	}
@@ -1531,7 +1525,7 @@ impl pallet_evm::Config for Runtime {
 	type BlockGasLimit = BlockGasLimit;
 	type Runner = pallet_evm::runner::stack::Runner<Self>;
 	type OnChargeTransaction = ();
-	type FindAuthor = FindAuthorTruncated<Babe>;
+	type FindAuthor = FindAuthorTruncated<Aura>;
 }
 
 impl pallet_ethereum::Config for Runtime {
@@ -1689,6 +1683,67 @@ impl pallet_utility::Config for Runtime {
 	type WeightInfo = pallet_utility::weights::SubstrateWeight<Runtime>;
 }
 
+parameter_types! {
+	pub const ReservedXcmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT.saturating_div(4);
+	pub const ReservedDmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT.saturating_div(4);
+}
+
+#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+impl cumulus_pallet_parachain_system::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type OnSystemEvent = ();
+	type SelfParaId = parachain_info::Pallet<Runtime>;
+	type OutboundXcmpMessageSource = XcmpQueue;
+	type DmpMessageHandler = DmpQueue;
+	type ReservedDmpWeight = ReservedDmpWeight;
+	type XcmpMessageHandler = XcmpQueue;
+	type ReservedXcmpWeight = ReservedXcmpWeight;
+	type CheckAssociatedRelayNumber = cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
+}
+
+#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+impl parachain_info::Config for Runtime {}
+
+impl cumulus_pallet_aura_ext::Config for Runtime {}
+
+#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+impl cumulus_pallet_xcmp_queue::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type XcmExecutor = XcmExecutor<XcmConfig>;
+	type ChannelInfo = ParachainSystem;
+	type VersionWrapper = ();
+	type ExecuteOverweightOrigin = EnsureRoot<AccountId>;
+	type ControllerOrigin = EnsureRoot<AccountId>;
+	type ControllerOriginConverter = XcmOriginToTransactDispatchOrigin;
+	type WeightInfo = ();
+}
+
+#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+impl cumulus_pallet_dmp_queue::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type XcmExecutor = XcmExecutor<XcmConfig>;
+	type ExecuteOverweightOrigin = EnsureRoot<AccountId>;
+}
+
+// We allow root only to execute privileged collator selection operations.
+pub type CollatorSelectionUpdateOrigin = EnsureRoot<AccountId>;
+
+impl pallet_collator_selection::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type UpdateOrigin = CollatorSelectionUpdateOrigin;
+	type PotId = PotId;
+	type MaxCandidates = MaxCandidates;
+	type MinCandidates = MinCandidates;
+	type MaxInvulnerables = MaxInvulnerables;
+	// should be a multiple of session or things will get inconsistent
+	type KickThreshold = Period;
+	type ValidatorId = <Self as frame_system::Config>::AccountId;
+	type ValidatorIdOf = pallet_collator_selection::IdentityCollator;
+	type ValidatorRegistration = Session;
+	type WeightInfo = ();
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub struct Runtime
@@ -1697,61 +1752,88 @@ construct_runtime!(
 		NodeBlock = opaque::Block,
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
-		System: frame_system,
-		RandomnessCollectiveFlip: pallet_randomness_collective_flip,
-		Timestamp: pallet_timestamp,
-		Grandpa: pallet_grandpa,
-		Balances: pallet_balances,
-		Nicks: pallet_nicks,
-		TransactionPayment: pallet_transaction_payment,
-		Sudo: pallet_sudo,
-		Scheduler: pallet_scheduler,
-		Dao: pallet_dao,
-		Contracts: pallet_contracts,
-		AuthorityDiscovery: pallet_authority_discovery,
-		Authorship: pallet_authorship,
-		Session: pallet_session,
-		Historical: pallet_session_historical::{Pallet},
-		Babe: pallet_babe,
-		Staking: pallet_staking,
-		Council: pallet_collective::<Instance1>,
-		TechnicalCommittee: pallet_collective::<Instance2>,
-		ImOnline: pallet_im_online,
-		Treasury: pallet_treasury,
-		DaoTreasury: pallet_dao_treasury,
-		BagsList: pallet_bags_list,
-		Offences: pallet_offences,
-		NominationPools: pallet_nomination_pools,
-		ElectionProviderMultiPhase: pallet_election_provider_multi_phase,
-		Bounties: pallet_bounties,
-		ChildBounties: pallet_child_bounties,
-		TechnicalMembership: pallet_membership::<Instance1>,
-		Referenda: pallet_referenda,
-		ConvictionVoting: pallet_conviction_voting,
-		Assets: pallet_dao_assets::<Instance1>,
-		Democracy: pallet_democracy,
-		Indices: pallet_indices,
-		Elections: pallet_elections_phragmen,
-		Proxy: pallet_proxy,
-		Vesting: pallet_vesting,
-		Uniques: pallet_uniques,
-		Society: pallet_society,
-		Multisig: pallet_multisig,
-		Ethereum: pallet_ethereum,
-		EVM: pallet_evm,
-		EVMChainId: pallet_evm_chain_id,
-		DynamicFee: pallet_dynamic_fee,
-		BaseFee: pallet_base_fee,
-		HotfixSufficients: pallet_hotfix_sufficients,
-		DaoCouncil: pallet_dao_collective::<Instance1>,
-		DaoTechnicalCommittee: pallet_dao_collective::<Instance2>,
-		DaoCouncilMembers: pallet_dao_membership::<Instance1>,
-		DaoTechnicalCommitteeMembers: pallet_dao_membership::<Instance2>,
-		DaoDemocracy: pallet_dao_democracy,
-		DaoEthGovernance: pallet_dao_eth_governance,
-		DaoBounties: pallet_dao_bounties,
-		Preimage: pallet_preimage,
-		Utility: pallet_utility,
+		System: frame_system::{Pallet, Call, Storage, Config, Event<T>} = 0,
+		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+		ParachainSystem: cumulus_pallet_parachain_system::{
+			Pallet, Call, Config, Storage, Inherent, Event<T>, ValidateUnsigned,
+		} = 1,
+		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent} = 2,
+		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+		ParachainInfo: parachain_info::{Pallet, Storage, Config} = 3,
+
+		// Monetary stuff=.
+		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>} = 10,
+		TransactionPayment: pallet_transaction_payment::{Pallet, Storage, Event<T>} = 11,
+
+		// Collator support. The order of these 4 are important and shall not change.
+		Authorship: pallet_authorship::{Pallet, Call, Storage} = 20,
+		CollatorSelection: pallet_collator_selection::{Pallet, Call, Storage, Event<T>, Config<T>} = 21,
+		Session: pallet_session::{Pallet, Call, Storage, Event, Config<T>} = 22,
+		Aura: pallet_aura::{Pallet, Storage, Config<T>} = 23,
+		AuraExt: cumulus_pallet_aura_ext::{Pallet, Storage, Config} = 24,
+		Grandpa: pallet_grandpa::{Pallet, Storage, Config, Event} = 25,
+		AuthorityDiscovery: pallet_authority_discovery::{Pallet, Storage, Config} = 26,
+
+		// FRAME Pallets
+		Sudo: pallet_sudo::{Pallet, Call, Event<T>, Config<T>} = 30,
+		Assets: pallet_dao_assets::<Instance1>::{Pallet, Call, Storage, Event<T>} = 31,
+		Nicks: pallet_nicks::{Pallet, Call, Event<T>} = 32,
+		Scheduler: pallet_scheduler::{Pallet, Call, Storage, Event<T>} = 33,
+		Contracts: pallet_contracts::{Pallet, Call, Storage, Event<T>} = 34,
+		Historical: pallet_session_historical::{Pallet, Storage} = 35,
+		Staking: pallet_staking::{Pallet, Call, Storage, Event<T>, Config<T>} = 36,
+		Council: pallet_collective::<Instance1>::{Pallet, Call, Storage, Event<T>, Origin<T>, Config<T>} = 37,
+		TechnicalCommittee: pallet_collective::<Instance2>::{Pallet, Call, Storage, Event<T>, Origin<T>, Config<T>} = 38,
+		Treasury: pallet_treasury::{Pallet, Call, Storage, Event<T>} = 40,
+		BagsList: pallet_bags_list::{Pallet, Call, Storage, Event<T>} = 41,
+		Offences: pallet_offences::{Pallet, Storage, Event} = 42,
+		NominationPools: pallet_nomination_pools::{Pallet, Call, Storage, Event<T>, Config<T>} = 43,
+		ElectionProviderMultiPhase: pallet_election_provider_multi_phase::{Pallet, Call, Storage, Event<T>} = 44,
+		Bounties: pallet_bounties::{Pallet, Call, Storage, Event<T>} = 45,
+		ChildBounties: pallet_child_bounties::{Pallet, Call, Storage, Event<T>} = 46,
+		TechnicalMembership: pallet_membership::<Instance1>::{Pallet, Call, Storage, Event<T>} = 47,
+		Referenda: pallet_referenda::{Pallet, Call, Storage, Event<T>} = 48,
+		ConvictionVoting: pallet_conviction_voting::{Pallet, Call, Storage, Event<T>} = 49,
+		Democracy: pallet_democracy::{Pallet, Call, Storage, Event<T>, Config<T>} = 50,
+		Indices: pallet_indices::{Pallet, Call, Storage, Event<T>, Config<T>} = 51,
+		Elections: pallet_elections_phragmen::{Pallet, Call, Storage, Event<T>, Config<T>} = 52,
+		Proxy: pallet_proxy::{Pallet, Call, Storage, Event<T>} = 53,
+		Vesting: pallet_vesting::{Pallet, Call, Storage, Event<T>} = 54,
+		Uniques: pallet_uniques::{Pallet, Call, Storage, Event<T>} = 55,
+		Society: pallet_society::{Pallet, Call, Storage, Event<T>, Config<T>} = 56,
+		Multisig: pallet_multisig::{Pallet, Call, Storage, Event<T>} = 57,
+		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet, Storage} = 58,
+		Preimage: pallet_preimage::{Pallet, Call, Storage, Event<T>} = 59,
+		Utility: pallet_utility::{Pallet, Call, Storage, Event} = 60,
+
+		// Ethereum compatibility
+		EVMChainId: pallet_evm_chain_id::{Pallet, Storage, Config} = 70,
+		EVM: pallet_evm::{Pallet, Config, Call, Storage, Event<T>} = 71,
+		Ethereum: pallet_ethereum::{Pallet, Call, Storage, Event, Origin, Config} = 72,
+		BaseFee: pallet_base_fee::{Pallet, Call, Storage, Config<T>, Event} = 73,
+		DynamicFee: pallet_dynamic_fee::{Pallet, Call, Storage} = 74,
+		HotfixSufficients: pallet_hotfix_sufficients::{Pallet, Call, Storage} = 75,
+
+		// XCM helpers.
+		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+		XcmpQueue: cumulus_pallet_xcmp_queue::{Pallet, Call, Storage, Event<T>} = 80,
+		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+		PolkadotXcm: pallet_xcm::{Pallet, Call, Event<T>, Origin, Config} = 81,
+		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+		CumulusXcm: cumulus_pallet_xcm::{Pallet, Event<T>, Origin} = 82,
+		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>} = 83,
+
+		// DAO management.
+		Dao: pallet_dao::{Pallet, Call, Storage, Event<T>, Origin<T>, Config<T>} = 100,
+		DaoTreasury: pallet_dao_treasury::{Pallet, Call, Storage, Event<T>} = 101,
+		DaoCouncil: pallet_dao_collective::<Instance1>::{Pallet, Call, Storage, Event<T>, Origin<T>} = 102,
+		DaoTechnicalCommittee: pallet_dao_collective::<Instance2>::{Pallet, Call, Storage, Event<T>, Origin<T>} = 103,
+		DaoCouncilMembers: pallet_dao_membership::<Instance1>::{Pallet, Call, Storage, Event<T>} = 104,
+		DaoTechnicalCommitteeMembers: pallet_dao_membership::<Instance2>::{Pallet, Call, Storage, Event<T>} = 105,
+		DaoDemocracy: pallet_dao_democracy::{Pallet, Call, Storage, Event<T>} = 106,
+		DaoEthGovernance: pallet_dao_eth_governance::{Pallet, Call, Storage, Event<T>, Config<T>} = 107,
+		DaoBounties: pallet_dao_bounties::{Pallet, Call, Storage, Event<T>} = 108,
 	}
 );
 
@@ -1945,56 +2027,13 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl sp_consensus_babe::BabeApi<Block> for Runtime {
-		fn configuration() -> sp_consensus_babe::BabeConfiguration {
-			// The choice of `c` parameter (where `1 - c` represents the
-			// probability of a slot being empty), is done in accordance to the
-			// slot duration and expected target block time, for safely
-			// resisting network delays of maximum two seconds.
-			// <https://research.web3.foundation/en/latest/polkadot/BABE/Babe/#6-practical-results>
-			sp_consensus_babe::BabeConfiguration {
-				slot_duration: Babe::slot_duration(),
-				epoch_length: EpochDuration::get(),
-				c: BABE_GENESIS_EPOCH_CONFIG.c,
-				authorities: Babe::authorities().to_vec(),
-				randomness: Babe::randomness(),
-				allowed_slots: BABE_GENESIS_EPOCH_CONFIG.allowed_slots,
-			}
+	impl sp_consensus_aura::AuraApi<Block, AuraId> for Runtime {
+		fn slot_duration() -> sp_consensus_aura::SlotDuration {
+			sp_consensus_aura::SlotDuration::from_millis(Aura::slot_duration())
 		}
 
-		fn current_epoch_start() -> sp_consensus_babe::Slot {
-			Babe::current_epoch_start()
-		}
-
-		fn current_epoch() -> sp_consensus_babe::Epoch {
-			Babe::current_epoch()
-		}
-
-		fn next_epoch() -> sp_consensus_babe::Epoch {
-			Babe::next_epoch()
-		}
-
-		fn generate_key_ownership_proof(
-			_slot: sp_consensus_babe::Slot,
-			authority_id: sp_consensus_babe::AuthorityId,
-		) -> Option<sp_consensus_babe::OpaqueKeyOwnershipProof> {
-			use codec::Encode;
-
-			Historical::prove((sp_consensus_babe::KEY_TYPE, authority_id))
-				.map(|p| p.encode())
-				.map(sp_consensus_babe::OpaqueKeyOwnershipProof::new)
-		}
-
-		fn submit_report_equivocation_unsigned_extrinsic(
-			equivocation_proof: sp_consensus_babe::EquivocationProof<<Block as BlockT>::Header>,
-			key_owner_proof: sp_consensus_babe::OpaqueKeyOwnershipProof,
-		) -> Option<()> {
-			let key_owner_proof = key_owner_proof.decode()?;
-
-			Babe::submit_unsigned_equivocation_report(
-				equivocation_proof,
-				key_owner_proof,
-			)
+		fn authorities() -> Vec<AuraId> {
+			Aura::authorities().into_inner()
 		}
 	}
 
@@ -2149,12 +2188,6 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl sp_authority_discovery::AuthorityDiscoveryApi<Block> for Runtime {
-		fn authorities() -> Vec<AuthorityDiscoveryId> {
-			AuthorityDiscovery::authorities()
-		}
-	}
-
 	impl sp_session::SessionKeys<Block> for Runtime {
 		fn generate_session_keys(seed: Option<Vec<u8>>) -> Vec<u8> {
 			SessionKeys::generate(seed)
@@ -2235,6 +2268,13 @@ impl_runtime_apis! {
 		}
 	}
 
+	#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+	impl cumulus_primitives_core::CollectCollationInfo<Block> for Runtime {
+		fn collect_collation_info(header: &<Block as BlockT>::Header) -> cumulus_primitives_core::CollationInfo {
+			ParachainSystem::collect_collation_info(header)
+		}
+	}
+
 	#[cfg(feature = "runtime-benchmarks")]
 	impl frame_benchmarking::Benchmark<Block> for Runtime {
 		fn benchmark_metadata(extra: bool) -> (
@@ -2300,4 +2340,34 @@ impl_runtime_apis! {
 			Executive::execute_block_no_check(block)
 		}
 	}
+}
+
+struct CheckInherents;
+
+impl cumulus_pallet_parachain_system::CheckInherents<Block> for CheckInherents {
+	fn check_inherents(
+		block: &Block,
+		relay_state_proof: &cumulus_pallet_parachain_system::RelayChainStateProof,
+	) -> sp_inherents::CheckInherentsResult {
+		let relay_chain_slot = relay_state_proof
+			.read_slot()
+			.expect("Could not read the relay chain slot from the proof");
+
+		let inherent_data =
+			cumulus_primitives_timestamp::InherentDataProvider::from_relay_chain_slot_and_duration(
+				relay_chain_slot,
+				sp_std::time::Duration::from_secs(6),
+			)
+			.create_inherent_data()
+			.expect("Could not create the timestamp inherent data");
+
+		inherent_data.check_extrinsics(block)
+	}
+}
+
+#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+cumulus_pallet_parachain_system::register_validate_block! {
+	Runtime = Runtime,
+	BlockExecutor = cumulus_pallet_aura_ext::BlockExecutor::<Runtime, Executive>,
+	CheckInherents = CheckInherents,
 }
