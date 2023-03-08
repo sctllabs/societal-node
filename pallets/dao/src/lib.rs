@@ -618,6 +618,22 @@ pub mod pallet {
 
 			Ok(())
 		}
+
+		#[pallet::weight(10_000)]
+		pub fn update_dao_policy(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			policy: Vec<u8>,
+		) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			let policy = serde_json::from_slice::<DaoPolicy>(&policy)
+				.map_err(|_| Error::<T>::InvalidInput)?;
+
+			Policies::<T>::insert(dao_id, policy);
+
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
