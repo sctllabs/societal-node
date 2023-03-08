@@ -6,6 +6,11 @@ pub mod currency {
 	pub const CENTS: Balance = 1_000 * MILLICENTS; // assume this is worth about a cent.
 	pub const DOLLARS: Balance = 100 * CENTS;
 
+	// Unit = the base number of indivisible units for balances
+	pub const UNIT: Balance = 1_000_000_000_000;
+	pub const MILLIUNIT: Balance = 1_000_000_000;
+	pub const MICROUNIT: Balance = 1_000_000;
+
 	pub const fn deposit(items: u32, bytes: u32) -> Balance {
 		items as Balance * 15 * CENTS + (bytes as Balance) * 6 * CENTS
 	}
@@ -33,6 +38,9 @@ pub mod time {
 	/// `SLOT_DURATION` should have the same value.
 	///
 	/// <https://research.web3.foundation/en/latest/polkadot/block-production/Babe.html#-6.-practical-results>
+	#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+	pub const MILLISECS_PER_BLOCK: Moment = 12000;
+	#[cfg(not(any(feature = "parachain", feature = "runtime-benchmarks")))]
 	pub const MILLISECS_PER_BLOCK: Moment = 6000;
 	pub const SECS_PER_BLOCK: Moment = MILLISECS_PER_BLOCK / 1000;
 

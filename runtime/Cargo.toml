@@ -19,6 +19,7 @@ codec = { package = "parity-scale-codec", version = "3.0.0", default-features = 
 log = { version = "0.4.17" }
 num_enum = { version = "0.5.3", default-features = false }
 scale-info = { version = "2.1.1", default-features = false, features = ["derive"] }
+smallvec = "1.10.0"
 static_assertions = "1.1.0"
 
 # primitives
@@ -113,6 +114,31 @@ frame-benchmarking = { version = "4.0.0-dev", default-features = false, git = "h
 frame-system-benchmarking = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", optional = true, branch = "polkadot-v0.9.37" }
 hex-literal = { version = "0.3.4", optional = true }
 
+# Moonbeam
+pallet-evm-precompileset-assets-erc20 = { version = "0.1.0", default-features = false, git = "https://github.com/sctllabs/moonbeam.git", branch = "moonbeam-polkadot-v0.9.37" }
+precompile-utils = { version = "0.1.0", default-features = false, git = "https://github.com/sctllabs/moonbeam.git", branch = "moonbeam-polkadot-v0.9.37" }
+
+# Polkadot
+pallet-xcm = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v0.9.37" }
+polkadot-parachain = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v0.9.37" }
+polkadot-runtime-common = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v0.9.37" }
+xcm = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v0.9.37" }
+xcm-builder = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v0.9.37" }
+xcm-executor = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v0.9.37" }
+
+# Cumulus
+cumulus-pallet-aura-ext = { git = "https://github.com/sctllabs/cumulus.git", branch = "polkadot-v0.9.37", default-features = false }
+cumulus-pallet-dmp-queue = { git = "https://github.com/sctllabs/cumulus.git", branch = "polkadot-v0.9.37", default-features = false }
+cumulus-pallet-parachain-system = { git = "https://github.com/sctllabs/cumulus.git", branch = "polkadot-v0.9.37", default-features = false }
+cumulus-pallet-session-benchmarking = {git = "https://github.com/sctllabs/cumulus.git", branch = "polkadot-v0.9.37", default-features = false, version = "3.0.0"}
+cumulus-pallet-xcm = { git = "https://github.com/sctllabs/cumulus.git", branch = "polkadot-v0.9.37", default-features = false }
+cumulus-pallet-xcmp-queue = { git = "https://github.com/sctllabs/cumulus.git", branch = "polkadot-v0.9.37", default-features = false }
+cumulus-primitives-core = { git = "https://github.com/sctllabs/cumulus.git", branch = "polkadot-v0.9.37", default-features = false }
+cumulus-primitives-timestamp = { git = "https://github.com/sctllabs/cumulus.git", branch = "polkadot-v0.9.37", default-features = false }
+cumulus-primitives-utility = { git = "https://github.com/sctllabs/cumulus.git", branch = "polkadot-v0.9.37", default-features = false }
+pallet-collator-selection = { git = "https://github.com/sctllabs/cumulus.git", branch = "polkadot-v0.9.37", default-features = false }
+parachain-info = { git = "https://github.com/sctllabs/cumulus.git", branch = "polkadot-v0.9.37", default-features = false }
+
 # Local Dependencies
 eth-primitives = { version = "4.0.0-dev", default-features = false, path = "../primitives/eth" }
 pallet-dao = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao" }
@@ -129,18 +155,25 @@ pallet-dao-membership-precompile = { version = "1.0.0-dev", default-features = f
 pallet-dao-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao" }
 pallet-dao-treasury = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-treasury" }
 pallet-dao-treasury-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao-treasury" }
-# From Moonbeam
-pallet-evm-precompileset-assets-erc20 = { version = "0.1.0", default-features = false, git = "https://github.com/sctllabs/moonbeam.git", branch = "moonbeam-polkadot-v0.9.37" }
-precompile-utils = { version = "0.1.0", default-features = false, git = "https://github.com/sctllabs/moonbeam.git", branch = "moonbeam-polkadot-v0.9.37" }
 
 [build-dependencies]
 substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.37" }
 
 [features]
 default = ["std"]
+
+parachain = []
+
 std = [
 	"codec/std",
-	"node-primitives/std",
+	"cumulus-pallet-aura-ext/std",
+	"cumulus-pallet-dmp-queue/std",
+	"cumulus-pallet-parachain-system/std",
+	"cumulus-pallet-xcm/std",
+	"cumulus-pallet-xcmp-queue/std",
+	"cumulus-primitives-core/std",
+	"cumulus-primitives-timestamp/std",
+	"cumulus-primitives-utility/std",
 	"fp-rpc/std",
 	"fp-self-contained/std",
 	"frame-executive/std",
@@ -148,6 +181,7 @@ std = [
 	"frame-system-benchmarking?/std",
 	"frame-system-rpc-runtime-api/std",
 	"frame-system/std",
+	"node-primitives/std",
 	"pallet-assets/std",
 	"pallet-aura/std",
 	"pallet-authority-discovery/std",
@@ -158,6 +192,7 @@ std = [
 	"pallet-base-fee/std",
 	"pallet-bounties/std",
 	"pallet-child-bounties/std",
+	"pallet-collator-selection/std",
 	"pallet-collective/std",
 	"pallet-contracts/std",
 	"pallet-contracts-primitives/std",
@@ -206,6 +241,10 @@ std = [
 	"pallet-uniques/std",
 	"pallet-utility/std",
 	"pallet-vesting/std",
+	"pallet-xcm/std",
+	"parachain-info/std",
+	"polkadot-parachain/std",
+	"polkadot-runtime-common/std",
 	"precompile-utils/std",
 	"scale-info/std",
 	"sp-api/std",
@@ -222,8 +261,13 @@ std = [
 	"sp-std/std",
 	"sp-transaction-pool/std",
 	"sp-version/std",
+	"xcm/std",
+	"xcm-builder/std",
+	"xcm-executor/std",
 ]
 runtime-benchmarks = [
+	"cumulus-pallet-session-benchmarking/runtime-benchmarks",
+	"cumulus-pallet-xcmp-queue/runtime-benchmarks",
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-support/runtime-benchmarks",
 	"frame-system-benchmarking/runtime-benchmarks",
@@ -237,6 +281,7 @@ runtime-benchmarks = [
 	"pallet-bounties/runtime-benchmarks",
 	"pallet-child-bounties/runtime-benchmarks",
 	"pallet-collective/runtime-benchmarks",
+	"pallet-collator-selection/runtime-benchmarks",
 	"pallet-contracts/runtime-benchmarks",
 	"pallet-conviction-voting/runtime-benchmarks",
 	"pallet-democracy/runtime-benchmarks",
@@ -264,15 +309,24 @@ runtime-benchmarks = [
 	"pallet-uniques/runtime-benchmarks",
 	"pallet-utility/runtime-benchmarks",
 	"pallet-vesting/runtime-benchmarks",
-	"sp-runtime/runtime-benchmarks"
+	"pallet-xcm/runtime-benchmarks",
+	"sp-runtime/runtime-benchmarks",
+	"xcm-builder/runtime-benchmarks",
+	"xcm-executor/runtime-benchmarks",
 ]
 try-runtime = [
+	"cumulus-pallet-aura-ext/try-runtime",
+	"cumulus-pallet-dmp-queue/try-runtime",
+	"cumulus-pallet-parachain-system/try-runtime",
+	"cumulus-pallet-xcm/try-runtime",
+	"cumulus-pallet-xcmp-queue/try-runtime",
 	"frame-executive/try-runtime",
 	"frame-system/try-runtime",
 	"frame-try-runtime",
 	"pallet-assets/try-runtime",
 	"pallet-aura/try-runtime",
 	"pallet-balances/try-runtime",
+	"pallet-collator-selection/try-runtime",
 	"pallet-grandpa/try-runtime",
 	"pallet-randomness-collective-flip/try-runtime",
 	"pallet-sudo/try-runtime",
@@ -316,4 +370,6 @@ try-runtime = [
 	"pallet-uniques/try-runtime",
 	"pallet-utility/try-runtime",
 	"pallet-vesting/try-runtime",
+	"pallet-xcm/try-runtime",
+	"parachain-info/try-runtime",
 ]
