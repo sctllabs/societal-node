@@ -20,6 +20,9 @@
 //!
 //! Should only be used for benchmarking as it may break in other contexts.
 
+#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+use crate::para_service::FullClient;
+#[cfg(not(any(feature = "parachain", feature = "runtime-benchmarks")))]
 use crate::service::FullClient;
 
 #[cfg(feature = "runtime-benchmarks")]
