@@ -384,6 +384,8 @@ pub mod pallet {
 		TokenAlreadyExists,
 		TokenNotExists,
 		TokenCreateFailed,
+		TokenMetadataFailed,
+		TokenMintFailed,
 		TokenBalanceInvalid,
 		TokenBalanceLow,
 		TokenTransferFailed,
@@ -498,7 +500,7 @@ pub mod pallet {
 						metadata.symbol,
 						metadata.decimals,
 					)
-					.map_err(|_| Error::<T>::TokenCreateFailed)?;
+					.map_err(|_| Error::<T>::TokenMetadataFailed)?;
 
 					if token_initial_balance.gt(&Self::u128_to_balance(0)) {
 						T::AssetProvider::mint_into(
@@ -506,7 +508,7 @@ pub mod pallet {
 							&dao_account_id,
 							token_initial_balance,
 						)
-						.map_err(|_| Error::<T>::TokenCreateFailed)?;
+						.map_err(|_| Error::<T>::TokenMintFailed)?;
 					}
 				}
 			}
@@ -633,6 +635,28 @@ pub mod pallet {
 			Policies::<T>::insert(dao_id, policy);
 
 			Ok(())
+		}
+
+		#[pallet::weight(10_000)]
+		pub fn mint_dao_token(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			amount: T::Balance,
+		) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			let dao_account_id = Self::dao_account_id(dao_id);
+			let dao_token = Self::dao_token(dao_id)?;
+
+			match dao_token {
+				DaoToken::FungibleToken(token_id) => {
+					T::AssetProvider::mint_into(token_id, &dao_account_id, amount)
+						.map_err(|_| Error::<T>::TokenMintFailed)?;
+
+					Ok(())
+				},
+				DaoToken::EthTokenAddress(_) => Err(Error::<T>::NotSupported.into()),
+			}
 		}
 	}
 
