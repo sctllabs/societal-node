@@ -1600,6 +1600,10 @@ impl pallet_dao::Config for Runtime {
 	type AssetProvider = Assets;
 	type AuthorityId = pallet_dao::crypto::TestAuthId;
 	type OffchainEthService = EthService<Dao>;
+	type ApproveOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 }
 
 parameter_types! {

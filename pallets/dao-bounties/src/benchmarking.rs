@@ -6,6 +6,7 @@ use super::*;
 
 use dao_primitives::{DaoOrigin, DaoPolicyProportion};
 use frame_benchmarking::{account, benchmarks_instance_pallet, whitelisted_caller};
+use frame_support::traits::EnsureOriginWithArg;
 use frame_system::RawOrigin;
 use sp_runtime::traits::Bounded;
 

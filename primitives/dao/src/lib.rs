@@ -5,6 +5,7 @@ use frame_support::{
 	codec::{Decode, Encode},
 	dispatch::DispatchError,
 };
+use frame_system::pallet_prelude::OriginFor;
 pub use node_primitives::Balance;
 
 use scale_info::TypeInfo;
@@ -289,6 +290,8 @@ pub trait DaoProvider<Hash> {
 	type AccountId;
 	type AssetId;
 	type Policy;
+	type Origin;
+	type ApproveOrigin;
 
 	fn exists(id: Self::Id) -> Result<(), DispatchError>;
 	fn dao_account_id(id: Self::Id) -> Self::AccountId;
@@ -296,6 +299,10 @@ pub trait DaoProvider<Hash> {
 	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError>;
 	fn count() -> u32;
 	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError>;
+	fn ensure_approved(
+		origin: Self::Origin,
+		dao_id: Self::Id,
+	) -> DispatchResultWithDaoOrigin<Self::AccountId>;
 }
 
 pub trait InitializeDaoMembers<DaoId, AccountId> {

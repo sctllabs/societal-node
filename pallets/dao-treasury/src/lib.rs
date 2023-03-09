@@ -64,7 +64,7 @@ use frame_support::{
 };
 use frame_system::pallet_prelude::OriginFor;
 
-use dao_primitives::{DaoOrigin, DaoPolicy, DaoProvider, DaoToken, DispatchResultWithDaoOrigin};
+use dao_primitives::{DaoOrigin, DaoPolicy, DaoProvider, DaoToken};
 
 pub use pallet::*;
 pub use weights::WeightInfo;
@@ -192,6 +192,7 @@ pub mod pallet {
 			AccountId = Self::AccountId,
 			AssetId = Self::AssetId,
 			Policy = DaoPolicy,
+			Origin = OriginFor<Self>,
 		>;
 
 		type AssetProvider: Inspect<
@@ -342,7 +343,7 @@ pub mod pallet {
 			#[pallet::compact] amount: BalanceOf<T, I>,
 			beneficiary: <T::Lookup as StaticLookup>::Source,
 		) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
+			T::DaoProvider::ensure_approved(origin, dao_id)?;
 
 			let beneficiary = T::Lookup::lookup(beneficiary)?;
 
@@ -375,7 +376,7 @@ pub mod pallet {
 			#[pallet::compact] amount: BalanceOf<T, I>,
 			beneficiary: <T::Lookup as StaticLookup>::Source,
 		) -> DispatchResult {
-			let dao_origin = Self::ensure_approved(origin, dao_id)?;
+			let dao_origin = T::DaoProvider::ensure_approved(origin, dao_id)?;
 
 			let dao_token = T::DaoProvider::dao_token(dao_id)?;
 
@@ -398,7 +399,7 @@ pub mod pallet {
 			#[pallet::compact] amount: BalanceOf<T, I>,
 			beneficiary: <T::Lookup as StaticLookup>::Source,
 		) -> DispatchResult {
-			let dao_origin = Self::ensure_approved(origin, dao_id)?;
+			let dao_origin = T::DaoProvider::ensure_approved(origin, dao_id)?;
 
 			Self::do_transfer_token(token_id, dao_origin.dao_account_id, amount, beneficiary)
 		}
@@ -503,17 +504,5 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		T::Currency::free_balance(&T::DaoProvider::dao_account_id(dao_id))
 			// Must never be less than 0 but better be safe.
 			.saturating_sub(T::Currency::minimum_balance())
-	}
-
-	pub fn ensure_approved(
-		origin: OriginFor<T>,
-		dao_id: DaoId,
-	) -> DispatchResultWithDaoOrigin<T::AccountId> {
-		let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
-		let approve_origin = T::DaoProvider::policy(dao_id)?.approve_origin;
-		let dao_origin = DaoOrigin { dao_account_id, proportion: approve_origin };
-		T::ApproveOrigin::ensure_origin(origin, &dao_origin)?;
-
-		Ok(dao_origin)
 	}
 }
