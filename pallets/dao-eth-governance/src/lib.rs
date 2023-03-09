@@ -114,7 +114,6 @@ pub mod pallet {
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
 	#[pallet::storage_version(STORAGE_VERSION)]
-	#[pallet::without_storage_info]
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
@@ -180,7 +179,7 @@ pub mod pallet {
 		DaoId,
 		Identity,
 		T::Hash,
-		<T as Config>::Proposal,
+		BoundedProposal<T>,
 		OptionQuery,
 	>;
 
@@ -195,7 +194,7 @@ pub mod pallet {
 		T::Hash,
 		(
 			PendingProposal<T::AccountId, BoundedVec<u8, T::ProposalMetadataLimit>>,
-			<T as Config>::Proposal,
+			BoundedProposal<T>,
 		),
 		OptionQuery,
 	>;
@@ -435,6 +434,7 @@ pub mod pallet {
 			dao_id: DaoId,
 			account: T::AccountId,
 			proposal_hash: T::Hash,
+			proposal: T::Proposal,
 		},
 		/// A motion (given hash) has been proposed (by given account) with a threshold
 		Proposed {
@@ -464,17 +464,9 @@ pub mod pallet {
 			vote: Vote<BalanceOf<T>>,
 		},
 		/// A motion was approved by the required threshold.
-		Approved {
-			dao_id: DaoId,
-			proposal_index: ProposalIndex,
-			proposal_hash: T::Hash,
-		},
+		Approved { dao_id: DaoId, proposal_index: ProposalIndex, proposal_hash: T::Hash },
 		/// A motion was not approved by the required threshold.
-		Disapproved {
-			dao_id: DaoId,
-			proposal_index: ProposalIndex,
-			proposal_hash: T::Hash,
-		},
+		Disapproved { dao_id: DaoId, proposal_index: ProposalIndex, proposal_hash: T::Hash },
 		/// A motion was executed; result will be `Ok` if it returned without error.
 		Executed {
 			dao_id: DaoId,
@@ -516,8 +508,6 @@ pub mod pallet {
 		WrongProposalLength,
 		/// There can only be a maximum of `MaxVotes` votes for proposal.
 		TooManyVotes,
-		/// There can only be a maximum of `MaxMembers` votes for proposal.
-		TooManyMembers,
 		/// Action is not allowed for non-eth DAOs
 		NotEthDao,
 		/// Signer account is not equal to the account provided
@@ -577,13 +567,14 @@ pub mod pallet {
 					<PendingProposalOf<T>>::insert(
 						dao_id,
 						proposal_hash,
-						(pending_proposal, proposal),
+						(pending_proposal, T::Preimages::bound(proposal.clone())?.transmute()),
 					);
 
 					Self::deposit_event(Event::ProposalPendingApproval {
 						dao_id,
 						account: who,
 						proposal_hash,
+						proposal: *proposal,
 					});
 
 					Ok(Default::default())
@@ -726,7 +717,7 @@ impl<T: Config> Pallet<T> {
 		dao_id: DaoId,
 		threshold: TokenSupply,
 		block_number: u32,
-		proposal: Box<<T as Config>::Proposal>,
+		proposal: BoundedProposal<T>,
 		length_bound: u32,
 		meta: BoundedVec<u8, T::ProposalMetadataLimit>,
 	) -> Result<(u32, u32), DispatchError> {
@@ -747,9 +738,12 @@ impl<T: Config> Pallet<T> {
 				Ok(proposals.len())
 			})?;
 
+		// Make sure using Inline type of Bounded
+		let (proposal_dispatch_data, _) = T::Preimages::peek(&proposal)?;
+
 		let index = Self::proposal_count(dao_id);
 		<ProposalCount<T>>::mutate(dao_id, |i| *i += 1);
-		<ProposalOf<T>>::insert(dao_id, proposal_hash, proposal.clone());
+		<ProposalOf<T>>::insert(dao_id, proposal_hash, proposal);
 		let votes = {
 			let end = frame_system::Pallet::<T>::block_number() + policy.proposal_period.into();
 			Votes {
@@ -768,7 +762,7 @@ impl<T: Config> Pallet<T> {
 			account: who,
 			proposal_index: index,
 			proposal_hash,
-			proposal: *proposal,
+			proposal: proposal_dispatch_data,
 			threshold,
 			meta,
 		});
@@ -921,10 +915,15 @@ impl<T: Config> Pallet<T> {
 		ensure!(proposal_len <= length_bound, Error::<T>::WrongProposalLength);
 		let proposal = ProposalOf::<T>::get(dao_id, hash).ok_or(Error::<T>::ProposalMissing)?;
 
-		let proposal_weight = proposal.get_dispatch_info().weight;
+		let (call, _lookup_len) = match T::Preimages::peek(&proposal) {
+			Ok(c) => c,
+			Err(_) => return Err(Error::<T>::ProposalMissing.into()),
+		};
+
+		let proposal_weight = call.get_dispatch_info().weight;
 
 		ensure!(proposal_weight.all_lte(weight_bound), Error::<T>::WrongProposalWeight);
-		Ok((proposal, proposal_len as usize))
+		Ok((call, proposal_len as usize))
 	}
 
 	/// Weight:
@@ -1045,7 +1044,7 @@ impl<T: Config> Pallet<T> {
 				dao_id,
 				threshold,
 				block_number,
-				Box::new(proposal),
+				proposal,
 				length_bound,
 				meta,
 			)?;
