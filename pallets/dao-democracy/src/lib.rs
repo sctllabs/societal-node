@@ -478,9 +478,15 @@ pub mod pallet {
 		/// A referendum has been cancelled.
 		Cancelled { dao_id: DaoId, ref_index: ReferendumIndex },
 		/// An account has delegated their vote to another account.
-		Delegated { dao_id: DaoId, who: T::AccountId, target: T::AccountId },
+		Delegated {
+			dao_id: DaoId,
+			who: T::AccountId,
+			target: T::AccountId,
+			conviction: Conviction,
+			balance: BalanceOf<T>,
+		},
 		/// An account has cancelled a previous delegation operation.
-		Undelegated { dao_id: DaoId, account: T::AccountId },
+		Undelegated { dao_id: DaoId, account: T::AccountId, votes: u32 },
 		/// An external proposal has been vetoed.
 		Vetoed { dao_id: DaoId, who: T::AccountId, proposal_hash: H256, until: T::BlockNumber },
 		/// A proposal_hash has been blacklisted permanently.
@@ -1594,7 +1600,7 @@ impl<T: Config> Pallet<T> {
 				}
 				Ok(votes)
 			})?;
-		Self::deposit_event(Event::<T>::Delegated { dao_id, who, target });
+		Self::deposit_event(Event::<T>::Delegated { dao_id, who, target, conviction, balance });
 		Ok(votes)
 	}
 
@@ -1632,7 +1638,7 @@ impl<T: Config> Pallet<T> {
 					Voting::Direct { .. } => Err(Error::<T>::NotDelegating.into()),
 				}
 			})?;
-		Self::deposit_event(Event::<T>::Undelegated { dao_id, account: who });
+		Self::deposit_event(Event::<T>::Undelegated { dao_id, account: who, votes });
 		Ok(votes)
 	}
 
