@@ -573,6 +573,7 @@ pub mod pallet {
 		///
 		/// Emits `Proposed`.
 		#[pallet::weight(T::WeightInfo::propose())]
+		#[pallet::call_index(0)]
 		pub fn propose(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -584,6 +585,7 @@ pub mod pallet {
 
 		/// Adds a new proposal with temporary meta field for arbitrary data indexed by node indexer
 		#[pallet::weight(T::WeightInfo::propose())]
+		#[pallet::call_index(1)]
 		pub fn propose_with_meta(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -653,6 +655,7 @@ pub mod pallet {
 		///
 		/// - `proposal`: The index of the proposal to second.
 		#[pallet::weight(T::WeightInfo::second())]
+		#[pallet::call_index(2)]
 		pub fn second(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -691,6 +694,7 @@ pub mod pallet {
 		/// - `ref_index`: The index of the referendum to vote for.
 		/// - `vote`: The vote configuration.
 		#[pallet::weight(T::WeightInfo::vote_new().max(T::WeightInfo::vote_existing()))]
+		#[pallet::call_index(3)]
 		pub fn vote(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -710,6 +714,7 @@ pub mod pallet {
 		///
 		/// Weight: `O(1)`.
 		#[pallet::weight((T::WeightInfo::emergency_cancel(), DispatchClass::Operational))]
+		#[pallet::call_index(4)]
 		pub fn emergency_cancel(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -740,6 +745,7 @@ pub mod pallet {
 		///
 		/// - `proposal_hash`: The preimage hash of the proposal.
 		#[pallet::weight(T::WeightInfo::external_propose())]
+		#[pallet::call_index(5)]
 		pub fn external_propose(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -777,6 +783,7 @@ pub mod pallet {
 		///
 		/// Weight: `O(1)`
 		#[pallet::weight(T::WeightInfo::external_propose_majority())]
+		#[pallet::call_index(6)]
 		pub fn external_propose_majority(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -807,6 +814,7 @@ pub mod pallet {
 		///
 		/// Weight: `O(1)`
 		#[pallet::weight(T::WeightInfo::external_propose_default())]
+		#[pallet::call_index(7)]
 		pub fn external_propose_default(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -842,6 +850,7 @@ pub mod pallet {
 		///
 		/// Weight: `O(1)`
 		#[pallet::weight(T::WeightInfo::fast_track())]
+		#[pallet::call_index(8)]
 		pub fn fast_track(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -911,6 +920,7 @@ pub mod pallet {
 		///
 		/// Weight: `O(V + log(V))` where V is number of `existing vetoers`
 		#[pallet::weight(T::WeightInfo::veto_external())]
+		#[pallet::call_index(9)]
 		pub fn veto_external(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -954,6 +964,7 @@ pub mod pallet {
 		///
 		/// # Weight: `O(1)`.
 		#[pallet::weight(T::WeightInfo::cancel_referendum())]
+		#[pallet::call_index(10)]
 		pub fn cancel_referendum(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -987,6 +998,7 @@ pub mod pallet {
 		// NOTE: weight must cover an incorrect voting of origin with max votes, this is ensure
 		// because a valid delegation cover decoding a direct voting with max votes.
 		#[pallet::weight(T::WeightInfo::delegate(T::MaxVotes::get()))]
+		#[pallet::call_index(11)]
 		pub fn delegate(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -1016,6 +1028,7 @@ pub mod pallet {
 		// NOTE: weight must cover an incorrect voting of origin with max votes, this is ensure
 		// because a valid delegation cover decoding a direct voting with max votes.
 		#[pallet::weight(T::WeightInfo::undelegate(T::MaxVotes::get()))]
+		#[pallet::call_index(12)]
 		pub fn undelegate(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 			let votes = Self::try_undelegate(dao_id, who)?;
@@ -1029,6 +1042,7 @@ pub mod pallet {
 		///
 		/// Weight: `O(1)`.
 		#[pallet::weight(T::WeightInfo::clear_public_proposals())]
+		#[pallet::call_index(13)]
 		pub fn clear_public_proposals(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
 			ensure_root(origin)?;
 			<PublicProps<T>>::remove(dao_id);
@@ -1043,6 +1057,7 @@ pub mod pallet {
 		///
 		/// Weight: `O(R)` with R number of vote of target.
 		#[pallet::weight(T::WeightInfo::unlock_set(T::MaxVotes::get()).max(T::WeightInfo::unlock_remove(T::MaxVotes::get())))]
+		#[pallet::call_index(14)]
 		pub fn unlock(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -1082,6 +1097,7 @@ pub mod pallet {
 		/// Weight: `O(R + log R)` where R is the number of referenda that `target` has voted on.
 		///   Weight is calculated for the maximum number of vote.
 		#[pallet::weight(T::WeightInfo::remove_vote(T::MaxVotes::get()))]
+		#[pallet::call_index(15)]
 		pub fn remove_vote(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -1107,6 +1123,7 @@ pub mod pallet {
 		/// Weight: `O(R + log R)` where R is the number of referenda that `target` has voted on.
 		///   Weight is calculated for the maximum number of vote.
 		#[pallet::weight(T::WeightInfo::remove_other_vote(T::MaxVotes::get()))]
+		#[pallet::call_index(16)]
 		pub fn remove_other_vote(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -1136,6 +1153,7 @@ pub mod pallet {
 		/// Weight: `O(p)` (though as this is an high-privilege dispatch, we assume it has a
 		///   reasonable value).
 		#[pallet::weight((T::WeightInfo::blacklist(), DispatchClass::Operational))]
+		#[pallet::call_index(17)]
 		pub fn blacklist(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -1206,6 +1224,7 @@ pub mod pallet {
 		///
 		/// Weight: `O(p)` where `p = PublicProps::<T>::decode_len()`
 		#[pallet::weight(T::WeightInfo::cancel_proposal())]
+		#[pallet::call_index(18)]
 		pub fn cancel_proposal(
 			origin: OriginFor<T>,
 			dao_id: DaoId,

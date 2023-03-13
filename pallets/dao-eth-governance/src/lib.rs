@@ -525,6 +525,7 @@ pub mod pallet {
 		///
 		/// Requires the sender to be member.
 		#[pallet::weight(10_1000)]
+		#[pallet::call_index(0)]
 		pub fn propose(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -537,6 +538,7 @@ pub mod pallet {
 
 		/// Adds a new proposal with temporary meta field for arbitrary data indexed by node indexer
 		#[pallet::weight(10_1000)]
+		#[pallet::call_index(1)]
 		pub fn propose_with_meta(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -585,6 +587,7 @@ pub mod pallet {
 
 		/// Add an aye or nay vote for the sender to the given proposal.
 		#[pallet::weight(10_000)]
+		#[pallet::call_index(2)]
 		pub fn vote(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -655,6 +658,7 @@ pub mod pallet {
 		/// + `length_bound`: The upper bound for the length of the proposal in storage. Checked via
 		/// `storage::read` so it is `size_of::<u32>() == 4` larger than the pure length.
 		#[pallet::weight(10_000)]
+		#[pallet::call_index(3)]
 		pub fn close(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -669,6 +673,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(10_000)]
+		#[pallet::call_index(4)]
 		pub fn approve_propose(
 			origin: OriginFor<T>,
 			dao_id: u32,
@@ -685,6 +690,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(10_000)]
+		#[pallet::call_index(5)]
 		pub fn approve_vote(
 			origin: OriginFor<T>,
 			dao_id: u32,

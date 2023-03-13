@@ -15,22 +15,22 @@ num_enum = { version = "0.5.3", default-features = false }
 
 # Substrate
 codec = { package = "parity-scale-codec", version = "3.0.0", default-features = false }
-frame-support = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.32", default-features = false }
-frame-system = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.32", default-features = false }
-pallet-preimage = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.32", default-features = false }
-sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.32", default-features = false }
-sp-io = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.32", default-features = false }
-sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.32", default-features = false }
-sp-std = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.32", default-features = false }
+frame-support = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37", default-features = false }
+frame-system = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37", default-features = false }
+pallet-preimage = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37", default-features = false }
+sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37", default-features = false }
+sp-io = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37", default-features = false }
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37", default-features = false }
+sp-std = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37", default-features = false }
 
 # Frontier
-fp-evm = { git = "https://github.com/sctllabs/frontier", branch = "polkadot-v0.9.32", default-features = false }
-pallet-evm = { git = "https://github.com/sctllabs/frontier", branch = "polkadot-v0.9.32", default-features = false, features = [ "forbid-evm-reentrancy" ] }
+fp-evm = { git = "https://github.com/sctllabs/frontier", branch = "polkadot-v0.9.37", default-features = false }
+pallet-evm = { git = "https://github.com/sctllabs/frontier", branch = "polkadot-v0.9.37", default-features = false, features = [ "forbid-evm-reentrancy" ] }
 
 # Local Dependencies
 pallet-dao-democracy = { version = "4.0.0-dev", default-features = false, path = "../../pallets/dao-democracy" }
 # From Moonbeam
-precompile-utils = { version = "0.1.0", default-features = false, git = "https://github.com/sctllabs/moonbeam.git", branch = "moonbeam-polkadot-v0.9.32" }
+precompile-utils = { version = "0.1.0", default-features = false, git = "https://github.com/sctllabs/moonbeam.git", branch = "moonbeam-polkadot-v0.9.37" }
 
 [dev-dependencies]
 derive_more = "0.99"
@@ -38,13 +38,13 @@ hex-literal = "0.3.4"
 serde = "1.0.100"
 
 # Substrate
-pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.32" }
-pallet-scheduler = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.32" }
-pallet-timestamp = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.32" }
+pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37" }
+pallet-scheduler = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37" }
+pallet-timestamp = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37" }
 scale-info = { version = "2.0", default-features = false, features = [
 	"derive",
 ] }
-sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.32" }
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37" }
 
 [features]
 default = [ "std" ]

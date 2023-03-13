@@ -307,6 +307,7 @@ pub mod pallet {
 		/// - O(1).
 		/// # </weight>
 		#[pallet::weight(<T as Config<I>>::WeightInfo::create_bounty())]
+		#[pallet::call_index(0)]
 		pub fn create_bounty(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -324,6 +325,7 @@ pub mod pallet {
 		/// - O(1).
 		/// # </weight>
 		#[pallet::weight(<T as Config<I>>::WeightInfo::create_bounty())]
+		#[pallet::call_index(1)]
 		pub fn create_token_bounty(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -346,6 +348,7 @@ pub mod pallet {
 		/// - O(1).
 		/// # </weight>
 		#[pallet::weight(<T as Config<I>>::WeightInfo::propose_curator())]
+		#[pallet::call_index(2)]
 		pub fn propose_curator(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -396,6 +399,7 @@ pub mod pallet {
 		/// - O(1).
 		/// # </weight>
 		#[pallet::weight(<T as Config<I>>::WeightInfo::unassign_curator())]
+		#[pallet::call_index(3)]
 		pub fn unassign_curator(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -500,6 +504,7 @@ pub mod pallet {
 		/// - O(1).
 		/// # </weight>
 		#[pallet::weight(<T as Config<I>>::WeightInfo::accept_curator())]
+		#[pallet::call_index(4)]
 		pub fn accept_curator(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -553,6 +558,7 @@ pub mod pallet {
 		/// - O(1).
 		/// # </weight>
 		#[pallet::weight(<T as Config<I>>::WeightInfo::award_bounty())]
+		#[pallet::call_index(5)]
 		pub fn award_bounty(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -611,6 +617,7 @@ pub mod pallet {
 		/// - O(1).
 		/// # </weight>
 		#[pallet::weight(<T as Config<I>>::WeightInfo::claim_bounty())]
+		#[pallet::call_index(6)]
 		pub fn claim_bounty(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -685,6 +692,7 @@ pub mod pallet {
 		/// # </weight>
 		#[pallet::weight(<T as Config<I>>::WeightInfo::close_bounty_proposed()
 			.max(<T as Config<I>>::WeightInfo::close_bounty_active()))]
+		#[pallet::call_index(7)]
 		pub fn close_bounty(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -774,6 +782,7 @@ pub mod pallet {
 		/// - O(1).
 		/// # </weight>
 		#[pallet::weight(<T as Config<I>>::WeightInfo::extend_bounty_expiry())]
+		#[pallet::call_index(8)]
 		pub fn extend_bounty_expiry(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
