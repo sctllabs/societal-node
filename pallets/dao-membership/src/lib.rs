@@ -152,6 +152,7 @@ pub mod pallet {
 		///
 		/// May only be called from `T::AddOrigin`.
 		#[pallet::weight(50_000_000)]
+		#[pallet::call_index(0)]
 		pub fn add_member(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -177,6 +178,7 @@ pub mod pallet {
 		///
 		/// May only be called from `T::RemoveOrigin`.
 		#[pallet::weight(50_000_000)]
+		#[pallet::call_index(1)]
 		pub fn remove_member(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -200,6 +202,7 @@ pub mod pallet {
 		///
 		/// May only be called from `T::SwapOrigin`.
 		#[pallet::weight(50_000_000)]
+		#[pallet::call_index(2)]
 		pub fn swap_member(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -236,6 +239,7 @@ pub mod pallet {
 		///
 		/// May only be called from `T::ResetOrigin`.
 		#[pallet::weight(50_000_000)]
+		#[pallet::call_index(3)]
 		pub fn reset_members(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -259,6 +263,7 @@ pub mod pallet {
 		///
 		/// May only be called from `Signed` origin of a current member.
 		#[pallet::weight(50_000_000)]
+		#[pallet::call_index(4)]
 		pub fn change_key(
 			origin: OriginFor<T>,
 			dao_id: DaoId,

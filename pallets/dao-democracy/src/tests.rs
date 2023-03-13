@@ -75,9 +75,14 @@ impl Contains<RuntimeCall> for BaseFilter {
 	}
 }
 
+const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
+
 parameter_types! {
 	pub BlockWeights: frame_system::limits::BlockWeights =
-		frame_system::limits::BlockWeights::simple_max(frame_support::weights::constants::WEIGHT_PER_SECOND.set_proof_size(u64::MAX));
+		frame_system::limits::BlockWeights::with_sensible_defaults(
+			Weight::from_parts(2u64 * WEIGHT_REF_TIME_PER_SECOND, u64::MAX),
+			NORMAL_DISPATCH_RATIO,
+		);
 }
 impl frame_system::Config for Test {
 	type BaseCallFilter = BaseFilter;

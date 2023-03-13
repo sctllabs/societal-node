@@ -337,6 +337,7 @@ pub mod pallet {
 		/// NOTE: For record-keeping purposes, the proposer is deemed to be equivalent to the
 		/// beneficiary.
 		#[pallet::weight(T::WeightInfo::spend())]
+		#[pallet::call_index(0)]
 		pub fn spend(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -370,6 +371,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(10_000)]
+		#[pallet::call_index(1)]
 		pub fn transfer_token(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -392,6 +394,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(10_000)]
+		#[pallet::call_index(2)]
 		pub fn transfer_token_by_id(
 			origin: OriginFor<T>,
 			dao_id: DaoId,

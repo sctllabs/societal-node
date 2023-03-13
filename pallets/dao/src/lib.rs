@@ -400,6 +400,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		// TODO: calculate dynamic weight
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(4).ref_time())]
+		#[pallet::call_index(0)]
 		pub fn create_dao(
 			origin: OriginFor<T>,
 			council: Vec<T::AccountId>,
@@ -581,6 +582,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(10_000)]
+		#[pallet::call_index(2)]
 		pub fn approve_dao(
 			origin: OriginFor<T>,
 			dao_hash: T::Hash,
@@ -602,6 +604,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(10_000)]
+		#[pallet::call_index(3)]
 		pub fn update_dao_metadata(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -622,6 +625,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(10_000)]
+		#[pallet::call_index(4)]
 		pub fn update_dao_policy(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -638,6 +642,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(10_000)]
+		#[pallet::call_index(5)]
 		pub fn mint_dao_token(
 			origin: OriginFor<T>,
 			dao_id: DaoId,

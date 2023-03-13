@@ -382,6 +382,7 @@ pub mod pallet {
 			),
 			DispatchClass::Operational
 		))]
+		#[pallet::call_index(0)]
 		// TODO: should be proceeded via dao origin - no roots allowed
 		pub fn set_members(
 			origin: OriginFor<T>,
@@ -454,6 +455,7 @@ pub mod pallet {
 		///   - 1 event
 		/// # </weight>
 		#[pallet::weight(10_000)]
+		#[pallet::call_index(1)]
 		pub fn propose(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -466,6 +468,7 @@ pub mod pallet {
 
 		/// Adds a new proposal with temporary meta field for arbitrary data indexed by node indexer
 		#[pallet::weight(10_000)]
+		#[pallet::call_index(2)]
 		pub fn propose_with_meta(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -515,6 +518,7 @@ pub mod pallet {
 		/// - 1 event
 		/// # </weight>
 		#[pallet::weight((T::WeightInfo::vote(T::MaxMembers::get()), DispatchClass::Operational))]
+		#[pallet::call_index(3)]
 		pub fn vote(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -569,6 +573,7 @@ pub mod pallet {
 		/// - up to 3 events
 		/// # </weight>
 		#[pallet::weight(10_000)]
+		#[pallet::call_index(4)]
 		pub fn close(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
