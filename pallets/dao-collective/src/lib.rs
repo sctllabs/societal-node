@@ -458,6 +458,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			proposal: Box<<T as Config<I>>::Proposal>,
+			// TODO: remove since bounded is used
 			#[pallet::compact] length_bound: u32,
 		) -> DispatchResultWithPostInfo {
 			Self::propose_with_meta(origin, dao_id, proposal, length_bound, None)
@@ -610,7 +611,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		meta: Option<Vec<u8>>,
 	) -> Result<(u32, u32), DispatchError> {
 		let proposal_len = proposal.encoded_size();
-		ensure!(proposal_len <= length_bound as usize, Error::<T, I>::WrongProposalLength);
 
 		let proposal_hash = T::Hashing::hash_of(&proposal);
 		ensure!(

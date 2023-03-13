@@ -718,11 +718,11 @@ impl<T: Config> Pallet<T> {
 		threshold: TokenSupply,
 		block_number: u32,
 		proposal: BoundedProposal<T>,
+		// TODO: remove since bounded is used
 		length_bound: u32,
 		meta: BoundedVec<u8, T::ProposalMetadataLimit>,
 	) -> Result<(u32, u32), DispatchError> {
 		let proposal_len = proposal.encoded_size();
-		ensure!(proposal_len <= length_bound as usize, Error::<T>::WrongProposalLength);
 
 		let proposal_hash = T::Hashing::hash_of(&proposal);
 		ensure!(
