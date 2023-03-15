@@ -3,10 +3,11 @@ version: "3.2"
 services:
   dev:
     container_name: societal-node
-    image: paritytech/ci-linux:production
-    working_dir: /var/www/societal-node
+    image: societal/societal-node:latest
+    working_dir: /societal-node
     ports:
       - "9944:9944"
+      - "9933:9933"
     environment:
       - CARGO_HOME=/var/www/societal-node/.cargo
     volumes:
@@ -14,4 +15,4 @@ services:
       - type: bind
         source: ./.local
         target: /root/.local
-    command: bash -c "cargo build --release && ./target/release/societal-node --dev --ws-external"
+    command: /usr/local/bin/societal-node --dev --enable-offchain-indexing true --unsafe-ws-external --rpc-cors all
