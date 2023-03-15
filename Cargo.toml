@@ -7,6 +7,7 @@ members = [
     "pallets/dao-collective",
     "pallets/dao-democracy",
     "pallets/dao-eth-governance",
+    "pallets/dao-nft-governance",
     "pallets/dao-membership",
     "pallets/dao-treasury",
 	"precompiles/dao",
