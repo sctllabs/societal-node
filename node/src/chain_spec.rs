@@ -1,40 +1,54 @@
-use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
+use std::{collections::BTreeMap, str::FromStr};
+
+use polkadot_service::ParaId;
 use sc_chain_spec::{ChainSpecExtension, Properties};
 use sc_service::ChainType;
 use serde::{Deserialize, Serialize};
 use societal_node_runtime::{
-	opaque::Block, wasm_binary_unwrap, AccountId, AuthorityDiscoveryConfig, BabeConfig, Balance,
-	BalancesConfig, CouncilConfig, DaoConfig, DaoEthGovernanceConfig, DemocracyConfig,
-	EVMChainIdConfig, EVMConfig, ElectionsConfig, GenesisConfig, GrandpaConfig, ImOnlineConfig,
-	IndicesConfig, MaxNominations, NominationPoolsConfig, SessionConfig, SessionKeys, Signature,
-	SocietyConfig, StakerStatus, StakingConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig,
-	DOLLARS,
+	wasm_binary_unwrap, AccountId, AuthorityDiscoveryConfig, Balance, BalancesConfig,
+	CollatorSelectionConfig, CouncilConfig, DaoConfig, DaoEthGovernanceConfig, DemocracyConfig,
+	EVMChainIdConfig, EVMConfig, ElectionsConfig, GenesisConfig, GrandpaConfig, IndicesConfig,
+	MaxNominations, NominationPoolsConfig, SessionConfig, SessionKeys, Signature, SocietyConfig,
+	StakerStatus, StakingConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, DOLLARS,
+	EXISTENTIAL_DEPOSIT,
 };
+
+#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+use societal_node_runtime::{ParachainInfoConfig, PolkadotXcmConfig};
+
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
-use sp_consensus_babe::AuthorityId as BabeId;
+use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::UncheckedInto, sr25519, Pair, Public, H160, U256};
 use sp_finality_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::{
 	traits::{IdentifyAccount, Verify},
 	Perbill,
 };
-use std::{collections::BTreeMap, str::FromStr};
 
 const ETH_RPC_URL_TESTNET: &str = "https://goerli.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161";
+
+/// The default XCM version to set in genesis config.
+#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+const SAFE_XCM_VERSION: u32 = xcm::prelude::XCM_VERSION;
 
 /// Node `ChainSpec` extensions.
 ///
 /// Additional parameters for some Substrate core modules,
 /// customizable from the chain spec.
 #[derive(Default, Clone, Serialize, Deserialize, ChainSpecExtension)]
-#[serde(rename_all = "camelCase")]
 pub struct Extensions {
-	/// Block numbers with known hashes.
-	pub fork_blocks: sc_client_api::ForkBlocks<Block>,
-	/// Known bad block hashes.
-	pub bad_blocks: sc_client_api::BadBlocks<Block>,
-	/// The light sync state extension used by the sync-state rpc.
-	pub light_sync_state: sc_sync_state_rpc::LightSyncStateExtension,
+	/// The relay chain of the Parachain.
+	pub relay_chain: String,
+	/// The id of the Parachain.
+	pub para_id: u32,
+}
+
+#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+impl Extensions {
+	/// Try to get the extension from the given `ChainSpec`.
+	pub fn try_get(chain_spec: &dyn sc_service::ChainSpec) -> Option<&Self> {
+		sc_chain_spec::get_extension(chain_spec.extensions())
+	}
 }
 
 /// Specialized `ChainSpec`.
@@ -63,13 +77,12 @@ where
 /// Helper function to generate stash, controller and session key from seed
 pub fn authority_keys_from_seed(
 	seed: &str,
-) -> (AccountId, AccountId, GrandpaId, BabeId, ImOnlineId, AuthorityDiscoveryId) {
+) -> (AccountId, AccountId, GrandpaId, AuraId, AuthorityDiscoveryId) {
 	(
 		get_account_id_from_seed::<sr25519::Public>(&format!("{seed}//stash")),
 		get_account_id_from_seed::<sr25519::Public>(seed),
 		get_from_seed::<GrandpaId>(seed),
-		get_from_seed::<BabeId>(seed),
-		get_from_seed::<ImOnlineId>(seed),
+		get_from_seed::<AuraId>(seed),
 		get_from_seed::<AuthorityDiscoveryId>(seed),
 	)
 }
@@ -86,6 +99,7 @@ fn development_config_genesis() -> GenesisConfig {
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
 		None,
 		1516,
+		1516.into(),
 		ETH_RPC_URL_TESTNET,
 	)
 }
@@ -102,7 +116,8 @@ pub fn development_config() -> ChainSpec {
 		None,
 		None,
 		Some(properties()),
-		Default::default(),
+		// Extensions
+		Extensions { relay_chain: "dev-service".into(), para_id: Default::default() },
 	)
 }
 
@@ -119,8 +134,7 @@ fn local_testnet_genesis() -> GenesisConfig {
 		AccountId,
 		AccountId,
 		GrandpaId,
-		BabeId,
-		ImOnlineId,
+		AuraId,
 		AuthorityDiscoveryId,
 	)> = vec![(
 		// 5CoLMkimzM8CnWvFcvYsnPNxPf6PjPVxTmvSPTQvrMYit7CY
@@ -129,9 +143,6 @@ fn local_testnet_genesis() -> GenesisConfig {
 		array_bytes::hex_n_into_unchecked("0x7e13c7c6702bb8fe6d1d2917ea303975f82cc05acb77a9ceece9b1527c380231"),
 		// 5G4DFSomE21btAoHbreqFn2WMivJg3vGgYkxLJ3HK3WiRY9t
 		array_bytes::hex2array_unchecked("0xb090a211774bd2860bcba90e579e31eb686fc698aa53aa00594e3944919379e5")
-			.unchecked_into(),
-		// 5EUFiuMACg57Kd1hgPJQre3FY4n3NMhW6F7FndwPKKBiNXAE
-		array_bytes::hex2array_unchecked("0x6a6e61d1d594e96cdc94745511c0c431a2369d9963956999c7e29b40b53a4c44")
 			.unchecked_into(),
 		// 5EUFiuMACg57Kd1hgPJQre3FY4n3NMhW6F7FndwPKKBiNXAE
 		array_bytes::hex2array_unchecked("0x6a6e61d1d594e96cdc94745511c0c431a2369d9963956999c7e29b40b53a4c44")
@@ -155,6 +166,7 @@ fn local_testnet_genesis() -> GenesisConfig {
 		root_key,
 		Some(endowed_accounts),
 		1516,
+		1516.into(),
 		ETH_RPC_URL_TESTNET,
 	)
 }
@@ -171,33 +183,26 @@ pub fn local_testnet_config() -> ChainSpec {
 		None,
 		None,
 		Some(properties()),
-		Default::default(),
+		Extensions { relay_chain: "rococo-local".into(), para_id: 1516_u32 },
 	)
 }
 
 fn session_keys(
 	grandpa: GrandpaId,
-	babe: BabeId,
-	im_online: ImOnlineId,
+	aura: AuraId,
 	authority_discovery: AuthorityDiscoveryId,
 ) -> SessionKeys {
-	SessionKeys { grandpa, babe, im_online, authority_discovery }
+	SessionKeys { grandpa, aura, authority_discovery }
 }
 
 /// Configure initial storage state for FRAME modules.
 pub fn testnet_genesis(
-	initial_authorities: Vec<(
-		AccountId,
-		AccountId,
-		GrandpaId,
-		BabeId,
-		ImOnlineId,
-		AuthorityDiscoveryId,
-	)>,
+	initial_authorities: Vec<(AccountId, AccountId, GrandpaId, AuraId, AuthorityDiscoveryId)>,
 	initial_nominators: Vec<AccountId>,
 	root_key: AccountId,
 	endowed_accounts: Option<Vec<AccountId>>,
 	chain_id: u64,
+	para_id: ParaId,
 	eth_rpc_url: &str,
 ) -> GenesisConfig {
 	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
@@ -262,15 +267,19 @@ pub fn testnet_genesis(
 			// Assign network admin rights.
 			key: Some(root_key),
 		},
+		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+		parachain_info: ParachainInfoConfig { parachain_id: para_id },
+		collator_selection: CollatorSelectionConfig {
+			invulnerables: initial_authorities.iter().map(|x| x.0.clone()).collect(),
+			candidacy_bond: EXISTENTIAL_DEPOSIT * 16,
+			..Default::default()
+		},
 		session: SessionConfig {
 			keys: initial_authorities
 				.iter()
+				// .map(|x| (x.0.clone(), x.0.clone(), session_keys(x.2.clone())))
 				.map(|x| {
-					(
-						x.0.clone(),
-						x.0.clone(),
-						session_keys(x.2.clone(), x.3.clone(), x.4.clone(), x.5.clone()),
-					)
+					(x.0.clone(), x.0.clone(), session_keys(x.2.clone(), x.3.clone(), x.4.clone()))
 				})
 				.collect::<Vec<_>>(),
 		},
@@ -283,19 +292,14 @@ pub fn testnet_genesis(
 			..Default::default()
 		},
 		council: CouncilConfig::default(),
-		im_online: ImOnlineConfig { keys: vec![] },
-		babe: BabeConfig {
-			authorities: vec![],
-			epoch_config: Some(societal_node_runtime::BABE_GENESIS_EPOCH_CONFIG),
-		},
-		authority_discovery: AuthorityDiscoveryConfig { keys: vec![] },
-		treasury: Default::default(),
+		aura: Default::default(),
+		aura_ext: Default::default(),
 		nomination_pools: NominationPoolsConfig {
 			min_create_bond: 10 * DOLLARS,
 			min_join_bond: 1 * DOLLARS,
 			..Default::default()
 		},
-		technical_membership: Default::default(),
+		authority_discovery: AuthorityDiscoveryConfig { keys: vec![] },
 		technical_committee: TechnicalCommitteeConfig {
 			members: endowed_accounts
 				.iter()
@@ -304,7 +308,6 @@ pub fn testnet_genesis(
 				.collect(),
 			phantom: Default::default(),
 		},
-		assets: Default::default(),
 		democracy: DemocracyConfig::default(),
 		indices: IndicesConfig { indices: vec![] },
 		elections: ElectionsConfig {
@@ -324,9 +327,6 @@ pub fn testnet_genesis(
 			pot: 0,
 			max_members: 999,
 		},
-		vesting: Default::default(),
-		transaction_payment: Default::default(),
-
 		// EVM compatibility
 		evm_chain_id: EVMChainIdConfig { chain_id },
 		evm: EVMConfig {
@@ -376,7 +376,6 @@ pub fn testnet_genesis(
 			},
 		},
 		ethereum: Default::default(),
-		dynamic_fee: Default::default(),
 		base_fee: Default::default(),
 		dao: {
 			DaoConfig { eth_rpc_url: eth_rpc_url.as_bytes().to_vec(), _phantom: Default::default() }
@@ -387,5 +386,9 @@ pub fn testnet_genesis(
 				_phantom: Default::default(),
 			}
 		},
+		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+		parachain_system: Default::default(),
+		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+		polkadot_xcm: PolkadotXcmConfig { safe_xcm_version: Some(SAFE_XCM_VERSION) },
 	}
 }
