@@ -57,23 +57,16 @@ fn setup_bounty<T: Config<I>, I: 'static>(
 }
 
 fn init_bounty<T: Config<I>, I: 'static>(
-) -> Result<(u32, DaoOrigin<T::AccountId>, AccountIdLookupOf<T>, BountyIndex), &'static str> {
+) -> Result<(u32, DaoOrigin<T::AccountId>, T::AccountId, BountyIndex), &'static str> {
 	let (dao_id, origin, caller, curator, fee, value, reason) =
 		setup_bounty::<T, I>(0, T::MaximumReasonLength::get());
-	let curator_lookup = T::Lookup::unlookup(curator.clone());
 	let approve_origin = T::ApproveOrigin::successful_origin(&origin);
 	Bounties::<T, I>::create_bounty(approve_origin.clone(), dao_id, value, reason)?;
 	let bounty_id = BountyCount::<T, I>::get(dao_id) - 1;
 	Treasury::<T, I>::on_initialize(T::BlockNumber::zero());
-	Bounties::<T, I>::propose_curator(
-		approve_origin,
-		dao_id,
-		bounty_id,
-		curator_lookup.clone(),
-		fee,
-	)?;
-	Bounties::<T, I>::accept_curator(RawOrigin::Signed(curator).into(), dao_id, bounty_id)?;
-	Ok((dao_id, origin, curator_lookup, bounty_id))
+	Bounties::<T, I>::propose_curator(approve_origin, dao_id, bounty_id, curator.clone(), fee)?;
+	Bounties::<T, I>::accept_curator(RawOrigin::Signed(curator.clone()).into(), dao_id, bounty_id)?;
+	Ok((dao_id, origin, curator, bounty_id))
 }
 
 fn setup_pot_account<T: Config<I>, I: 'static>() {
@@ -95,18 +88,17 @@ benchmarks_instance_pallet! {
 	propose_curator {
 		setup_pot_account::<T, I>();
 		let (dao_id, origin, caller, curator, fee, value, reason) = setup_bounty::<T, I>(0, T::MaximumReasonLength::get());
-		let curator_lookup = T::Lookup::unlookup(curator);
 		let approve_origin = T::ApproveOrigin::successful_origin(&origin);
 		Bounties::<T, I>::create_bounty(approve_origin, dao_id, value, reason)?;
 		let bounty_id = BountyCount::<T, I>::get(dao_id) - 1;
 		Treasury::<T, I>::on_initialize(T::BlockNumber::zero());
 		let approve_origin = T::ApproveOrigin::successful_origin(&origin);
-	}: _<T::RuntimeOrigin>(approve_origin, dao_id, bounty_id, curator_lookup, fee)
+	}: _<T::RuntimeOrigin>(approve_origin, dao_id, bounty_id, curator, fee)
 
 	// Worst case when curator is inactive and any sender unassigns the curator.
 	unassign_curator {
 		setup_pot_account::<T, I>();
-		let (dao_id, origin, curator_lookup, bounty_id) = init_bounty::<T, I>()?;
+		let (dao_id, origin, curator, bounty_id) = init_bounty::<T, I>()?;
 		Treasury::<T, I>::on_initialize(T::BlockNumber::zero());
 		let bounty_id = BountyCount::<T, I>::get(dao_id) - 1;
 		// frame_system::Pallet::<T>::set_block_number(T::BountyUpdatePeriod::get() + 2u32.into());
@@ -117,35 +109,32 @@ benchmarks_instance_pallet! {
 	accept_curator {
 		setup_pot_account::<T, I>();
 		let (dao_id, origin, caller, curator, fee, value, reason) = setup_bounty::<T, I>(0, T::MaximumReasonLength::get());
-		let curator_lookup = T::Lookup::unlookup(curator.clone());
 		let approve_origin = T::ApproveOrigin::successful_origin(&origin);
 		Bounties::<T, I>::create_bounty(approve_origin.clone(), dao_id, value, reason)?;
 		let bounty_id = BountyCount::<T, I>::get(dao_id) - 1;
 		Treasury::<T, I>::on_initialize(T::BlockNumber::zero());
-		Bounties::<T, I>::propose_curator(approve_origin, dao_id, bounty_id, curator_lookup, fee)?;
+		Bounties::<T, I>::propose_curator(approve_origin, dao_id, bounty_id, curator.clone(), fee)?;
 	}: _(RawOrigin::Signed(curator), dao_id, bounty_id)
 
 	award_bounty {
 		setup_pot_account::<T, I>();
-		let (dao_id, origin, curator_lookup, bounty_id) = init_bounty::<T, I>()?;
+		let (dao_id, origin, curator, bounty_id) = init_bounty::<T, I>()?;
 		Treasury::<T, I>::on_initialize(T::BlockNumber::zero());
 
 		let bounty_id = BountyCount::<T, I>::get(dao_id) - 1;
-		let curator = T::Lookup::lookup(curator_lookup).map_err(<&str>::from)?;
 
-		let beneficiary = T::Lookup::unlookup(account("beneficiary", 0, SEED));
+		let beneficiary = account("beneficiary", 0, SEED);
 	}: _(RawOrigin::Signed(curator), dao_id, bounty_id, beneficiary)
 
 	claim_bounty {
 		setup_pot_account::<T, I>();
-		let (dao_id, origin, curator_lookup, bounty_id) = init_bounty::<T, I>()?;
+		let (dao_id, origin, curator, bounty_id) = init_bounty::<T, I>()?;
 		Treasury::<T, I>::on_initialize(T::BlockNumber::zero());
 
 		let bounty_id = BountyCount::<T, I>::get(dao_id) - 1;
-		let curator = T::Lookup::lookup(curator_lookup).map_err(<&str>::from)?;
 
 		let beneficiary_account: T::AccountId = account("beneficiary", 0, SEED);
-		let beneficiary = T::Lookup::unlookup(beneficiary_account.clone());
+		let beneficiary = beneficiary_account.clone();
 		Bounties::<T, I>::award_bounty(RawOrigin::Signed(curator.clone()).into(), dao_id, bounty_id, beneficiary)?;
 
 		// frame_system::Pallet::<T>::set_block_number(T::BountyDepositPayoutDelay::get() + 1u32.into());
@@ -159,7 +148,7 @@ benchmarks_instance_pallet! {
 
 	close_bounty_active {
 		setup_pot_account::<T, I>();
-		let (dao_id, origin, curator_lookup, bounty_id) = init_bounty::<T, I>()?;
+		let (dao_id, origin, curator, bounty_id) = init_bounty::<T, I>()?;
 		Treasury::<T, I>::on_initialize(T::BlockNumber::zero());
 		let bounty_id = BountyCount::<T, I>::get(dao_id) - 1;
 		let approve_origin = T::ApproveOrigin::successful_origin(&origin);
@@ -170,11 +159,10 @@ benchmarks_instance_pallet! {
 
 	extend_bounty_expiry {
 		setup_pot_account::<T, I>();
-		let (dao_id, origin, curator_lookup, bounty_id) = init_bounty::<T, I>()?;
+		let (dao_id, origin, curator, bounty_id) = init_bounty::<T, I>()?;
 		Treasury::<T, I>::on_initialize(T::BlockNumber::zero());
 
 		let bounty_id = BountyCount::<T, I>::get(dao_id) - 1;
-		let curator = T::Lookup::lookup(curator_lookup).map_err(<&str>::from)?;
 	}: _(RawOrigin::Signed(curator), dao_id, bounty_id, Vec::new())
 	verify {
 		assert_last_event::<T, I>(Event::BountyExtended { dao_id, index: bounty_id }.into())
@@ -203,7 +191,7 @@ benchmarks_instance_pallet! {
 		ensure!(missed_any == false, "Missed some");
 		if b > 0 {
 			ensure!(budget_remaining < BalanceOf::<T, I>::max_value(), "Budget not used");
-			assert_last_event::<T, I>(Event::BountyBecameActive { dao_id, index: b - 1 }.into())
+			assert_last_event::<T, I>(Event::BountyBecameActive { dao_id, index: b - 1, status: BountyStatus::Funded }.into())
 		} else {
 			ensure!(budget_remaining == BalanceOf::<T, I>::max_value(), "Budget used");
 		}

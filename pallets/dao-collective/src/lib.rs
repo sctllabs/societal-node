@@ -339,6 +339,8 @@ pub mod pallet {
 		TooManyVotes,
 		/// There can only be a maximum of `MaxMembers` votes for proposal.
 		TooManyMembers,
+		/// Voting is disabled for expired proposals
+		Expired,
 	}
 
 	// Note that councillor operations are assigned to the operational class.
@@ -680,6 +682,9 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	) -> Result<bool, DispatchError> {
 		let mut voting = Self::voting(dao_id, proposal).ok_or(Error::<T, I>::ProposalMissing)?;
 		ensure!(voting.index == index, Error::<T, I>::WrongIndex);
+
+		// Proposal voting is not allowed if the voting period has ended.
+		ensure!(frame_system::Pallet::<T>::block_number() >= voting.end, Error::<T, I>::Expired);
 
 		let position_yes = voting.ayes.iter().position(|a| a == &who);
 		let position_no = voting.nays.iter().position(|a| a == &who);
