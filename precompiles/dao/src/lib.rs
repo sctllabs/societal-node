@@ -37,10 +37,12 @@ pub struct DaoPrecompile<Runtime>(PhantomData<Runtime>);
 #[precompile_utils::precompile]
 impl<Runtime> DaoPrecompile<Runtime>
 where
-	Runtime: pallet_dao::Config + pallet_evm::Config,
-	Runtime::RuntimeCall: Dispatchable<PostInfo = PostDispatchInfo> + GetDispatchInfo,
-	<Runtime::RuntimeCall as Dispatchable>::RuntimeOrigin: From<Option<Runtime::AccountId>>,
-	Runtime::RuntimeCall: From<pallet_dao::Call<Runtime>>,
+	Runtime: pallet_dao::Config + pallet_evm::Config + frame_system::Config,
+	<Runtime as frame_system::Config>::RuntimeCall:
+		Dispatchable<PostInfo = PostDispatchInfo> + GetDispatchInfo,
+	<<Runtime as frame_system::Config>::RuntimeCall as Dispatchable>::RuntimeOrigin:
+		From<Option<Runtime::AccountId>>,
+	<Runtime as frame_system::Config>::RuntimeCall: From<pallet_dao::Call<Runtime>>,
 {
 	/// The dispatch origin for this call must be Signed.
 	///

@@ -709,7 +709,6 @@ impl pallet_dao_treasury::Config for Runtime {
 	>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
-	type SpendPeriod = SpendPeriod;
 	type Burn = Burn;
 	type BurnDestination = ();
 	type SpendFunds = DaoBounties;
@@ -1596,9 +1595,11 @@ parameter_types! {
 	pub const DaoMetadataLimit: u32 = 500;
 	pub const DaoMaxCouncilMembers: u32 = 100; // TODO
 	pub const DaoMaxTechnicalCommitteeMembers: u32 = 100; // TODO
+	pub const DaoMinTreasurySpendPeriod: u32 = 100;
 }
 
 impl pallet_dao::Config for Runtime {
+	type RuntimeCall = RuntimeCall;
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
 	type PalletId = DaoPalletId;
@@ -1606,6 +1607,7 @@ impl pallet_dao::Config for Runtime {
 	type DaoMetadataLimit = DaoMetadataLimit;
 	type DaoMaxCouncilMembers = DaoMaxCouncilMembers;
 	type DaoMaxTechnicalCommitteeMembers = DaoMaxTechnicalCommitteeMembers;
+	type DaoMinTreasurySpendPeriod = DaoMinTreasurySpendPeriod;
 	type AssetId = AssetId;
 	type Balance = Balance;
 	type CouncilProvider = DaoCouncilMembers;
@@ -1617,6 +1619,10 @@ impl pallet_dao::Config for Runtime {
 		EnsureDao<AccountId>,
 		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
 	>;
+	type Scheduler = Scheduler;
+	type PalletsOrigin = OriginCaller;
+	type Preimages = Preimage;
+	type SpendDaoFunds = DaoTreasury;
 }
 
 parameter_types! {
