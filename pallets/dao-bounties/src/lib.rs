@@ -652,7 +652,7 @@ pub mod pallet {
 						curator: signer,
 						beneficiary: beneficiary.clone(),
 						unlock_at: frame_system::Pallet::<T>::block_number() +
-							dao_policy.bounty_update_period.0.into(),
+							dao_policy.bounty_payout_delay.0.into(),
 					};
 
 					bounty.status = pending_payout_status.clone();
