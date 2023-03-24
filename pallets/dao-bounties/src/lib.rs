@@ -258,6 +258,7 @@ pub mod pallet {
 		BountyCuratorProposed {
 			dao_id: DaoId,
 			index: BountyIndex,
+			fee: BalanceOf<T, I>,
 			status: BountyStatus<T::AccountId, T::BlockNumber>,
 		},
 		/// A curator is unassigned from bounty.
@@ -411,6 +412,7 @@ pub mod pallet {
 			Self::deposit_event(Event::<T, I>::BountyCuratorProposed {
 				dao_id,
 				index: bounty_id,
+				fee,
 				status: BountyStatus::CuratorProposed { curator },
 			});
 
