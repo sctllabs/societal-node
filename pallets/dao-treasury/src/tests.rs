@@ -10,12 +10,10 @@ use std::cell::RefCell;
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
-	traits::{BadOrigin, BlakeTwo256, IdentityLookup},
+	traits::{AccountIdConversion, BadOrigin, BlakeTwo256, IdentityLookup},
 };
 
-use dao_primitives::{
-	AccountTokenBalance, BountyPayoutDelay, BountyUpdatePeriod, DaoPolicyProportion,
-};
+use dao_primitives::{BountyPayoutDelay, BountyUpdatePeriod, DaoPolicyProportion};
 use frame_support::{
 	assert_noop, assert_ok,
 	dispatch::DispatchError,
@@ -132,6 +130,8 @@ impl DaoProvider<H256> for TestDaoProvider {
 	type AccountId = u128;
 	type AssetId = u128;
 	type Policy = DaoPolicy;
+	type Origin = RuntimeOrigin;
+	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
 
 	fn exists(_id: Self::Id) -> Result<(), DispatchError> {
 		Ok(())
@@ -148,6 +148,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 			governance: None,
 			bounty_payout_delay: BountyPayoutDelay(10),
 			bounty_update_period: BountyUpdatePeriod(10),
+			spend_period: TreasurySpendPeriod(100),
 		})
 	}
 
@@ -155,12 +156,25 @@ impl DaoProvider<H256> for TestDaoProvider {
 		PalletId(*b"py/sctld").into_sub_account_truncating(id)
 	}
 
-	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError> {
+	fn ensure_member(_id: Self::Id, _who: &Self::AccountId) -> Result<bool, DispatchError> {
 		Ok(true)
 	}
 
-	fn dao_token(id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
+	fn dao_token(_id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
 		todo!()
+	}
+
+	fn ensure_approved(
+		origin: Self::Origin,
+		dao_id: Self::Id,
+	) -> DispatchResultWithDaoOrigin<Self::AccountId> {
+		let dao_account_id = Self::dao_account_id(dao_id);
+		let approve_origin = Self::policy(dao_id)?.approve_origin;
+		let dao_origin = DaoOrigin { dao_account_id, proportion: approve_origin };
+
+		Self::ApproveOrigin::ensure_origin(origin, &dao_origin)?;
+
+		Ok(dao_origin)
 	}
 }
 
@@ -224,6 +238,10 @@ impl Inspect<AccountId> for TestAssetProvider {
 	) -> WithdrawConsequence<Self::Balance> {
 		WithdrawConsequence::Success
 	}
+
+	fn asset_exists(_asset: Self::AssetId) -> bool {
+		true
+	}
 }
 
 impl Mutate<AccountId> for TestAssetProvider {
@@ -280,11 +298,11 @@ impl MetadataMutate<AccountId> for TestAssetProvider {
 
 impl Transfer<AccountId> for TestAssetProvider {
 	fn transfer(
-		asset: u128,
-		source: &AccountId,
-		dest: &AccountId,
+		_asset: u128,
+		_source: &AccountId,
+		_dest: &AccountId,
 		amount: u128,
-		keep_alive: bool,
+		_keep_alive: bool,
 	) -> Result<Self::Balance, DispatchError> {
 		Ok(amount)
 	}
@@ -297,7 +315,6 @@ impl Config for Test {
 	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
-	type SpendPeriod = ConstU64<2>;
 	type Burn = Burn;
 	type BurnDestination = (); // Just gets burned.
 	type WeightInfo = ();
@@ -354,6 +371,7 @@ fn spend_origin_works() {
 		assert_eq!(Balances::free_balance(6), 0);
 
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
+		Treasury::spend_dao_funds(0);
 		assert_eq!(Balances::free_balance(6), 100);
 		assert_eq!(Treasury::pot(0), 0);
 	});
@@ -403,6 +421,7 @@ fn accepted_spend_proposal_enacted_on_spend_period() {
 		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, 100, 3));
 
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
+		Treasury::spend_dao_funds(0);
 		assert_eq!(Balances::free_balance(3), 100);
 		assert_eq!(Treasury::pot(0), 0);
 	});
@@ -423,6 +442,7 @@ fn pot_underflow_should_not_diminish() {
 			Balances::deposit_into_existing(&<Test as Config>::DaoProvider::dao_account_id(0), 100)
 				.unwrap();
 		<Treasury as OnInitialize<u64>>::on_initialize(4);
+		Treasury::spend_dao_funds(0);
 		assert_eq!(Balances::free_balance(3), 150); // Fund has been spent
 		assert_eq!(Treasury::pot(0), 50); // Pot has finally changed
 	});
@@ -446,6 +466,7 @@ fn treasury_account_doesnt_get_deleted() {
 		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, Treasury::pot(0), 3));
 
 		<Treasury as OnInitialize<u64>>::on_initialize(4);
+		Treasury::spend_dao_funds(0);
 		assert_eq!(Treasury::pot(0), 0); // Pot is emptied
 		assert_eq!(Balances::free_balance(<Test as Config>::DaoProvider::dao_account_id(0)), 1); // but the account is still there
 	});
@@ -477,6 +498,7 @@ fn inexistent_account_works() {
 		assert_eq!(Balances::free_balance(<Test as Config>::DaoProvider::dao_account_id(0)), 100); // Account does exist
 
 		<Treasury as OnInitialize<u64>>::on_initialize(4);
+		Treasury::spend_dao_funds(0);
 
 		assert_eq!(Treasury::pot(0), 0); // Pot has changed
 		assert_eq!(Balances::free_balance(3), 99); // Balance of `3` has changed

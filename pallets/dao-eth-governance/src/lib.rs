@@ -725,7 +725,7 @@ impl<T: Config> Pallet<T> {
 		block_number: u32,
 		proposal: BoundedProposal<T>,
 		// TODO: remove since bounded is used
-		length_bound: u32,
+		_length_bound: u32,
 		meta: BoundedVec<u8, T::ProposalMetadataLimit>,
 	) -> Result<(u32, u32), DispatchError> {
 		let proposal_len = proposal.encoded_size();

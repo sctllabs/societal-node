@@ -1,8 +1,8 @@
 use crate::{mock::*, BoundedVec, Config, Dao, DaoConfig, DaoPolicy, Error};
 use dao_primitives::{
 	BountyPayoutDelay, BountyUpdatePeriod, DaoPolicyProportion, DaoStatus, DaoToken,
+	TreasurySpendPeriod,
 };
-use frame_benchmarking::account;
 use frame_support::{
 	assert_noop, assert_ok,
 	traits::tokens::fungibles::{metadata::Inspect as MetadataInspect, Inspect},
@@ -186,6 +186,7 @@ fn create_dao_works() {
 				governance: None,
 				bounty_payout_delay: BountyPayoutDelay(14400),
 				bounty_update_period: BountyUpdatePeriod(14400),
+				spend_period: TreasurySpendPeriod(14400),
 			}
 		);
 	});
