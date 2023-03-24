@@ -6,7 +6,7 @@ use frame_support::{
 	pallet_prelude::*,
 	traits::{
 		tokens::fungibles::{metadata::Mutate as MetadataMutate, Create, Inspect, Mutate},
-		Currency, EnsureOriginWithArg, Get, ReservableCurrency,
+		Currency, EnsureOriginWithArg, Get, LockIdentifier, ReservableCurrency,
 	},
 	BoundedVec, PalletId,
 };
@@ -17,7 +17,7 @@ use serde::{self, Deserialize};
 use sp_core::crypto::KeyTypeId;
 use sp_io::offchain_index;
 use sp_runtime::{
-	traits::{AccountIdConversion, AtLeast32BitUnsigned, BlockNumberProvider},
+	traits::{AccountIdConversion, AtLeast32BitUnsigned, BlockNumberProvider, Saturating},
 	transaction_validity::{
 		InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
 	},
@@ -60,6 +60,8 @@ type PendingDaoOf<T> = PendingDao<
 	>,
 >;
 
+pub type CallOf<T> = <T as Config>::RuntimeCall;
+
 /// Dao ID. Just a `u32`.
 pub type DaoId = u32;
 
@@ -78,6 +80,8 @@ const UNSIGNED_TXS_PRIORITY: u64 = 100;
 const ONCHAIN_TX_KEY: &[u8] = b"societal-dao::storage::tx";
 
 const TOKEN_MIN_BALANCE: u128 = 1;
+
+const DAO_FACTORY_ID: LockIdentifier = *b"daofctry";
 
 pub mod crypto {
 	use crate::KEY_TYPE;
@@ -125,13 +129,20 @@ struct IndexingData<Hash>(Vec<u8>, OffchainData<Hash>);
 pub mod pallet {
 	pub use super::*;
 	use eth_primitives::EthRpcService;
+	use frame_support::traits::{
+		schedule::{
+			v3::{Named as ScheduleNamed, TaskName},
+			DispatchTime,
+		},
+		QueryPreimage, StorePreimage,
+	};
 	use frame_system::{
 		offchain::{AppCrypto, CreateSignedTransaction, SubmitTransaction},
 		pallet_prelude::*,
 	};
 	use sp_runtime::{
 		offchain::storage::StorageValueRef,
-		traits::{Hash, Zero},
+		traits::{Dispatchable, Hash, Zero},
 	};
 
 	/// The current storage version.
@@ -144,6 +155,12 @@ pub mod pallet {
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
+		type RuntimeCall: Parameter
+			+ Dispatchable<RuntimeOrigin = Self::RuntimeOrigin>
+			+ From<Call<Self>>
+			+ IsType<<Self as frame_system::Config>::RuntimeCall>
+			+ From<frame_system::Call<Self>>;
+
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
@@ -185,6 +202,9 @@ pub mod pallet {
 		#[pallet::constant]
 		type DaoMaxTechnicalCommitteeMembers: Get<u32>;
 
+		#[pallet::constant]
+		type DaoMinTreasurySpendPeriod: Get<u32>;
+
 		type CouncilProvider: InitializeDaoMembers<u32, Self::AccountId>
 			+ ContainsDaoMember<u32, Self::AccountId>;
 
@@ -215,6 +235,16 @@ pub mod pallet {
 		type OffchainEthService: EthRpcService;
 
 		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
+
+		type Scheduler: ScheduleNamed<Self::BlockNumber, CallOf<Self>, Self::PalletsOrigin>;
+
+		/// Overarching type of all pallets origins.
+		type PalletsOrigin: From<RawOrigin<Self::AccountId>>;
+
+		type Preimages: QueryPreimage + StorePreimage;
+
+		/// Runtime hooks to external pallet using treasury to compute spend funds.
+		type SpendDaoFunds: SpendDaoFunds<u32>;
 	}
 
 	/// Origin for the dao pallet.
@@ -369,6 +399,14 @@ pub mod pallet {
 			beneficiary: T::AccountId,
 			amount: Balance<T>,
 		},
+		DaoMetadataUpdated {
+			dao_id: DaoId,
+			metadata: Vec<u8>,
+		},
+		DaoPolicyUpdated {
+			dao_id: DaoId,
+			policy: DaoPolicy,
+		},
 	}
 
 	#[pallet::error]
@@ -460,6 +498,8 @@ pub mod pallet {
 
 			let founder = who;
 			let config = DaoConfig { name: dao_name, purpose: dao_purpose, metadata: dao_metadata };
+
+			assert!(policy.spend_period.0 <= T::DaoMinTreasurySpendPeriod::get(), "Value too low");
 
 			let mut has_token_id: Option<AssetId<T>> = None;
 
@@ -612,14 +652,16 @@ pub mod pallet {
 		) -> DispatchResult {
 			Self::ensure_approved(origin, dao_id)?;
 
-			let dao_metadata = BoundedVec::<u8, T::DaoMetadataLimit>::try_from(metadata)
+			let dao_metadata = BoundedVec::<u8, T::DaoMetadataLimit>::try_from(metadata.clone())
 				.map_err(|_| Error::<T>::MetadataTooLong)?;
 
 			Daos::<T>::mutate(dao_id, |maybe_dao| {
 				if let Some(dao) = maybe_dao {
-					dao.config.metadata = dao_metadata;
+					dao.config.metadata = dao_metadata.clone();
 				}
 			});
+
+			Self::deposit_event(Event::DaoMetadataUpdated { dao_id, metadata });
 
 			Ok(())
 		}
@@ -636,7 +678,32 @@ pub mod pallet {
 			let policy = serde_json::from_slice::<DaoPolicy>(&policy)
 				.map_err(|_| Error::<T>::InvalidInput)?;
 
-			Policies::<T>::insert(dao_id, policy);
+			Policies::<T>::insert(dao_id, policy.clone());
+
+			let old_policy = Self::policy(dao_id)?;
+			if old_policy.spend_period != policy.spend_period {
+				let task_id = Self::spend_dao_funds_task_id(dao_id);
+
+				// Canceling previously scheduled tasks
+				T::Scheduler::cancel_named(task_id)?;
+
+				let origin = RawOrigin::Dao(Self::dao_account_id(dao_id)).into();
+				let now = frame_system::Pallet::<T>::block_number();
+				let when = now.saturating_add(policy.spend_period.0.into());
+				let call = CallOf::<T>::from(Call::spend_dao_funds { dao_id });
+
+				// Scheduling DAO treasury periodic spending
+				T::Scheduler::schedule_named(
+					task_id,
+					DispatchTime::At(when),
+					Some((policy.spend_period.0.into(), u32::MAX)),
+					50,
+					origin,
+					T::Preimages::bound(call)?.transmute(),
+				)?;
+			}
+
+			Self::deposit_event(Event::DaoPolicyUpdated { dao_id, policy });
 
 			Ok(())
 		}
@@ -663,6 +730,16 @@ pub mod pallet {
 				DaoToken::EthTokenAddress(_) => Err(Error::<T>::NotSupported.into()),
 			}
 		}
+
+		#[pallet::weight(10_000)]
+		#[pallet::call_index(6)]
+		pub fn spend_dao_funds(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			T::SpendDaoFunds::spend_dao_funds(dao_id);
+
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -678,6 +755,10 @@ pub mod pallet {
 			TryInto::<Balance<T>>::try_into(cost).ok().unwrap()
 		}
 
+		fn spend_dao_funds_task_id(dao_id: DaoId) -> TaskName {
+			(DAO_FACTORY_ID, dao_id).encode_into()
+		}
+
 		pub fn do_register_dao(
 			mut dao: DaoOf<T>,
 			policy: PolicyOf,
@@ -686,7 +767,9 @@ pub mod pallet {
 		) -> DispatchResult {
 			let dao_id = <NextDaoId<T>>::get();
 
-			dao.account_id = Self::account_id(dao_id);
+			let account_id = Self::account_id(dao_id);
+
+			dao.account_id = account_id.clone();
 			dao.status = DaoStatus::Success;
 
 			let dao_event_source = dao.clone();
@@ -703,6 +786,22 @@ pub mod pallet {
 			)?;
 
 			<NextDaoId<T>>::put(dao_id.checked_add(1).unwrap());
+
+			let origin = RawOrigin::Dao(account_id).into();
+			let now = frame_system::Pallet::<T>::block_number();
+			let when = now.saturating_add(policy.spend_period.0.into());
+
+			let call = CallOf::<T>::from(Call::spend_dao_funds { dao_id });
+
+			// Scheduling DAO treasury periodic spending
+			T::Scheduler::schedule_named(
+				Self::spend_dao_funds_task_id(dao_id),
+				DispatchTime::At(when),
+				Some((policy.spend_period.0.into(), u32::MAX)),
+				50,
+				origin,
+				T::Preimages::bound(call)?.transmute(),
+			)?;
 
 			Self::deposit_event(Event::DaoRegistered {
 				dao_id,
@@ -731,6 +830,27 @@ pub mod pallet {
 		}
 	}
 }
+
+//TODO: taken from democracy pallet
+pub trait EncodeInto: Encode {
+	fn encode_into<T: AsMut<[u8]> + Default>(&self) -> T {
+		let mut t = T::default();
+		self.using_encoded(|data| {
+			if data.len() <= t.as_mut().len() {
+				t.as_mut()[0..data.len()].copy_from_slice(data);
+			} else {
+				// encoded self is too big to fit into a T. hash it and use the first bytes of that
+				// instead.
+				let hash = sp_io::hashing::blake2_256(data);
+				let l = t.as_mut().len().min(hash.len());
+				t.as_mut()[0..l].copy_from_slice(&hash[0..l]);
+			}
+		});
+		t
+	}
+}
+
+impl<T: Encode> EncodeInto for T {}
 
 impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 	type Id = u32;
