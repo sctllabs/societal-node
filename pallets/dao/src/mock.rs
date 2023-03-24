@@ -1,8 +1,8 @@
 use crate as pallet_dao;
-use dao_primitives::{ContainsDaoMember, InitializeDaoMembers};
+use dao_primitives::{ContainsDaoMember, InitializeDaoMembers, RawOrigin};
 use frame_support::{
 	dispatch::{DispatchError, DispatchResult},
-	parameter_types,
+	ord_parameter_types, parameter_types,
 	traits::{
 		tokens::{
 			fungibles::{
@@ -16,18 +16,19 @@ use frame_support::{
 	PalletId,
 };
 use frame_system as system;
-use sp_core::{ConstU128, H256};
+use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, Extrinsic as ExtrinsicT, IdentityLookup},
 };
 
 use crate::crypto;
-use frame_support::traits::fungibles::Transfer;
+use frame_support::traits::{fungibles::Transfer, AsEnsureOriginWithArg, EqualPrivilegeOnly};
+use frame_system::EnsureRoot;
 use serde_json::{json, Value};
-use sp_core::sr25519::Signature;
+use sp_core::sr25519::{Public, Signature};
 use sp_runtime::{
-	testing::{TestSignature, TestXt, UintAuthorityId},
+	testing::TestXt,
 	traits::{IdentifyAccount, Verify},
 };
 use std::collections::HashMap;
@@ -46,6 +47,7 @@ frame_support::construct_runtime!(
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Storage, Event<T>},
 		DaoFactory: pallet_dao::{Pallet, Call, Storage, Event<T>},
+		Scheduler: pallet_scheduler::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
@@ -76,6 +78,12 @@ where
 {
 	type OverarchingCall = RuntimeCall;
 	type Extrinsic = Extrinsic;
+}
+
+impl From<RawOrigin<Public>> for OriginCaller {
+	fn from(_value: RawOrigin<Public>) -> Self {
+		OriginCaller::system(frame_system::RawOrigin::Root)
+	}
 }
 
 impl frame_system::Config for Test {
@@ -149,7 +157,7 @@ impl InitializeDaoMembers<u32, AccountId> for TestCouncilProvider {
 }
 
 impl ContainsDaoMember<u32, AccountId> for TestCouncilProvider {
-	fn contains(dao_id: u32, who: &AccountId) -> Result<bool, DispatchError> {
+	fn contains(_dao_id: u32, _who: &AccountId) -> Result<bool, DispatchError> {
 		Ok(true)
 	}
 }
@@ -170,7 +178,7 @@ impl InitializeDaoMembers<u32, AccountId> for TestTechnicalCommitteeProvider {
 }
 
 impl ContainsDaoMember<u32, AccountId> for TestTechnicalCommitteeProvider {
-	fn contains(dao_id: u32, who: &AccountId) -> Result<bool, DispatchError> {
+	fn contains(_dao_id: u32, _who: &AccountId) -> Result<bool, DispatchError> {
 		Ok(true)
 	}
 }
@@ -199,7 +207,7 @@ impl Inspect<AccountId> for TestAssetProvider {
 		0
 	}
 
-	fn minimum_balance(asset: Self::AssetId) -> Self::Balance {
+	fn minimum_balance(_asset: Self::AssetId) -> Self::Balance {
 		1
 	}
 
@@ -230,6 +238,10 @@ impl Inspect<AccountId> for TestAssetProvider {
 		_amount: Self::Balance,
 	) -> WithdrawConsequence<Self::Balance> {
 		WithdrawConsequence::Success
+	}
+
+	fn asset_exists(_asset: Self::AssetId) -> bool {
+		true
 	}
 }
 
@@ -287,14 +299,32 @@ impl MetadataMutate<AccountId> for TestAssetProvider {
 
 impl Transfer<AccountId> for TestAssetProvider {
 	fn transfer(
-		asset: u128,
-		source: &AccountId,
-		dest: &AccountId,
+		_asset: u128,
+		_source: &AccountId,
+		_dest: &AccountId,
 		amount: u128,
-		keep_alive: bool,
+		_keep_alive: bool,
 	) -> Result<Self::Balance, DispatchError> {
 		Ok(amount)
 	}
+}
+
+impl pallet_scheduler::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeOrigin = RuntimeOrigin;
+	type PalletsOrigin = OriginCaller;
+	type RuntimeCall = RuntimeCall;
+	type MaximumWeight = ();
+	type ScheduleOrigin = EnsureRoot<AccountId>;
+	type MaxScheduledPerBlock = ConstU32<100>;
+	type WeightInfo = ();
+	type OriginPrivilegeCmp = EqualPrivilegeOnly; // TODO : Simplest type, maybe there is better ?
+	type Preimages = ();
+}
+
+ord_parameter_types! {
+	pub const One: u64 = 1;
+	pub const Two: u64 = 2;
 }
 
 impl pallet_dao::Config for Test {
@@ -312,6 +342,13 @@ impl pallet_dao::Config for Test {
 	type DaoMaxTechnicalCommitteeMembers = ConstU32<20>;
 	type TechnicalCommitteeProvider = TestTechnicalCommitteeProvider;
 	type OffchainEthService = ();
+	type RuntimeCall = RuntimeCall;
+	type DaoMinTreasurySpendPeriod = ConstU32<20>;
+	type ApproveOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type Scheduler = Scheduler;
+	type PalletsOrigin = OriginCaller;
+	type Preimages = ();
+	type SpendDaoFunds = ();
 }
 
 // Build genesis storage according to the mock runtime.

@@ -401,6 +401,13 @@ pub trait SpendDaoFunds<DaoId> {
 	fn spend_dao_funds(dao_id: DaoId) -> Weight;
 }
 
+/// Empty implementation in case no callbacks are required.
+impl<DaoId> SpendDaoFunds<DaoId> for () {
+	fn spend_dao_funds(_dao_id: DaoId) -> Weight {
+		Weight::zero()
+	}
+}
+
 /// Origin for the collective module.
 #[derive(PartialEq, Eq, Clone, RuntimeDebug, Encode, Decode, TypeInfo, MaxEncodedLen)]
 #[codec(mel_bound(AccountId: MaxEncodedLen))]

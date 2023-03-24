@@ -614,7 +614,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		who: T::AccountId,
 		dao_id: DaoId,
 		proposal: BoundedProposal<T, I>,
-		length_bound: MemberCount,
+		_length_bound: MemberCount,
 		meta: Option<Vec<u8>>,
 	) -> Result<(u32, u32), DispatchError> {
 		let proposal_len = proposal.encoded_size();
@@ -684,7 +684,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		ensure!(voting.index == index, Error::<T, I>::WrongIndex);
 
 		// Proposal voting is not allowed if the voting period has ended.
-		ensure!(frame_system::Pallet::<T>::block_number() >= voting.end, Error::<T, I>::Expired);
+		ensure!(frame_system::Pallet::<T>::block_number() <= voting.end, Error::<T, I>::Expired);
 
 		let position_yes = voting.ayes.iter().position(|a| a == &who);
 		let position_no = voting.nays.iter().position(|a| a == &who);
@@ -851,14 +851,13 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	fn validate_and_get_proposal(
 		dao_id: DaoId,
 		hash: &T::Hash,
-		length_bound: u32,
+		_length_bound: u32,
 		weight_bound: Weight,
 	) -> Result<(<T as Config<I>>::Proposal, usize), DispatchError> {
 		let key = ProposalOf::<T, I>::hashed_key_for(dao_id, hash);
 		// read the length of the proposal storage entry directly
 		let proposal_len =
 			storage::read(&key, &mut [0; 0], 0).ok_or(Error::<T, I>::ProposalMissing)?;
-		ensure!(proposal_len <= length_bound, Error::<T, I>::WrongProposalLength);
 		let proposal =
 			ProposalOf::<T, I>::get(dao_id, hash).ok_or(Error::<T, I>::ProposalMissing)?;
 

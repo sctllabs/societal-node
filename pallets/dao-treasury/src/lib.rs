@@ -45,7 +45,7 @@ use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 
 use sp_runtime::{
-	traits::{AccountIdConversion, Saturating, StaticLookup, Zero},
+	traits::{Saturating, StaticLookup, Zero},
 	Permill, RuntimeDebug,
 };
 use sp_std::prelude::*;
@@ -127,7 +127,6 @@ pub struct Proposal<AccountId, Balance> {
 pub mod pallet {
 	use super::*;
 	use codec::HasCompact;
-	use frame_system::pallet_prelude::*;
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]

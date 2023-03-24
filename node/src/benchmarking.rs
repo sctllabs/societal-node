@@ -22,9 +22,6 @@
 
 use crate::service::FullClient;
 
-#[cfg(feature = "runtime-benchmarks")]
-use futures::TryFutureExt;
-
 use runtime::{AccountId, Balance, BalancesCall, SystemCall};
 use sc_cli::Result;
 use sc_client_api::BlockBackend;
@@ -180,6 +177,6 @@ pub fn inherent_benchmark_data() -> Result<InherentData> {
 	let timestamp = sp_timestamp::InherentDataProvider::new(d.into());
 
 	futures::executor::block_on(timestamp.provide_inherent_data(&mut inherent_data))
-		.map_err(|e| format!("creating inherent data: {:?}", e))?;
+		.map_err(|e| format!("creating inherent data: {e:?}"))?;
 	Ok(inherent_data)
 }

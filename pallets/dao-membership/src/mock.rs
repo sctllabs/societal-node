@@ -10,7 +10,8 @@ use sp_runtime::{
 };
 
 use dao_primitives::{
-	AccountTokenBalance, BountyPayoutDelay, BountyUpdatePeriod, DaoPolicyProportion, DaoToken,
+	BountyPayoutDelay, BountyUpdatePeriod, DaoOrigin, DaoPolicyProportion, DaoToken,
+	DispatchResultWithDaoOrigin, TreasurySpendPeriod,
 };
 use frame_support::{
 	ord_parameter_types, parameter_types,
@@ -109,6 +110,8 @@ impl DaoProvider<H256> for TestDaoProvider {
 	type AccountId = u64;
 	type AssetId = u128;
 	type Policy = DaoPolicy;
+	type Origin = RuntimeOrigin;
+	type ApproveOrigin = AsEnsureOriginWithArg<EnsureSignedBy<One, u64>>;
 
 	fn exists(_id: Self::Id) -> Result<(), DispatchError> {
 		Ok(())
@@ -125,6 +128,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 			governance: None,
 			bounty_payout_delay: BountyPayoutDelay(10),
 			bounty_update_period: BountyUpdatePeriod(10),
+			spend_period: TreasurySpendPeriod(100),
 		})
 	}
 
@@ -132,12 +136,25 @@ impl DaoProvider<H256> for TestDaoProvider {
 		PalletId(*b"py/sctld").into_sub_account_truncating(id)
 	}
 
-	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError> {
+	fn ensure_member(_id: Self::Id, _who: &Self::AccountId) -> Result<bool, DispatchError> {
 		Ok(true)
 	}
 
-	fn dao_token(id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
+	fn dao_token(_id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
 		todo!()
+	}
+
+	fn ensure_approved(
+		origin: Self::Origin,
+		dao_id: Self::Id,
+	) -> DispatchResultWithDaoOrigin<Self::AccountId> {
+		let dao_account_id = Self::dao_account_id(dao_id);
+		let approve_origin = Self::policy(dao_id)?.approve_origin;
+		let dao_origin = DaoOrigin { dao_account_id, proportion: approve_origin };
+
+		Self::ApproveOrigin::ensure_origin(origin, &dao_origin)?;
+
+		Ok(dao_origin)
 	}
 }
 
@@ -167,11 +184,4 @@ pub(crate) fn init_members() {
 	Members::set(members);
 
 	Membership::initialize_members(0, vec![10, 20, 30]).ok();
-}
-
-pub(crate) fn clean() {
-	let mut members: HashMap<u32, Vec<u64>> = HashMap::new();
-	members.insert(0, vec![]);
-
-	Members::set(members);
 }
