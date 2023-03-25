@@ -78,8 +78,10 @@ use frame_support::traits::{
 	Get, Imbalance, ReservableCurrency,
 };
 
+#[cfg(feature = "runtime-benchmarks")]
+use sp_runtime::traits::StaticLookup;
 use sp_runtime::{
-	traits::{AccountIdConversion, BadOrigin, Saturating, StaticLookup, Zero},
+	traits::{AccountIdConversion, BadOrigin, Saturating, Zero},
 	DispatchResult, RuntimeDebug,
 };
 
@@ -100,8 +102,6 @@ type PositiveImbalanceOf<T, I = ()> = pallet_dao_treasury::PositiveImbalanceOf<T
 
 /// An index of a bounty. Just a `u32`.
 pub type BountyIndex = u32;
-
-type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup>::Source;
 
 /// A bounty proposal.
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
@@ -241,13 +241,45 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config<I>, I: 'static = ()> {
 		/// New bounty proposal.
-		BountyCreated { dao_id: DaoId, index: BountyIndex },
-		/// A bounty proposal was rejected; funds were slashed.
-		BountyRejected { dao_id: DaoId, index: BountyIndex, bond: BalanceOf<T, I> },
+		BountyCreated {
+			dao_id: DaoId,
+			index: BountyIndex,
+			status: BountyStatus<T::AccountId, T::BlockNumber>,
+			description: Vec<u8>,
+			value: BalanceOf<T, I>,
+		},
 		/// A bounty proposal is funded and became active.
-		BountyBecameActive { dao_id: DaoId, index: BountyIndex },
+		BountyBecameActive {
+			dao_id: DaoId,
+			index: BountyIndex,
+			status: BountyStatus<T::AccountId, T::BlockNumber>,
+		},
+		/// A curator is proposed for bounty.
+		BountyCuratorProposed {
+			dao_id: DaoId,
+			index: BountyIndex,
+			fee: BalanceOf<T, I>,
+			status: BountyStatus<T::AccountId, T::BlockNumber>,
+		},
+		/// A curator is unassigned from bounty.
+		BountyCuratorUnassigned {
+			dao_id: DaoId,
+			index: BountyIndex,
+			status: BountyStatus<T::AccountId, T::BlockNumber>,
+		},
+		/// A curator is accepted for bounty.
+		BountyCuratorAccepted {
+			dao_id: DaoId,
+			index: BountyIndex,
+			status: BountyStatus<T::AccountId, T::BlockNumber>,
+		},
 		/// A bounty is awarded to a beneficiary.
-		BountyAwarded { dao_id: DaoId, index: BountyIndex, beneficiary: T::AccountId },
+		BountyAwarded {
+			dao_id: DaoId,
+			index: BountyIndex,
+			beneficiary: T::AccountId,
+			status: BountyStatus<T::AccountId, T::BlockNumber>,
+		},
 		/// A bounty is claimed by beneficiary.
 		BountyClaimed {
 			dao_id: DaoId,
@@ -353,12 +385,11 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			#[pallet::compact] bounty_id: BountyIndex,
-			curator: AccountIdLookupOf<T>,
+			curator: T::AccountId,
 			#[pallet::compact] fee: BalanceOf<T, I>,
 		) -> DispatchResult {
 			T::DaoProvider::ensure_approved(origin, dao_id)?;
 
-			let curator = T::Lookup::lookup(curator)?;
 			Bounties::<T, I>::try_mutate_exists(
 				dao_id,
 				bounty_id,
@@ -371,12 +402,20 @@ pub mod pallet {
 
 					ensure!(fee < bounty.value, Error::<T, I>::InvalidFee);
 
-					bounty.status = BountyStatus::CuratorProposed { curator };
+					bounty.status = BountyStatus::CuratorProposed { curator: curator.clone() };
 					bounty.fee = fee;
 
 					Ok(())
 				},
 			)?;
+
+			Self::deposit_event(Event::<T, I>::BountyCuratorProposed {
+				dao_id,
+				index: bounty_id,
+				fee,
+				status: BountyStatus::CuratorProposed { curator },
+			});
+
 			Ok(())
 		}
 
@@ -492,6 +531,13 @@ pub mod pallet {
 					Ok(())
 				},
 			)?;
+
+			Self::deposit_event(Event::<T, I>::BountyCuratorUnassigned {
+				dao_id,
+				index: bounty_id,
+				status: BountyStatus::Funded,
+			});
+
 			Ok(())
 		}
 
@@ -516,6 +562,8 @@ pub mod pallet {
 
 			let dao_policy = T::DaoProvider::policy(dao_id)?;
 
+			let mut status: Option<BountyStatus<T::AccountId, T::BlockNumber>> = None;
+
 			Bounties::<T, I>::try_mutate_exists(
 				dao_id,
 				bounty_id,
@@ -534,8 +582,13 @@ pub mod pallet {
 
 							let update_due = frame_system::Pallet::<T>::block_number() +
 								dao_policy.bounty_update_period.0.into();
-							bounty.status =
+
+							let active_status =
 								BountyStatus::Active { curator: curator.clone(), update_due };
+
+							bounty.status = active_status.clone();
+
+							status = Some(active_status);
 
 							Ok(())
 						},
@@ -543,6 +596,13 @@ pub mod pallet {
 					}
 				},
 			)?;
+
+			Self::deposit_event(Event::<T, I>::BountyCuratorAccepted {
+				dao_id,
+				index: bounty_id,
+				status: status.unwrap(),
+			});
+
 			Ok(())
 		}
 
@@ -563,12 +623,13 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			#[pallet::compact] bounty_id: BountyIndex,
-			beneficiary: AccountIdLookupOf<T>,
+			beneficiary: T::AccountId,
 		) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
-			let beneficiary = T::Lookup::lookup(beneficiary)?;
 
 			let dao_policy = T::DaoProvider::policy(dao_id)?;
+
+			let mut status: Option<BountyStatus<T::AccountId, T::BlockNumber>> = None;
 
 			Bounties::<T, I>::try_mutate_exists(
 				dao_id,
@@ -588,12 +649,17 @@ pub mod pallet {
 						},
 						_ => return Err(Error::<T, I>::UnexpectedStatus.into()),
 					}
-					bounty.status = BountyStatus::PendingPayout {
+
+					let pending_payout_status = BountyStatus::PendingPayout {
 						curator: signer,
 						beneficiary: beneficiary.clone(),
 						unlock_at: frame_system::Pallet::<T>::block_number() +
-							dao_policy.bounty_update_period.0.into(),
+							dao_policy.bounty_payout_delay.0.into(),
 					};
+
+					bounty.status = pending_payout_status.clone();
+
+					status = Some(pending_payout_status);
 
 					Ok(())
 				},
@@ -602,6 +668,7 @@ pub mod pallet {
 			Self::deposit_event(Event::<T, I>::BountyAwarded {
 				dao_id,
 				index: bounty_id,
+				status: status.unwrap(),
 				beneficiary,
 			});
 			Ok(())
@@ -835,7 +902,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		value: BalanceOf<T, I>,
 	) -> DispatchResult {
 		let bounded_description: BoundedVec<_, _> =
-			description.try_into().map_err(|_| Error::<T, I>::ReasonTooBig)?;
+			description.clone().try_into().map_err(|_| Error::<T, I>::ReasonTooBig)?;
 		ensure!(value != Zero::zero(), Error::<T, I>::InvalidValue);
 
 		match token_id {
@@ -865,7 +932,13 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		BountyApprovals::<T, I>::try_append(dao_id, index)
 			.map_err(|()| Error::<T, I>::TooManyQueued)?;
 
-		Self::deposit_event(Event::<T, I>::BountyCreated { dao_id, index });
+		Self::deposit_event(Event::<T, I>::BountyCreated {
+			dao_id,
+			index,
+			status: bounty.status,
+			description,
+			value,
+		});
 
 		Ok(())
 	}
@@ -910,6 +983,7 @@ impl<T: Config<I>, I: 'static> pallet_dao_treasury::SpendFunds<T, I> for Pallet<
 									Self::deposit_event(Event::<T, I>::BountyBecameActive {
 										dao_id,
 										index,
+										status: bounty.clone().status,
 									});
 									false
 								} else {
@@ -942,6 +1016,7 @@ impl<T: Config<I>, I: 'static> pallet_dao_treasury::SpendFunds<T, I> for Pallet<
 									Self::deposit_event(Event::<T, I>::BountyBecameActive {
 										dao_id,
 										index,
+										status: bounty.clone().status,
 									});
 									false
 								} else {
