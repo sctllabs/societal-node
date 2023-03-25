@@ -64,7 +64,7 @@ use frame_support::{
 };
 use frame_system::pallet_prelude::OriginFor;
 
-use dao_primitives::{DaoOrigin, DaoPolicy, DaoProvider, DaoToken};
+use dao_primitives::*;
 
 pub use pallet::*;
 pub use weights::WeightInfo;
@@ -158,10 +158,6 @@ pub mod pallet {
 
 		/// Handler for the unbalanced decrease when slashing for a rejected proposal or bounty.
 		type OnSlash: OnUnbalanced<NegativeImbalanceOf<Self, I>>;
-
-		/// Period between successive spends.
-		#[pallet::constant]
-		type SpendPeriod: Get<Self::BlockNumber>;
 
 		/// Percentage of spare funds (if any) that are burnt per spend period.
 		#[pallet::constant]
@@ -294,35 +290,6 @@ pub mod pallet {
 		/// Proposal has not been approved.
 		ProposalNotApproved,
 		NotSupported,
-	}
-
-	/// TODO: beware of huge DAO count - use chunk spend instead
-	/// perhaps set another storage for pending spends per block similar to scheduler approach
-	/// or use scheduler instead???
-	#[pallet::hooks]
-	impl<T: Config<I>, I: 'static> Hooks<BlockNumberFor<T>> for Pallet<T, I> {
-		/// # <weight>
-		/// - Complexity: `O(A)` where `A` is the number of approvals
-		/// - Db reads and writes: `Approvals`, `pot account data`
-		/// - Db reads and writes per approval: `Proposals`, `proposer account data`, `beneficiary
-		///   account data`
-		/// - The weight is overestimated if some approvals got missed.
-		/// # </weight>
-		fn on_initialize(n: T::BlockNumber) -> Weight {
-			let mut weight = Weight::zero();
-			// Check to see if we should spend some funds!
-			if (n % T::SpendPeriod::get()).is_zero() {
-				let dao_count = T::DaoProvider::count();
-
-				for dao_id in 0..dao_count {
-					weight += Self::spend_funds(dao_id);
-				}
-
-				weight
-			} else {
-				Weight::zero()
-			}
-		}
 	}
 
 	#[pallet::call]
@@ -507,5 +474,11 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		T::Currency::free_balance(&T::DaoProvider::dao_account_id(dao_id))
 			// Must never be less than 0 but better be safe.
 			.saturating_sub(T::Currency::minimum_balance())
+	}
+}
+
+impl<T: Config<I>, I: 'static> SpendDaoFunds<DaoId> for Pallet<T, I> {
+	fn spend_dao_funds(dao_id: DaoId) -> Weight {
+		Self::spend_funds(dao_id)
 	}
 }

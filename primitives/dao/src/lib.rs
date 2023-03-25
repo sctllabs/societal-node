@@ -4,6 +4,7 @@ use codec::MaxEncodedLen;
 use frame_support::{
 	codec::{Decode, Encode},
 	dispatch::DispatchError,
+	weights::Weight,
 };
 pub use node_primitives::Balance;
 
@@ -14,7 +15,8 @@ use sp_std::prelude::*;
 
 pub type DispatchResultWithDaoOrigin<T> = Result<DaoOrigin<T>, DispatchError>;
 
-pub const DAY_IN_BLOCKS: u32 = 24 * 60 * 60 / 6;
+pub const EXPECTED_BLOCK_TIME: u32 = 6; // in seconds
+pub const DAY_IN_BLOCKS: u32 = 24 * 60 * 60 / EXPECTED_BLOCK_TIME;
 
 #[derive(
 	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize, MaxEncodedLen,
@@ -33,6 +35,16 @@ pub struct BountyUpdatePeriod(pub u32);
 impl Default for BountyUpdatePeriod {
 	fn default() -> Self {
 		BountyUpdatePeriod(DAY_IN_BLOCKS)
+	}
+}
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize, MaxEncodedLen,
+)]
+pub struct TreasurySpendPeriod(pub u32);
+impl Default for TreasurySpendPeriod {
+	fn default() -> Self {
+		TreasurySpendPeriod(DAY_IN_BLOCKS)
 	}
 }
 
@@ -91,7 +103,7 @@ pub struct DaoConfig<BoundedString, BoundedMetadata> {
 	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize, MaxEncodedLen,
 )]
 pub struct DaoPolicy {
-	/// In millis
+	/// In blocks
 	pub proposal_period: u32,
 	#[serde(default)]
 	pub approve_origin: DaoPolicyProportion,
@@ -106,6 +118,9 @@ pub struct DaoPolicy {
 	/// Same as payout delay by default.
 	#[serde(default)]
 	pub bounty_update_period: BountyUpdatePeriod,
+	/// Periodic treasury spend period in blocks
+	#[serde(default)]
+	pub spend_period: TreasurySpendPeriod,
 }
 
 #[derive(
@@ -380,6 +395,10 @@ pub trait ChangeDaoMembers<DaoId, AccountId: Clone + Ord> {
 		}
 		(incoming, outgoing)
 	}
+}
+
+pub trait SpendDaoFunds<DaoId> {
+	fn spend_dao_funds(dao_id: DaoId) -> Weight;
 }
 
 /// Origin for the collective module.
