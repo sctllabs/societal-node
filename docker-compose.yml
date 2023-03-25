@@ -15,4 +15,4 @@ services:
       - type: bind
         source: ./.local
         target: /root/.local
-    command: /usr/local/bin/societal-node --dev --enable-offchain-indexing true --unsafe-ws-external --rpc-cors all
+    command: /usr/local/bin/societal-node --dev --enable-offchain-indexing true --rpc-external --ws-external --rpc-cors=all --unsafe-ws-external --unsafe-rpc-external
