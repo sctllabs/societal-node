@@ -349,6 +349,7 @@ impl pallet_dao::Config for Test {
 	type PalletsOrigin = OriginCaller;
 	type Preimages = ();
 	type SpendDaoFunds = ();
+	type DaoReferendumScheduler = ();
 }
 
 // Build genesis storage according to the mock runtime.

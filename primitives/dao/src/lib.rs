@@ -3,7 +3,7 @@
 use codec::MaxEncodedLen;
 use frame_support::{
 	codec::{Decode, Encode},
-	dispatch::DispatchError,
+	dispatch::{DispatchError, DispatchResult},
 	weights::Weight,
 };
 pub use node_primitives::Balance;
@@ -405,6 +405,21 @@ pub trait SpendDaoFunds<DaoId> {
 impl<DaoId> SpendDaoFunds<DaoId> for () {
 	fn spend_dao_funds(_dao_id: DaoId) -> Weight {
 		Weight::zero()
+	}
+}
+
+pub trait DaoReferendumScheduler<DaoId> {
+	fn launch_referendum(dao_id: DaoId) -> DispatchResult;
+	fn bake_referendum(dao_id: DaoId) -> DispatchResult;
+}
+
+/// Empty implementation.
+impl<DaoId> DaoReferendumScheduler<DaoId> for () {
+	fn launch_referendum(_dao_id: DaoId) -> DispatchResult {
+		Ok(())
+	}
+	fn bake_referendum(_dao_id: DaoId) -> DispatchResult {
+		Ok(())
 	}
 }
 
