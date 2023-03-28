@@ -154,7 +154,8 @@
 
 use codec::{Decode, Encode};
 use dao_primitives::{
-	DaoGovernance, DaoOrigin, DaoPolicy, DaoProvider, DaoToken, GovernanceV1Policy, RawOrigin,
+	DaoGovernance, DaoOrigin, DaoPolicy, DaoProvider, DaoReferendumScheduler, DaoToken,
+	GovernanceV1Policy, RawOrigin,
 };
 use frame_support::{
 	ensure,
@@ -164,7 +165,6 @@ use frame_support::{
 		schedule::{v3::Named as ScheduleNamed, DispatchTime},
 		Bounded, Currency, Get, LockIdentifier, OnUnbalanced, QueryPreimage, StorePreimage,
 	},
-	weights::Weight,
 };
 use frame_system::pallet_prelude::OriginFor;
 use sp_runtime::{
@@ -557,14 +557,6 @@ pub mod pallet {
 		NotSupported,
 		/// Metadata size exceeds the limits
 		MetadataTooLong,
-	}
-
-	#[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		/// Weight: see `begin_block`
-		fn on_initialize(n: T::BlockNumber) -> Weight {
-			Self::begin_block(n)
-		}
 	}
 
 	#[pallet::call]
@@ -1330,7 +1322,7 @@ impl<T: Config> Pallet<T> {
 				Some(ReferendumInfo::Ongoing(status)) => Some((i, status)),
 				_ => None,
 			})
-			.filter(|(_, status)| status.end == n)
+			.filter(|(_, status)| status.end <= n)
 			.collect()
 	}
 
@@ -1825,95 +1817,6 @@ impl<T: Config> Pallet<T> {
 		approved
 	}
 
-	// TODO: beware of huge DAO count - use chunk spend instead
-	/// Current era is ending; we should finish up any proposals.
-	///
-	///
-	/// # <weight>
-	/// If a referendum is launched or maturing, this will take full block weight if queue is not
-	/// empty. Otherwise:
-	/// - Complexity: `O(R)` where `R` is the number of unbaked referenda.
-	/// - Db reads: `LastTabledWasExternal`, `NextExternal`, `PublicProps`, `account`,
-	///   `ReferendumCount`, `LowestUnbaked`
-	/// - Db writes: `PublicProps`, `account`, `ReferendumCount`, `DepositOf`, `ReferendumInfoOf`
-	/// - Db reads per R: `DepositOf`, `ReferendumInfoOf`
-	/// # </weight>
-	fn begin_block(now: T::BlockNumber) -> Weight {
-		let max_block_weight = T::BlockWeights::get().max_block;
-		let mut weight = Weight::zero();
-
-		let dao_count = T::DaoProvider::count();
-
-		for dao_id in 0..dao_count {
-			let maybe_policy = T::DaoProvider::policy(dao_id);
-
-			// TODO
-			if maybe_policy.is_err() {
-				continue
-			}
-
-			let governance = Self::ensure_democracy_supported(dao_id);
-
-			// TODO
-			if governance.is_err() {
-				continue
-			}
-
-			let GovernanceV1Policy { launch_period, .. } = governance.unwrap();
-
-			let next = Self::lowest_unbaked(dao_id);
-			let last = Self::referendum_count(dao_id);
-			let r = last.saturating_sub(next);
-
-			// pick out another public referendum if it's time.
-			if (now % Self::u32_to_block_number(launch_period)).is_zero() {
-				// Errors come from the queue being empty. If the queue is not empty, it will take
-				// full block weight.
-				if Self::launch_next(dao_id, now).is_ok() {
-					weight = max_block_weight;
-				} else {
-					weight
-						.saturating_accrue(T::WeightInfo::on_initialize_base_with_launch_period(r));
-				}
-			} else {
-				weight.saturating_accrue(T::WeightInfo::on_initialize_base(r));
-			}
-
-			// tally up votes for any expiring referenda.
-			for (index, info) in
-				Self::maturing_referenda_at_inner(dao_id, now, next..last).into_iter()
-			{
-				let approved = Self::bake_referendum(dao_id, now, index, info);
-				ReferendumInfoOf::<T>::insert(
-					dao_id,
-					index,
-					ReferendumInfo::Finished { end: now, approved },
-				);
-				weight = max_block_weight;
-			}
-
-			// Notes:
-			// * We don't consider the lowest unbaked to be the last maturing in case some referenda
-			//   have a longer voting period than others.
-			// * The iteration here shouldn't trigger any storage read that are not in cache, due to
-			//   `maturing_referenda_at_inner` having already read them.
-			// * We shouldn't iterate more than `LaunchPeriod/VotingPeriod + 1` times because the
-			//   number of unbaked referendum is bounded by this number. In case those number have
-			//   changed in a runtime upgrade the formula should be adjusted but the bound should
-			//   still be sensible.
-			<LowestUnbaked<T>>::mutate(dao_id, |ref_index| {
-				while *ref_index < last &&
-					Self::referendum_info(dao_id, *ref_index)
-						.map_or(true, |info| matches!(info, ReferendumInfo::Finished { .. }))
-				{
-					*ref_index += 1
-				}
-			});
-		}
-
-		weight
-	}
-
 	/// Reads the length of account in DepositOf without getting the complete value in the runtime.
 	///
 	/// Return 0 if no deposit for this proposal.
@@ -1931,6 +1834,58 @@ impl<T: Config> Pallet<T> {
 		TryInto::<<T as frame_system::Config>::BlockNumber>::try_into(block)
 			.ok()
 			.unwrap()
+	}
+}
+
+impl<T: Config> DaoReferendumScheduler<DaoId> for Pallet<T> {
+	fn launch_referendum(dao_id: DaoId) -> DispatchResult {
+		let _maybe_policy = T::DaoProvider::policy(dao_id)?;
+
+		let now = <frame_system::Pallet<T>>::block_number();
+
+		// let next = Self::lowest_unbaked(dao_id);
+		// let last = Self::referendum_count(dao_id);
+		// let r = last.saturating_sub(next);
+
+		Self::launch_next(dao_id, now)
+
+		// TODO: max block weight?
+	}
+
+	fn bake_referendum(dao_id: DaoId) -> DispatchResult {
+		let now = <frame_system::Pallet<T>>::block_number();
+		let next = Self::lowest_unbaked(dao_id);
+		let last = Self::referendum_count(dao_id);
+
+		// tally up votes for any expiring referenda.
+		for (index, info) in Self::maturing_referenda_at_inner(dao_id, now, next..last).into_iter()
+		{
+			let approved = Self::bake_referendum(dao_id, now, index, info);
+			ReferendumInfoOf::<T>::insert(
+				dao_id,
+				index,
+				ReferendumInfo::Finished { end: now, approved },
+			);
+		}
+
+		// Notes:
+		// * We don't consider the lowest unbaked to be the last maturing in case some referenda
+		//   have a longer voting period than others.
+		// * The iteration here shouldn't trigger any storage read that are not in cache, due to
+		//   `maturing_referenda_at_inner` having already read them.
+		// * We shouldn't iterate more than `LaunchPeriod/VotingPeriod + 1` times because the number
+		//   of unbaked referendum is bounded by this number. In case those number have changed in a
+		//   runtime upgrade the formula should be adjusted but the bound should still be sensible.
+		<LowestUnbaked<T>>::mutate(dao_id, |ref_index| {
+			while *ref_index < last &&
+				Self::referendum_info(dao_id, *ref_index)
+					.map_or(true, |info| matches!(info, ReferendumInfo::Finished { .. }))
+			{
+				*ref_index += 1
+			}
+		});
+
+		Ok(())
 	}
 }
 

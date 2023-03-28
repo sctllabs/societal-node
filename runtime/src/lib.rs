@@ -1623,6 +1623,7 @@ impl pallet_dao::Config for Runtime {
 	type PalletsOrigin = OriginCaller;
 	type Preimages = Preimage;
 	type SpendDaoFunds = DaoTreasury;
+	type DaoReferendumScheduler = DaoDemocracy;
 }
 
 parameter_types! {
