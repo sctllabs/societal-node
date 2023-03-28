@@ -859,6 +859,7 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 	type Policy = PolicyOf;
 	type Origin = OriginFor<T>;
 	type ApproveOrigin = T::ApproveOrigin;
+	type NFTCollectionId = u32;
 
 	fn exists(id: Self::Id) -> Result<(), DispatchError> {
 		if !Daos::<T>::contains_key(id) {
@@ -896,6 +897,10 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 					DaoToken::EthTokenAddress(token_address.to_vec()),
 			}),
 		}
+	}
+
+	fn dao_nft_collection_id(_id: Self::Id) -> Result<Option<Self::NFTCollectionId>, DispatchError> {
+		Err(Error::<T>::NotSupported.into())
 	}
 
 	fn ensure_approved(

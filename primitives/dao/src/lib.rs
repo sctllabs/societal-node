@@ -306,11 +306,13 @@ pub trait DaoProvider<Hash> {
 	type Policy;
 	type Origin;
 	type ApproveOrigin;
+	type NFTCollectionId;
 
 	fn exists(id: Self::Id) -> Result<(), DispatchError>;
 	fn dao_account_id(id: Self::Id) -> Self::AccountId;
 	fn dao_token(id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError>;
 	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError>;
+	fn dao_nft_collection_id(id: Self::Id) -> Result<Option<Self::NFTCollectionId>, DispatchError>;
 	fn count() -> u32;
 	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError>;
 	fn ensure_approved(
