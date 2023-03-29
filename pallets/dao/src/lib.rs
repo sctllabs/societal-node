@@ -58,6 +58,7 @@ type PendingDaoOf<T> = PendingDao<
 		<T as frame_system::Config>::AccountId,
 		<T as Config>::DaoMaxTechnicalCommitteeMembers,
 	>,
+	<T as frame_system::Config>::BlockNumber,
 >;
 
 pub type CallOf<T> = <T as Config>::RuntimeCall;
@@ -597,7 +598,13 @@ pub mod pallet {
 
 					PendingDaos::<T>::insert(
 						dao_hash,
-						PendingDao { dao, policy: policy.clone(), council, technical_committee },
+						PendingDao {
+							dao,
+							policy: policy.clone(),
+							council,
+							technical_committee,
+							block_number: frame_system::Pallet::<T>::block_number(),
+						},
 					);
 
 					Self::deposit_event(Event::DaoPendingApproval {
@@ -635,7 +642,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			ensure_none(origin)?;
 
-			let PendingDao { dao, policy, council, technical_committee } =
+			let PendingDao { dao, policy, council, technical_committee, .. } =
 				match <PendingDaos<T>>::take(dao_hash) {
 					None => return Err(Error::<T>::DaoNotExist.into()),
 					Some(dao) => dao,
