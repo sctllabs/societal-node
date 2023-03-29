@@ -517,6 +517,8 @@ pub mod pallet {
 		MetadataTooLong,
 		OffchainUnsignedTxError,
 		NotSupported,
+		/// Voting is disabled for expired proposals
+		Expired,
 	}
 
 	#[pallet::call]
@@ -597,12 +599,14 @@ pub mod pallet {
 			account_id: Vec<u8>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			// TODO: check membership
 
 			let account_id = Self::validate_account(who.clone(), account_id)?;
 
 			let voting = Self::voting(dao_id, proposal).ok_or(Error::<T>::ProposalMissing)?;
 			ensure!(voting.index == index, Error::<T>::WrongIndex);
+
+			// Proposal voting is not allowed if the voting period has ended.
+			ensure!(frame_system::Pallet::<T>::block_number() <= voting.end, Error::<T>::Expired);
 
 			let Vote { aye, balance } = vote;
 
