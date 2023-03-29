@@ -242,7 +242,7 @@ pub mod pallet {
 		MetadataTooLong,
 		/// Collection has too many items in it
 		CollectionIsTooBig,
-		/// Not supported 
+		/// Not supported
 		NotSupported,
 	}
 

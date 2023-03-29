@@ -129,6 +129,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 	type Policy = DaoPolicy;
 	type Origin = RuntimeOrigin;
 	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
+	type NFTCollectionId = u32;
 
 	fn exists(_id: Self::Id) -> Result<(), DispatchError> {
 		Ok(())
@@ -151,6 +152,12 @@ impl DaoProvider<H256> for TestDaoProvider {
 			bounty_update_period: BountyUpdatePeriod(10),
 			spend_period: TreasurySpendPeriod(100),
 		})
+	}
+
+	fn dao_nft_collection_id(
+		_id: Self::Id,
+	) -> Result<Option<Self::NFTCollectionId>, DispatchError> {
+		Err(Error::<Test>::NotSupported.into())
 	}
 
 	fn count() -> u32 {

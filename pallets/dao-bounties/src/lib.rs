@@ -78,8 +78,6 @@ use frame_support::traits::{
 	Get, Imbalance, ReservableCurrency,
 };
 
-#[cfg(feature = "runtime-benchmarks")]
-use sp_runtime::traits::StaticLookup;
 use sp_runtime::{
 	traits::{AccountIdConversion, BadOrigin, Saturating, Zero},
 	DispatchResult, RuntimeDebug,

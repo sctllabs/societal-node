@@ -44,6 +44,8 @@ pub mod weights;
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 
+#[cfg(test)]
+use sp_runtime::traits::AccountIdConversion;
 use sp_runtime::{
 	traits::{Saturating, StaticLookup, Zero},
 	Permill, RuntimeDebug,

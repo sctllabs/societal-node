@@ -69,15 +69,14 @@ pub enum Subcommand {
 #[derive(Debug, Parser)]
 pub struct ExportGenesisWasmCommand {
 	/// Output file name or stdout if unspecified.
-	#[clap(value_parser)]
 	pub output: Option<PathBuf>,
 
 	/// Write output in binary. Default is to write in hex.
-	#[clap(short, long)]
+	#[arg(short, long)]
 	pub raw: bool,
 
 	/// The name of the chain for that the genesis wasm file should be exported.
-	#[clap(long)]
+	#[arg(long)]
 	pub chain: Option<String>,
 }
 
@@ -89,17 +88,17 @@ pub struct RunCmd {
 	pub base: cumulus_client_cli::RunCmd,
 
 	/// Enable the development service to run without a backing relay chain
-	#[clap(long)]
+	#[arg(long)]
 	pub dev_service: bool,
 
 	/// When blocks should be sealed in the dev service.
 	///
 	/// Options are "instant", "manual", or timer interval in milliseconds
-	#[clap(long, default_value = "instant")]
+	#[arg(long, default_value = "instant")]
 	pub sealing: Sealing,
 
 	/// Id of the parachain this collator collates for.
-	#[clap(long)]
+	#[arg(long)]
 	pub parachain_id: Option<u32>,
 
 	#[arg(long)]
@@ -137,7 +136,7 @@ pub struct Cli {
 	pub run: RunCmd,
 
 	/// Relaychain arguments
-	#[clap(raw = true)]
+	#[arg(raw = true)]
 	pub relay_chain_args: Vec<String>,
 
 	/// Disable automatic hardware benchmarks.

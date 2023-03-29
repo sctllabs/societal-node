@@ -176,6 +176,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 	type Policy = DaoPolicy;
 	type Origin = RuntimeOrigin;
 	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u64>>;
+	type NFTCollectionId = u32;
 
 	fn exists(_id: Self::Id) -> Result<(), DispatchError> {
 		Ok(())
@@ -219,6 +220,12 @@ impl DaoProvider<H256> for TestDaoProvider {
 		Self::ApproveOrigin::ensure_origin(origin, &dao_origin)?;
 
 		Ok(dao_origin)
+	}
+
+	fn dao_nft_collection_id(
+		_id: Self::Id,
+	) -> Result<Option<Self::NFTCollectionId>, DispatchError> {
+		Err(Error::<Test, Instance1>::NotMember.into())
 	}
 }
 

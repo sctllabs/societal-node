@@ -6342,7 +6342,6 @@ name = "pallet-dao-nft-governance"
 version = "4.0.0-dev"
 dependencies = [
  "dao-primitives",
- "eth-primitives",
  "frame-benchmarking",
  "frame-support",
  "frame-system",

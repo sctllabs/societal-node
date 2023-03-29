@@ -964,7 +964,9 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 		}
 	}
 
-	fn dao_nft_collection_id(_id: Self::Id) -> Result<Option<Self::NFTCollectionId>, DispatchError> {
+	fn dao_nft_collection_id(
+		_id: Self::Id,
+	) -> Result<Option<Self::NFTCollectionId>, DispatchError> {
 		Err(Error::<T>::NotSupported.into())
 	}
 

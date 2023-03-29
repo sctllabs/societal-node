@@ -169,11 +169,8 @@ pub fn new_partial(
 	)?;
 	let justification_import = grandpa_block_import.clone();
 
-	let frontier_block_import = FrontierBlockImport::new(
-		grandpa_block_import.clone(),
-		client.clone(),
-		frontier_backend.clone(),
-	);
+	let frontier_block_import =
+		FrontierBlockImport::new(grandpa_block_import, client.clone(), frontier_backend.clone());
 
 	let slot_duration = sc_consensus_aura::slot_duration(&*client)?;
 

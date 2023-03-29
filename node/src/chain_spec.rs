@@ -202,7 +202,7 @@ pub fn testnet_genesis(
 	root_key: AccountId,
 	endowed_accounts: Option<Vec<AccountId>>,
 	chain_id: u64,
-	para_id: ParaId,
+	_para_id: ParaId,
 	eth_rpc_url: &str,
 ) -> GenesisConfig {
 	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
@@ -268,7 +268,7 @@ pub fn testnet_genesis(
 			key: Some(root_key),
 		},
 		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
-		parachain_info: ParachainInfoConfig { parachain_id: para_id },
+		parachain_info: ParachainInfoConfig { parachain_id: _para_id },
 		collator_selection: CollatorSelectionConfig {
 			invulnerables: initial_authorities.iter().map(|x| x.0.clone()).collect(),
 			candidacy_bond: EXISTENTIAL_DEPOSIT * 16,
