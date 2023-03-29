@@ -499,7 +499,7 @@ pub mod pallet {
 			let founder = who;
 			let config = DaoConfig { name: dao_name, purpose: dao_purpose, metadata: dao_metadata };
 
-			assert!(policy.spend_period.0 <= T::DaoMinTreasurySpendPeriod::get(), "Value too low");
+			assert!(policy.spend_period.0 >= T::DaoMinTreasurySpendPeriod::get(), "Value too low");
 
 			let mut has_token_id: Option<AssetId<T>> = None;
 

@@ -1265,9 +1265,9 @@ fn unreserving_asset_balance_should_work() {
 		assert_ok!(Assets::hold(0, &1, 70));
 		assert_eq!(Assets::balance(0, 1), 30);
 		assert_eq!(Assets::balance_on_hold(0, &1), 70);
-		/// failing to release higher amount with `best_effort` set to false
+		// failing to release higher amount with `best_effort` set to false
 		assert_noop!(Assets::release(0, &1, 71, false), Error::<Test>::BalanceLow);
-		/// releasing exact amount with `best_effort` set to false
+		// releasing exact amount with `best_effort` set to false
 		assert_ok!(Assets::release(0, &1, 70, false));
 		assert_eq!(Assets::balance(0, 1), 100);
 		assert_eq!(Assets::balance_on_hold(0, &1), 0);
@@ -1280,7 +1280,7 @@ fn unreserving_higher_with_best_effort_asset_balance_should_work() {
 		assert_ok!(Assets::force_create(RuntimeOrigin::root(), 0, 1, true, 1));
 		assert_ok!(Assets::mint(RuntimeOrigin::signed(1), 0, 1, 100));
 		assert_ok!(Assets::hold(0, &1, 70));
-		/// releasing higher amount with `best_effort` set to true
+		// releasing higher amount with `best_effort` set to true
 		assert_ok!(Assets::release(0, &1, 71, true));
 		assert_eq!(Assets::balance(0, 1), 100);
 		assert_eq!(Assets::balance_on_hold(0, &1), 0);
@@ -1318,10 +1318,10 @@ fn transferring_reserved_balance_should_work() {
 		assert_ok!(Assets::force_create(RuntimeOrigin::root(), 0, 1, true, 1));
 		assert_ok!(Assets::mint(RuntimeOrigin::signed(1), 0, 1, 100));
 		assert_ok!(Assets::hold(0, &1, 70));
-		/// failing to transfer higher held amount - `best_effort` set to false
+		// failing to transfer higher held amount - `best_effort` set to false
 		assert_noop!(Assets::transfer_held(0, &1, &2, 80, false, false), Error::<Test>::BalanceLow);
-		/// finally transferring held amount to account that doesn't exist and will be created
-		/// `on_hold` set to true
+		// finally transferring held amount to account that doesn't exist and will be created
+		// `on_hold` set to true
 		assert_ok!(Assets::transfer_held(0, &1, &2, 40, true, false));
 		assert_eq!(Assets::balance(0, 1), 30);
 		assert_eq!(Assets::balance_on_hold(0, &1), 30);

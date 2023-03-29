@@ -6,29 +6,21 @@ use super::*;
 use crate as pallet_dao_bounties;
 
 use frame_support::{
-	assert_noop, assert_ok,
-	pallet_prelude::GenesisBuild,
-	parameter_types,
-	traits::{
-		fungibles::{
-			metadata::{Inspect as MetadataInspect, Mutate as MetadataMutate},
-			BalancedHold, Create, CreditOf, InspectHold, Mutate, MutateHold, Unbalanced,
-		},
-		tokens::{DepositConsequence, WithdrawConsequence},
-		AsEnsureOriginWithArg, ConstU32, ConstU64, LockIdentifier, OnInitialize,
-	},
+	assert_noop, assert_ok, parameter_types,
+	traits::{AsEnsureOriginWithArg, ConstU32, ConstU64, EnsureOriginWithArg, OnInitialize},
 	PalletId,
 };
 use frame_system::EnsureRoot;
 
 use dao_primitives::{
-	AccountTokenBalance, BountyPayoutDelay, BountyUpdatePeriod, DaoPolicy, DaoPolicyProportion,
+	BountyPayoutDelay, BountyUpdatePeriod, DaoOrigin, DaoPolicy, DaoPolicyProportion,
+	DispatchResultWithDaoOrigin, SpendDaoFunds, TreasurySpendPeriod,
 };
-use sp_core::{ConstU128, H256};
+use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
 	traits::{BadOrigin, BlakeTwo256, IdentityLookup},
-	BuildStorage, Perbill, Permill, Storage,
+	BuildStorage, Perbill, Permill,
 };
 
 use super::Event as BountiesEvent;
@@ -123,6 +115,10 @@ impl pallet_dao_assets::Config for Test {
 	type StringLimit = StringLimit;
 	type Freezer = Assets;
 	type Extra = ();
+	type RemoveItemsLimit = ();
+	type AssetIdParameter = u128;
+	type CreateOrigin = AsEnsureOriginWithArg<frame_system::EnsureSigned<u128>>;
+	type CallbackHandle = ();
 }
 
 pub struct TestDaoProvider;
@@ -131,6 +127,8 @@ impl DaoProvider<H256> for TestDaoProvider {
 	type AccountId = u128;
 	type AssetId = u128;
 	type Policy = DaoPolicy;
+	type Origin = RuntimeOrigin;
+	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
 
 	fn exists(_id: Self::Id) -> Result<(), DispatchError> {
 		Ok(())
@@ -140,7 +138,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 		PalletId(*b"py/sctld").into_sub_account_truncating(id)
 	}
 
-	fn dao_token(id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
+	fn dao_token(_id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
 		Ok(DaoToken::FungibleToken(1))
 	}
 
@@ -151,6 +149,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 			governance: None,
 			bounty_payout_delay: BountyPayoutDelay(10),
 			bounty_update_period: BountyUpdatePeriod(10),
+			spend_period: TreasurySpendPeriod(100),
 		})
 	}
 
@@ -158,8 +157,21 @@ impl DaoProvider<H256> for TestDaoProvider {
 		1
 	}
 
-	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError> {
+	fn ensure_member(_id: Self::Id, _who: &Self::AccountId) -> Result<bool, DispatchError> {
 		Ok(true)
+	}
+
+	fn ensure_approved(
+		origin: Self::Origin,
+		dao_id: Self::Id,
+	) -> DispatchResultWithDaoOrigin<Self::AccountId> {
+		let dao_account_id = Self::dao_account_id(dao_id);
+		let approve_origin = Self::policy(dao_id)?.approve_origin;
+		let dao_origin = DaoOrigin { dao_account_id, proportion: approve_origin };
+
+		Self::ApproveOrigin::ensure_origin(origin, &dao_origin)?;
+
+		Ok(dao_origin)
 	}
 }
 
@@ -175,7 +187,6 @@ impl pallet_dao_treasury::Config for Test {
 	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
-	type SpendPeriod = ConstU64<2>;
 	type Burn = Burn;
 	type BurnDestination = (); // Just gets burned.
 	type WeightInfo = ();
@@ -192,7 +203,6 @@ impl pallet_dao_treasury::Config<Instance1> for Test {
 	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
-	type SpendPeriod = ConstU64<2>;
 	type Burn = Burn;
 	type BurnDestination = (); // Just gets burned.
 	type WeightInfo = ();
@@ -282,6 +292,7 @@ fn accepted_spend_proposal_enacted_on_spend_period() {
 		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, 100, 3));
 
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
+		Treasury::spend_dao_funds(0);
 		assert_eq!(Balances::free_balance(3), 100);
 		assert_eq!(Treasury::pot(0), 0);
 	});
@@ -300,6 +311,7 @@ fn pot_underflow_should_not_diminish() {
 
 		assert_ok!(Balances::deposit_into_existing(&TestDaoProvider::dao_account_id(0), 100));
 		<Treasury as OnInitialize<u64>>::on_initialize(4);
+		Treasury::spend_dao_funds(0);
 		assert_eq!(Balances::free_balance(3), 150); // Fund has been spent
 		assert_eq!(Treasury::pot(0), 50); // Pot has finally changed
 	});
@@ -322,6 +334,7 @@ fn treasury_account_doesnt_get_deleted() {
 		assert_ok!(Treasury::spend(RuntimeOrigin::root(), 0, Treasury::pot(0), 3));
 
 		<Treasury as OnInitialize<u64>>::on_initialize(4);
+		Treasury::spend_dao_funds(0);
 		assert_eq!(Treasury::pot(0), 0); // Pot is emptied
 		assert_eq!(Balances::free_balance(TestDaoProvider::dao_account_id(0)), 1); // but the account is
 		                                                                   // still there
@@ -354,6 +367,7 @@ fn inexistent_account_works() {
 		assert_eq!(Balances::free_balance(TestDaoProvider::dao_account_id(0)), 100); // Account does exist
 
 		<Treasury as OnInitialize<u64>>::on_initialize(4);
+		Treasury::spend_dao_funds(0);
 
 		assert_eq!(Treasury::pot(0), 0); // Pot has changed
 		assert_eq!(Balances::free_balance(3), 99); // Balance of `3` has changed
@@ -372,9 +386,16 @@ fn close_bounty_works() {
 
 		assert_ok!(Bounties::create_bounty(RuntimeOrigin::root(), 0, 10, b"12345".to_vec()));
 
-		let deposit: u64 = 80 + 5;
-
-		assert_eq!(last_event(), BountiesEvent::BountyCreated { dao_id: 0, index: 0 });
+		assert_eq!(
+			last_event(),
+			BountiesEvent::BountyCreated {
+				dao_id: 0,
+				index: 0,
+				status: BountyStatus::Approved,
+				description: b"12345".to_vec(),
+				value: 10
+			}
+		);
 
 		assert_eq!(Balances::reserved_balance(0), 0);
 		assert_eq!(Balances::free_balance(0), 100);
@@ -419,6 +440,7 @@ fn create_bounty_works() {
 		assert_eq!(Balances::free_balance(0), 100 - deposit);
 
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
+		Treasury::spend_dao_funds(0);
 
 		// return deposit
 		assert_eq!(Balances::reserved_balance(0), 0);
@@ -454,6 +476,7 @@ fn assign_curator_works() {
 		assert_ok!(Bounties::create_bounty(RuntimeOrigin::root(), 0, 50, b"12345".to_vec()));
 
 		System::set_block_number(2);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 
 		assert_noop!(
@@ -508,6 +531,7 @@ fn unassign_curator_works() {
 		assert_ok!(Bounties::create_bounty(RuntimeOrigin::root(), 0, 50, b"12345".to_vec()));
 
 		System::set_block_number(2);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 
 		let fee = 0;
@@ -557,6 +581,7 @@ fn award_and_claim_bounty_works() {
 		assert_ok!(Bounties::create_bounty(RuntimeOrigin::root(), 0, 50, b"12345".to_vec()));
 
 		System::set_block_number(2);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 
 		let fee = 0;
@@ -589,6 +614,7 @@ fn award_and_claim_bounty_works() {
 		);
 
 		System::set_block_number(12);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(5);
 
 		assert_ok!(Balances::transfer(
@@ -623,6 +649,7 @@ fn claim_handles_high_fee() {
 		assert_ok!(Bounties::create_bounty(RuntimeOrigin::root(), 0, 50, b"12345".to_vec()));
 
 		System::set_block_number(2);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 
 		assert_ok!(Bounties::propose_curator(RuntimeOrigin::root(), 0, 0, 4, 0));
@@ -631,6 +658,7 @@ fn claim_handles_high_fee() {
 		assert_ok!(Bounties::award_bounty(RuntimeOrigin::signed(4), 0, 0, 3));
 
 		System::set_block_number(15);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(5);
 
 		// make fee > balance
@@ -663,6 +691,7 @@ fn cancel_and_refund() {
 		assert_ok!(Bounties::create_bounty(RuntimeOrigin::root(), 0, 50, b"12345".to_vec()));
 
 		System::set_block_number(2);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 
 		assert_ok!(Balances::transfer(
@@ -701,6 +730,7 @@ fn award_and_cancel() {
 		assert_ok!(Bounties::create_bounty(RuntimeOrigin::root(), 0, 50, b"12345".to_vec()));
 
 		System::set_block_number(2);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 
 		assert_ok!(Bounties::propose_curator(RuntimeOrigin::root(), 0, 0, 0, 0));
@@ -742,6 +772,7 @@ fn expire_and_unassign() {
 		assert_ok!(Bounties::create_bounty(RuntimeOrigin::root(), 0, 50, b"12345".to_vec()));
 
 		System::set_block_number(2);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 
 		assert_ok!(Bounties::propose_curator(RuntimeOrigin::root(), 0, 0, 1, 0));
@@ -751,6 +782,7 @@ fn expire_and_unassign() {
 		assert_eq!(Balances::reserved_balance(1), 0);
 
 		System::set_block_number(22);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(22);
 
 		System::set_block_number(23);
@@ -788,6 +820,7 @@ fn extend_expiry() {
 		);
 
 		System::set_block_number(2);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 
 		assert_ok!(Bounties::propose_curator(RuntimeOrigin::root(), 0, 0, 4, 0));
@@ -797,6 +830,7 @@ fn extend_expiry() {
 		assert_eq!(Balances::reserved_balance(4), 0);
 
 		System::set_block_number(10);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(10);
 
 		assert_noop!(
@@ -830,6 +864,7 @@ fn extend_expiry() {
 		);
 
 		System::set_block_number(25);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(25);
 
 		assert_ok!(Bounties::unassign_curator(RuntimeOrigin::signed(4), 0, 0));
@@ -865,6 +900,7 @@ fn unassign_curator_self() {
 		assert_ok!(Bounties::create_bounty(RuntimeOrigin::root(), 0, 50, b"12345".to_vec()));
 
 		System::set_block_number(2);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 
 		assert_ok!(Bounties::propose_curator(RuntimeOrigin::root(), 0, 0, 1, 0));
@@ -874,6 +910,7 @@ fn unassign_curator_self() {
 		assert_eq!(Balances::reserved_balance(1), 0);
 
 		System::set_block_number(8);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(8);
 
 		assert_ok!(Bounties::unassign_curator(RuntimeOrigin::signed(1), 0, 0));
@@ -911,6 +948,7 @@ fn accept_curator_handles_different_deposit_calculations() {
 		assert_ok!(Bounties::create_bounty(RuntimeOrigin::root(), 0, value, b"12345".to_vec()));
 
 		System::set_block_number(2);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(2);
 
 		assert_ok!(Bounties::propose_curator(RuntimeOrigin::root(), 0, bounty_index, user, fee));
@@ -932,6 +970,7 @@ fn accept_curator_handles_different_deposit_calculations() {
 		assert_ok!(Bounties::create_bounty(RuntimeOrigin::root(), 0, value, b"12345".to_vec()));
 
 		System::set_block_number(4);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(4);
 
 		assert_ok!(Bounties::propose_curator(RuntimeOrigin::root(), 0, bounty_index, user, fee));
@@ -955,6 +994,7 @@ fn accept_curator_handles_different_deposit_calculations() {
 		assert_ok!(Bounties::create_bounty(RuntimeOrigin::root(), 0, value, b"12345".to_vec()));
 
 		System::set_block_number(6);
+		Treasury::spend_dao_funds(0);
 		<Treasury as OnInitialize<u64>>::on_initialize(6);
 
 		assert_ok!(Bounties::propose_curator(RuntimeOrigin::root(), 0, bounty_index, user, fee));

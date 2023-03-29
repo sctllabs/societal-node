@@ -23,9 +23,6 @@
 use crate::{mock::*, Error};
 use frame_support::{assert_noop, assert_ok, bounded_vec};
 use sp_runtime::traits::BadOrigin;
-use std::collections::HashMap;
-
-use dao_primitives::InitializeDaoMembers;
 
 #[test]
 fn query_membership_works() {
