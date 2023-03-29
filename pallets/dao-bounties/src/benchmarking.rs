@@ -18,7 +18,7 @@ const SEED: u32 = 0;
 // Create bounties that are approved for use in `on_initialize`.
 fn create_approved_bounties<T: Config<I>, I: 'static>(n: u32) -> Result<(), &'static str> {
 	for i in 0..n {
-		let (dao_id, origin, caller, _curator, _fee, value, reason) =
+		let (dao_id, origin, _caller, _curator, _fee, value, reason) =
 			setup_bounty::<T, I>(i, T::MaximumReasonLength::get());
 		let approve_origin = T::ApproveOrigin::successful_origin(&origin);
 		Bounties::<T, I>::create_bounty(approve_origin, dao_id, value, reason)?;
@@ -58,7 +58,7 @@ fn setup_bounty<T: Config<I>, I: 'static>(
 
 fn init_bounty<T: Config<I>, I: 'static>(
 ) -> Result<(u32, DaoOrigin<T::AccountId>, T::AccountId, BountyIndex), &'static str> {
-	let (dao_id, origin, caller, curator, fee, value, reason) =
+	let (dao_id, origin, _caller, curator, fee, value, reason) =
 		setup_bounty::<T, I>(0, T::MaximumReasonLength::get());
 	let approve_origin = T::ApproveOrigin::successful_origin(&origin);
 	Bounties::<T, I>::create_bounty(approve_origin.clone(), dao_id, value, reason)?;
