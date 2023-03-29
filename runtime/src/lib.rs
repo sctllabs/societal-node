@@ -1382,8 +1382,6 @@ impl pallet_nfts::Config for Runtime {
 	type MaxTips = MaxTips;
 	type MaxDeadlineDuration = MaxDeadlineDuration;
 	type Features = Features;
-	#[cfg(feature = "runtime-benchmarks")]
-	type Helper = ();
 	type WeightInfo = pallet_nfts::weights::SubstrateWeight<Runtime>;
 }
 
