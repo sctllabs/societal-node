@@ -247,6 +247,7 @@ pub mod pallet {
 			status: BountyStatus<T::AccountId, T::BlockNumber>,
 			description: Vec<u8>,
 			value: BalanceOf<T, I>,
+			token_id: Option<T::AssetId>,
 		},
 		/// A bounty proposal is funded and became active.
 		BountyBecameActive {
@@ -938,6 +939,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			status: bounty.status,
 			description,
 			value,
+			token_id,
 		});
 
 		Ok(())
