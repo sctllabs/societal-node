@@ -1881,14 +1881,14 @@ construct_runtime!(
 		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>} = 83,
 
 		// DAO management.
-		Dao: pallet_dao::{Pallet, Call, Storage, Event<T>, Origin<T>, Config<T>} = 100,
+		Dao: pallet_dao::{Pallet, Call, Storage, Event<T>, Origin<T>, Config<T>, ValidateUnsigned} = 100,
 		DaoTreasury: pallet_dao_treasury::{Pallet, Call, Storage, Event<T>} = 101,
 		DaoCouncil: pallet_dao_collective::<Instance1>::{Pallet, Call, Storage, Event<T>, Origin<T>} = 102,
 		DaoTechnicalCommittee: pallet_dao_collective::<Instance2>::{Pallet, Call, Storage, Event<T>, Origin<T>} = 103,
 		DaoCouncilMembers: pallet_dao_membership::<Instance1>::{Pallet, Call, Storage, Event<T>} = 104,
 		DaoTechnicalCommitteeMembers: pallet_dao_membership::<Instance2>::{Pallet, Call, Storage, Event<T>} = 105,
 		DaoDemocracy: pallet_dao_democracy::{Pallet, Call, Storage, Event<T>} = 106,
-		DaoEthGovernance: pallet_dao_eth_governance::{Pallet, Call, Storage, Event<T>, Config<T>} = 107,
+		DaoEthGovernance: pallet_dao_eth_governance::{Pallet, Call, Storage, Event<T>, Config<T>, ValidateUnsigned} = 107,
 		DaoBounties: pallet_dao_bounties::{Pallet, Call, Storage, Event<T>} = 108,
 	}
 );
