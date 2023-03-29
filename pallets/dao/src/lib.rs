@@ -82,6 +82,9 @@ const ONCHAIN_TX_KEY: &[u8] = b"societal-dao::storage::tx";
 const TOKEN_MIN_BALANCE: u128 = 1;
 
 const DAO_FACTORY_ID: LockIdentifier = *b"daofctry";
+const DAO_SPEND_ID: [u8; 4] = *b"spnd";
+const DAO_REFERENDUM_LAUNCH_ID: [u8; 4] = *b"refl";
+const DAO_REFERENDUM_BAKE_ID: [u8; 4] = *b"refb";
 
 pub mod crypto {
 	use crate::KEY_TYPE;
@@ -245,6 +248,8 @@ pub mod pallet {
 
 		/// Runtime hooks to external pallet using treasury to compute spend funds.
 		type SpendDaoFunds: SpendDaoFunds<u32>;
+
+		type DaoReferendumScheduler: DaoReferendumScheduler<u32>;
 	}
 
 	/// Origin for the dao pallet.
@@ -499,7 +504,7 @@ pub mod pallet {
 			let founder = who;
 			let config = DaoConfig { name: dao_name, purpose: dao_purpose, metadata: dao_metadata };
 
-			assert!(policy.spend_period.0 >= T::DaoMinTreasurySpendPeriod::get(), "Value too low");
+			ensure!(policy.spend_period.0 >= T::DaoMinTreasurySpendPeriod::get(), "Value too low");
 
 			let mut has_token_id: Option<AssetId<T>> = None;
 
@@ -678,29 +683,11 @@ pub mod pallet {
 			let policy = serde_json::from_slice::<DaoPolicy>(&policy)
 				.map_err(|_| Error::<T>::InvalidInput)?;
 
+			let old_policy = Self::policy(dao_id)?;
 			Policies::<T>::insert(dao_id, policy.clone());
 
-			let old_policy = Self::policy(dao_id)?;
 			if old_policy.spend_period != policy.spend_period {
-				let task_id = Self::spend_dao_funds_task_id(dao_id);
-
-				// Canceling previously scheduled tasks
-				T::Scheduler::cancel_named(task_id)?;
-
-				let origin = RawOrigin::Dao(Self::dao_account_id(dao_id)).into();
-				let now = frame_system::Pallet::<T>::block_number();
-				let when = now.saturating_add(policy.spend_period.0.into());
-				let call = CallOf::<T>::from(Call::spend_dao_funds { dao_id });
-
-				// Scheduling DAO treasury periodic spending
-				T::Scheduler::schedule_named(
-					task_id,
-					DispatchTime::At(when),
-					Some((policy.spend_period.0.into(), u32::MAX)),
-					50,
-					origin,
-					T::Preimages::bound(call)?.transmute(),
-				)?;
+				Self::schedule_dao_events(dao_id, policy.clone(), true)?;
 			}
 
 			Self::deposit_event(Event::DaoPolicyUpdated { dao_id, policy });
@@ -740,6 +727,22 @@ pub mod pallet {
 
 			Ok(())
 		}
+
+		#[pallet::weight(10_000)]
+		#[pallet::call_index(7)]
+		pub fn launch_dao_referendum(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			T::DaoReferendumScheduler::launch_referendum(dao_id)
+		}
+
+		#[pallet::weight(10_000)]
+		#[pallet::call_index(8)]
+		pub fn bake_dao_referendum(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			T::DaoReferendumScheduler::bake_referendum(dao_id)
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -756,7 +759,15 @@ pub mod pallet {
 		}
 
 		fn spend_dao_funds_task_id(dao_id: DaoId) -> TaskName {
-			(DAO_FACTORY_ID, dao_id).encode_into()
+			(DAO_FACTORY_ID, DAO_SPEND_ID, dao_id).encode_into()
+		}
+
+		fn launch_dao_referendum_task_id(dao_id: DaoId) -> TaskName {
+			(DAO_FACTORY_ID, DAO_REFERENDUM_LAUNCH_ID, dao_id).encode_into()
+		}
+
+		fn bake_dao_referendum_task_id(dao_id: DaoId) -> TaskName {
+			(DAO_FACTORY_ID, DAO_REFERENDUM_BAKE_ID, dao_id).encode_into()
 		}
 
 		pub fn do_register_dao(
@@ -767,9 +778,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let dao_id = <NextDaoId<T>>::get();
 
-			let account_id = Self::account_id(dao_id);
-
-			dao.account_id = account_id.clone();
+			dao.account_id = Self::account_id(dao_id);
 			dao.status = DaoStatus::Success;
 
 			let dao_event_source = dao.clone();
@@ -787,21 +796,7 @@ pub mod pallet {
 
 			<NextDaoId<T>>::put(dao_id.checked_add(1).unwrap());
 
-			let origin = RawOrigin::Dao(account_id).into();
-			let now = frame_system::Pallet::<T>::block_number();
-			let when = now.saturating_add(policy.spend_period.0.into());
-
-			let call = CallOf::<T>::from(Call::spend_dao_funds { dao_id });
-
-			// Scheduling DAO treasury periodic spending
-			T::Scheduler::schedule_named(
-				Self::spend_dao_funds_task_id(dao_id),
-				DispatchTime::At(when),
-				Some((policy.spend_period.0.into(), u32::MAX)),
-				50,
-				origin,
-				T::Preimages::bound(call)?.transmute(),
-			)?;
+			Self::schedule_dao_events(dao_id, policy.clone(), false)?;
 
 			Self::deposit_event(Event::DaoRegistered {
 				dao_id,
@@ -813,6 +808,76 @@ pub mod pallet {
 				config: dao_event_source.config,
 				policy,
 			});
+
+			Ok(())
+		}
+
+		pub fn schedule_dao_events(
+			dao_id: DaoId,
+			policy: DaoPolicy,
+			reschedule: bool,
+		) -> DispatchResult {
+			let now = frame_system::Pallet::<T>::block_number();
+			let DaoPolicy { spend_period, governance, .. } = policy;
+			let account_id = Self::account_id(dao_id);
+
+			let spend_task_id = Self::spend_dao_funds_task_id(dao_id);
+			if reschedule {
+				// Canceling previously scheduled treasury spend task
+				T::Scheduler::cancel_named(spend_task_id)?;
+			}
+			// Scheduling DAO treasury periodic spending
+			let spend_call = CallOf::<T>::from(Call::spend_dao_funds { dao_id });
+			T::Scheduler::schedule_named(
+				spend_task_id,
+				DispatchTime::At(now.saturating_add(spend_period.0.into())),
+				Some((spend_period.0.into(), u32::MAX)),
+				50,
+				RawOrigin::Dao(account_id.clone()).into(),
+				T::Preimages::bound(spend_call)?.transmute(),
+			)?;
+
+			if let Some(governance) = governance {
+				match governance {
+					DaoGovernance::GovernanceV1(governance) => {
+						let GovernanceV1Policy { launch_period, voting_period, .. } = governance;
+
+						let ref_launch_task_id = Self::launch_dao_referendum_task_id(dao_id);
+						if reschedule {
+							// Canceling previously scheduled referendum launch task
+							T::Scheduler::cancel_named(ref_launch_task_id)?;
+						}
+						let ref_launch_call =
+							CallOf::<T>::from(Call::launch_dao_referendum { dao_id });
+						// Scheduling DAO periodic referendum launch
+						T::Scheduler::schedule_named(
+							ref_launch_task_id,
+							DispatchTime::At(now.saturating_add(launch_period.into())),
+							Some((launch_period.into(), u32::MAX)),
+							50,
+							RawOrigin::Dao(account_id.clone()).into(),
+							T::Preimages::bound(ref_launch_call)?.transmute(),
+						)?;
+
+						let ref_bake_task_id = Self::bake_dao_referendum_task_id(dao_id);
+						if reschedule {
+							// Canceling previously scheduled referendum bake task
+							T::Scheduler::cancel_named(ref_bake_task_id)?;
+						}
+						let ref_bake_call = CallOf::<T>::from(Call::bake_dao_referendum { dao_id });
+						// Scheduling DAO periodic referendum voting tally up
+						T::Scheduler::schedule_named(
+							ref_bake_task_id,
+							DispatchTime::At(now.saturating_add(voting_period.into())),
+							Some((voting_period.into(), u32::MAX)),
+							50,
+							RawOrigin::Dao(account_id).into(),
+							T::Preimages::bound(ref_bake_call)?.transmute(),
+						)?;
+					},
+					DaoGovernance::OwnershipWeightedVoting => {},
+				}
+			}
 
 			Ok(())
 		}
