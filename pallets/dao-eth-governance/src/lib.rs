@@ -193,7 +193,7 @@ pub mod pallet {
 		Identity,
 		T::Hash,
 		(
-			PendingProposal<T::AccountId, BoundedVec<u8, T::ProposalMetadataLimit>>,
+			PendingProposal<T::AccountId, BoundedVec<u8, T::ProposalMetadataLimit>, T::BlockNumber>,
 			BoundedProposal<T>,
 		),
 		OptionQuery,
@@ -221,7 +221,7 @@ pub mod pallet {
 		DaoId,
 		Identity,
 		T::Hash,
-		PendingVote<T::AccountId, T::Hash, BalanceOf<T>>,
+		PendingVote<T::AccountId, T::Hash, BalanceOf<T>, T::BlockNumber>,
 		OptionQuery,
 	>;
 
@@ -566,7 +566,12 @@ pub mod pallet {
 
 			match account_token_balance {
 				AccountTokenBalance::Offchain { .. } => {
-					let pending_proposal = PendingProposal { who: who.clone(), length_bound, meta };
+					let pending_proposal = PendingProposal {
+						who: who.clone(),
+						length_bound,
+						meta,
+						block_number: frame_system::Pallet::<T>::block_number(),
+					};
 
 					<PendingProposalOf<T>>::insert(
 						dao_id,
@@ -616,6 +621,7 @@ pub mod pallet {
 				proposal_index: index,
 				aye,
 				balance,
+				block_number: frame_system::Pallet::<T>::block_number(),
 			};
 
 			let pending_vote_hash = T::Hashing::hash_of(&pending_vote);
@@ -1046,7 +1052,7 @@ impl<T: Config> Pallet<T> {
 		let (pending_proposal, proposal) =
 			<PendingProposalOf<T>>::take(dao_id, hash).expect("Pending Proposal not found");
 
-		let PendingProposal { who, length_bound, meta } = pending_proposal;
+		let PendingProposal { who, length_bound, meta, .. } = pending_proposal;
 
 		if approve {
 			Self::do_propose_proposed(
@@ -1064,7 +1070,7 @@ impl<T: Config> Pallet<T> {
 	}
 
 	fn do_approve_vote(dao_id: DaoId, hash: T::Hash, approve: bool) -> Result<(), DispatchError> {
-		let PendingVote { who, proposal_hash, proposal_index, aye, balance } =
+		let PendingVote { who, proposal_hash, proposal_index, aye, balance, .. } =
 			<PendingVoting<T>>::take(dao_id, hash).expect("Pending Vote not found");
 
 		if approve {

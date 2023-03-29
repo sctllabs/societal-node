@@ -231,27 +231,31 @@ pub struct PendingDao<
 	BoundedMetadata,
 	BoundedCouncilMembers,
 	BoundedTechnicalCommittee,
+	BlockNumber,
 > {
 	pub dao: Dao<AccountId, TokenId, BoundedString, BoundedMetadata>,
 	pub policy: DaoPolicy,
 	pub council: BoundedCouncilMembers,
 	pub technical_committee: BoundedTechnicalCommittee,
+	pub block_number: BlockNumber,
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
-pub struct PendingProposal<AccountId, BoundedMetadata> {
+pub struct PendingProposal<AccountId, BoundedMetadata, BlockNumber> {
 	pub who: AccountId,
 	pub length_bound: u32,
 	pub meta: BoundedMetadata,
+	pub block_number: BlockNumber,
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
-pub struct PendingVote<AccountId, Hash, Balance> {
+pub struct PendingVote<AccountId, Hash, Balance, BlockNumber> {
 	pub who: AccountId,
 	pub proposal_hash: Hash,
 	pub proposal_index: u32,
 	pub aye: bool,
 	pub balance: Balance,
+	pub block_number: BlockNumber,
 }
 
 #[derive(
