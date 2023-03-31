@@ -292,7 +292,7 @@ pub fn testnet_genesis(
 		treasury: Default::default(),
 		nomination_pools: NominationPoolsConfig {
 			min_create_bond: 10 * DOLLARS,
-			min_join_bond: 1 * DOLLARS,
+			min_join_bond: DOLLARS,
 			..Default::default()
 		},
 		technical_membership: Default::default(),

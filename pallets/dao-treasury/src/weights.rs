@@ -63,13 +63,13 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	// Storage: Treasury Proposals (r:2 w:2)
 	// Storage: System Account (r:4 w:4)
 	fn on_initialize_proposals(p: u32, ) -> Weight {
-		Weight::from_ref_time(25_805_000 as u64)
+		Weight::from_ref_time(25_805_000)
 			// Standard Error: 18_000
-			.saturating_add(Weight::from_ref_time(28_473_000 as u64).saturating_mul(p as u64))
-			.saturating_add(T::DbWeight::get().reads(2 as u64))
-			.saturating_add(T::DbWeight::get().reads((3 as u64).saturating_mul(p as u64)))
-			.saturating_add(T::DbWeight::get().writes(2 as u64))
-			.saturating_add(T::DbWeight::get().writes((3 as u64).saturating_mul(p as u64)))
+			.saturating_add(Weight::from_ref_time(28_473_000_u64).saturating_mul(p as u64))
+			.saturating_add(T::DbWeight::get().reads(2_u64))
+			.saturating_add(T::DbWeight::get().reads((3_u64).saturating_mul(p as u64)))
+			.saturating_add(T::DbWeight::get().writes(2_u64))
+			.saturating_add(T::DbWeight::get().writes((3_u64).saturating_mul(p as u64)))
 	}
 }
 
@@ -78,21 +78,21 @@ impl WeightInfo for () {
 	// Storage: Treasury ProposalCount (r:1 w:1)
 	// Storage: Treasury Proposals (r:0 w:1)
 	fn spend() -> Weight {
-		Weight::from_ref_time(22_063_000 as u64)
-			.saturating_add(RocksDbWeight::get().reads(1 as u64))
-			.saturating_add(RocksDbWeight::get().writes(2 as u64))
+		Weight::from_ref_time(22_063_000)
+			.saturating_add(RocksDbWeight::get().reads(1_u64))
+			.saturating_add(RocksDbWeight::get().writes(2_u64))
 	}
 	// Storage: Treasury Approvals (r:1 w:1)
 	// Storage: Bounties BountyApprovals (r:1 w:1)
 	// Storage: Treasury Proposals (r:2 w:2)
 	// Storage: System Account (r:4 w:4)
 	fn on_initialize_proposals(p: u32, ) -> Weight {
-		Weight::from_ref_time(25_805_000 as u64)
+		Weight::from_ref_time(25_805_000)
 			// Standard Error: 18_000
-			.saturating_add(Weight::from_ref_time(28_473_000 as u64).saturating_mul(p as u64))
-			.saturating_add(RocksDbWeight::get().reads(2 as u64))
-			.saturating_add(RocksDbWeight::get().reads((3 as u64).saturating_mul(p as u64)))
-			.saturating_add(RocksDbWeight::get().writes(2 as u64))
-			.saturating_add(RocksDbWeight::get().writes((3 as u64).saturating_mul(p as u64)))
+			.saturating_add(Weight::from_ref_time(28_473_000).saturating_mul(p as u64))
+			.saturating_add(RocksDbWeight::get().reads(2_u64))
+			.saturating_add(RocksDbWeight::get().reads((3_u64).saturating_mul(p as u64)))
+			.saturating_add(RocksDbWeight::get().writes(2_u64))
+			.saturating_add(RocksDbWeight::get().writes((3_u64).saturating_mul(p as u64)))
 	}
 }

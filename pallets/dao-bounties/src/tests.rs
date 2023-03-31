@@ -393,7 +393,8 @@ fn close_bounty_works() {
 				index: 0,
 				status: BountyStatus::Approved,
 				description: b"12345".to_vec(),
-				value: 10
+				value: 10,
+				token_id: None,
 			}
 		);
 
