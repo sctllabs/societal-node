@@ -1654,6 +1654,7 @@ parameter_types! {
 }
 
 impl pallet_dao_eth_governance::Config for Runtime {
+	type RuntimeCall = RuntimeCall;
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeOrigin = RuntimeOrigin;
 	type Balance = Balance;
@@ -1666,6 +1667,8 @@ impl pallet_dao_eth_governance::Config for Runtime {
 	type Preimages = Preimage;
 	type AuthorityId = pallet_dao::crypto::TestAuthId;
 	type OffchainEthService = EthService<DaoEthGovernance>;
+	type Scheduler = Scheduler;
+	type PalletsOrigin = OriginCaller;
 }
 
 parameter_types! {
