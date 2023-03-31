@@ -85,7 +85,7 @@ use sp_runtime::{
 
 use frame_support::dispatch::DispatchResultWithPostInfo;
 
-use dao_primitives::{DaoProvider, DaoToken};
+use dao_primitives::{DaoGovernance, DaoPolicy, DaoProvider, DaoToken};
 use frame_support::{pallet_prelude::*, traits::fungibles::Transfer};
 use frame_system::pallet_prelude::*;
 use scale_info::TypeInfo;
@@ -168,7 +168,7 @@ pub trait ChildBountyManager<Balance> {
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use frame_support::traits::TryDrop;
+	use frame_support::traits::{OnUnbalanced, TryDrop};
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
@@ -230,8 +230,8 @@ pub mod pallet {
 		HasActiveChildBounty,
 		/// Too many approvals are already queued.
 		TooManyQueued,
-		/// Insufficient asset token balance
-		InsufficientTokenBalance,
+		/// Insufficient balance
+		InsufficientBalance,
 		NotSupported,
 	}
 
@@ -446,7 +446,6 @@ pub mod pallet {
 				.map(Some)
 				.or_else(|_| T::DaoProvider::ensure_approved(origin, dao_id).map(|_| None))?;
 
-			let dao_token_id = Self::dao_token_id(dao_id)?;
 			Bounties::<T, I>::try_mutate_exists(
 				dao_id,
 				bounty_id,
@@ -455,10 +454,19 @@ pub mod pallet {
 
 					let slash_curator =
 						|curator: &T::AccountId, curator_deposit: &mut BalanceOf<T, I>| {
-							let (credit_of, _balance) =
-								T::Assets::slash_held(dao_token_id, curator, *curator_deposit);
-							// TODO: check
-							if let Ok(()) = credit_of.try_drop() {}
+							match bounty.token_id {
+								None => {
+									let imbalance =
+										T::Currency::slash_reserved(curator, *curator_deposit).0;
+									T::OnSlash::on_unbalanced(imbalance);
+								},
+								Some(token_id) => {
+									let (credit_of, _balance) =
+										T::Assets::slash_held(token_id, curator, *curator_deposit);
+									// TODO: check
+									if let Ok(()) = credit_of.try_drop() {}
+								},
+							}
 
 							*curator_deposit = Zero::zero();
 						};
@@ -502,12 +510,18 @@ pub mod pallet {
 									} else {
 										// Else this is the curator, willingly giving up their role.
 										// Give back their deposit.
-										let err_amount = T::Assets::release(
-											dao_token_id,
-											curator,
-											bounty.curator_deposit,
-											true,
-										)?;
+										let err_amount = match bounty.token_id {
+											None => T::Currency::unreserve(
+												curator,
+												bounty.curator_deposit,
+											),
+											Some(token_id) => T::Assets::release(
+												token_id,
+												curator,
+												bounty.curator_deposit,
+												true,
+											)?,
+										};
 										debug_assert!(err_amount.is_zero());
 										bounty.curator_deposit = Zero::zero();
 										// Continue to change bounty status below...
@@ -556,8 +570,6 @@ pub mod pallet {
 		) -> DispatchResult {
 			let signer = ensure_signed(origin)?;
 
-			let dao_token_id = Self::dao_token_id(dao_id)?;
-
 			let dao_policy = T::DaoProvider::policy(dao_id)?;
 
 			let mut status: Option<BountyStatus<T::AccountId, T::BlockNumber>> = None;
@@ -573,7 +585,11 @@ pub mod pallet {
 							ensure!(signer == *curator, Error::<T, I>::RequireCurator);
 
 							if bounty.fee > Zero::zero() {
-								T::Assets::hold(dao_token_id, curator, bounty.fee)?;
+								match bounty.token_id {
+									None => T::Currency::reserve(curator, bounty.fee)?,
+									Some(token_id) =>
+										T::Assets::hold(token_id, curator, bounty.fee)?,
+								}
 							}
 
 							bounty.curator_deposit = bounty.fee;
@@ -903,15 +919,17 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			description.clone().try_into().map_err(|_| Error::<T, I>::ReasonTooBig)?;
 		ensure!(value != Zero::zero(), Error::<T, I>::InvalidValue);
 
-		match token_id {
-			None => {},
-			Some(token_id) => {
-				let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
-				let balance = T::Assets::balance(token_id, &dao_account_id);
-
-				ensure!(balance >= value, Error::<T, I>::InsufficientTokenBalance);
-			},
+		let DaoPolicy { governance, .. } = T::DaoProvider::policy(dao_id)?;
+		if token_id.is_some() && Some(DaoGovernance::OwnershipWeightedVoting) == governance {
+			return Err(Error::<T, I>::NotSupported.into())
 		}
+
+		let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+		let balance = match token_id {
+			None => T::Currency::free_balance(&dao_account_id),
+			Some(token_id) => T::Assets::balance(token_id, &dao_account_id),
+		};
+		ensure!(balance >= value, Error::<T, I>::InsufficientBalance);
 
 		let index = Self::bounty_count(dao_id);
 		BountyCount::<T, I>::insert(dao_id, index + 1);
