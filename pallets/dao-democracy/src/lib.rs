@@ -152,9 +152,11 @@
 #![recursion_limit = "256"]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::{Decode, Encode};
+use codec::Decode;
+#[cfg(feature = "runtime-benchmarks")]
+use codec::Encode;
 use dao_primitives::{
-	DaoGovernance, DaoOrigin, DaoPolicy, DaoProvider, DaoReferendumScheduler, DaoToken,
+	DaoGovernance, DaoOrigin, DaoPolicy, DaoProvider, DaoReferendumScheduler, DaoToken, EncodeInto,
 	GovernanceV1Policy, RawOrigin,
 };
 use frame_support::{
@@ -1261,25 +1263,6 @@ pub mod pallet {
 		}
 	}
 }
-
-pub trait EncodeInto: Encode {
-	fn encode_into<T: AsMut<[u8]> + Default>(&self) -> T {
-		let mut t = T::default();
-		self.using_encoded(|data| {
-			if data.len() <= t.as_mut().len() {
-				t.as_mut()[0..data.len()].copy_from_slice(data);
-			} else {
-				// encoded self is too big to fit into a T. hash it and use the first bytes of that
-				// instead.
-				let hash = sp_io::hashing::blake2_256(data);
-				let l = t.as_mut().len().min(hash.len());
-				t.as_mut()[0..l].copy_from_slice(&hash[0..l]);
-			}
-		});
-		t
-	}
-}
-impl<T: Encode> EncodeInto for T {}
 
 impl<T: Config> Pallet<T> {
 	pub fn ensure_democracy_supported(dao_id: DaoId) -> Result<GovernanceV1Policy, DispatchError> {

@@ -903,27 +903,6 @@ pub mod pallet {
 	}
 }
 
-//TODO: taken from democracy pallet
-pub trait EncodeInto: Encode {
-	fn encode_into<T: AsMut<[u8]> + Default>(&self) -> T {
-		let mut t = T::default();
-		self.using_encoded(|data| {
-			if data.len() <= t.as_mut().len() {
-				t.as_mut()[0..data.len()].copy_from_slice(data);
-			} else {
-				// encoded self is too big to fit into a T. hash it and use the first bytes of that
-				// instead.
-				let hash = sp_io::hashing::blake2_256(data);
-				let l = t.as_mut().len().min(hash.len());
-				t.as_mut()[0..l].copy_from_slice(&hash[0..l]);
-			}
-		});
-		t
-	}
-}
-
-impl<T: Encode> EncodeInto for T {}
-
 impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 	type Id = u32;
 	type AccountId = T::AccountId;
