@@ -1595,7 +1595,7 @@ parameter_types! {
 	pub const DaoMetadataLimit: u32 = 500;
 	pub const DaoMaxCouncilMembers: u32 = 100; // TODO
 	pub const DaoMaxTechnicalCommitteeMembers: u32 = 100; // TODO
-	pub const DaoMinTreasurySpendPeriod: u32 = 100;
+	pub const DaoMinTreasurySpendPeriod: u32 = 10; // TODO
 }
 
 impl pallet_dao::Config for Runtime {
