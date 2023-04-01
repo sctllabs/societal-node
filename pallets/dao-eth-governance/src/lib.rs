@@ -823,7 +823,7 @@ impl<T: Config> Pallet<T> {
 
 		// Scheduling proposal close
 		T::Scheduler::schedule_named(
-			(DAO_ETH_GOVERNANCE_ID, dao_id).encode_into(),
+			(DAO_ETH_GOVERNANCE_ID, dao_id, proposal_hash, index).encode_into(),
 			DispatchTime::At(end),
 			None,
 			50,
