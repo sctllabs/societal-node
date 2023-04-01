@@ -95,10 +95,14 @@ impl<Runtime, Instance> DaoCollectivePrecompile<Runtime, Instance>
 where
 	Instance: 'static,
 	Runtime: pallet_dao_collective::Config<Instance> + pallet_evm::Config,
-	Runtime::RuntimeCall: Dispatchable<PostInfo = PostDispatchInfo> + GetDispatchInfo + Decode,
-	Runtime::RuntimeCall: From<pallet_dao_collective::Call<Runtime, Instance>>,
-	<Runtime as pallet_dao_collective::Config<Instance>>::Proposal: From<Runtime::RuntimeCall>,
-	<Runtime::RuntimeCall as Dispatchable>::RuntimeOrigin: From<Option<Runtime::AccountId>>,
+	<Runtime as frame_system::Config>::RuntimeCall:
+		Dispatchable<PostInfo = PostDispatchInfo> + GetDispatchInfo + Decode,
+	<Runtime as frame_system::Config>::RuntimeCall:
+		From<pallet_dao_collective::Call<Runtime, Instance>>,
+	<Runtime as pallet_dao_collective::Config<Instance>>::Proposal:
+		From<<Runtime as frame_system::Config>::RuntimeCall>,
+	<<Runtime as frame_system::Config>::RuntimeCall as Dispatchable>::RuntimeOrigin:
+		From<Option<Runtime::AccountId>>,
 	H256: From<<Runtime as frame_system::Config>::Hash>
 		+ Into<<Runtime as frame_system::Config>::Hash>,
 {
@@ -130,7 +134,7 @@ where
 		let proposal_index =
 			pallet_dao_collective::Pallet::<Runtime, Instance>::proposal_count(dao_id);
 		let proposal_hash: H256 = hash::<Runtime>(&proposal);
-		let proposal = Runtime::RuntimeCall::decode(&mut &*proposal)
+		let proposal = <Runtime as frame_system::Config>::RuntimeCall::decode(&mut &*proposal)
 			.map_err(|_| RevertReason::custom("Failed to decode proposal").in_field("proposal"))?
 			.into();
 		let proposal = Box::new(proposal);

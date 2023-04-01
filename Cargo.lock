@@ -6190,6 +6190,7 @@ dependencies = [
  "frame-system",
  "log",
  "pallet-preimage",
+ "pallet-scheduler",
  "parity-scale-codec",
  "scale-info",
  "sp-core",
