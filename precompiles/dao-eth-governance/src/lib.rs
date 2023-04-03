@@ -102,10 +102,13 @@ pub struct DaoEthGovernancePrecompile<Runtime>(PhantomData<Runtime>);
 impl<Runtime> DaoEthGovernancePrecompile<Runtime>
 where
 	Runtime: pallet_dao_eth_governance::Config + pallet_evm::Config,
-	Runtime::RuntimeCall: Dispatchable<PostInfo = PostDispatchInfo> + GetDispatchInfo + Decode,
-	Runtime::RuntimeCall: From<pallet_dao_eth_governance::Call<Runtime>>,
-	<Runtime as pallet_dao_eth_governance::Config>::Proposal: From<Runtime::RuntimeCall>,
-	<Runtime::RuntimeCall as Dispatchable>::RuntimeOrigin: From<Option<Runtime::AccountId>>,
+	<Runtime as frame_system::Config>::RuntimeCall:
+		Dispatchable<PostInfo = PostDispatchInfo> + GetDispatchInfo + Decode,
+	<Runtime as frame_system::Config>::RuntimeCall: From<pallet_dao_eth_governance::Call<Runtime>>,
+	<Runtime as pallet_dao_eth_governance::Config>::Proposal:
+		From<<Runtime as frame_system::Config>::RuntimeCall>,
+	<<Runtime as frame_system::Config>::RuntimeCall as Dispatchable>::RuntimeOrigin:
+		From<Option<Runtime::AccountId>>,
 	BalanceOf<Runtime>: TryFrom<u128> + TryInto<u128> + Into<u128> + EvmData,
 	H256: From<<Runtime as frame_system::Config>::Hash>
 		+ Into<<Runtime as frame_system::Config>::Hash>,
@@ -139,7 +142,7 @@ where
 
 		let proposal_index = pallet_dao_eth_governance::Pallet::<Runtime>::proposal_count(dao_id);
 		let _proposal_hash: H256 = hash::<Runtime>(&proposal);
-		let proposal = Runtime::RuntimeCall::decode(&mut &*proposal)
+		let proposal = <Runtime as frame_system::Config>::RuntimeCall::decode(&mut &*proposal)
 			.map_err(|_| RevertReason::custom("Failed to decode proposal").in_field("proposal"))?
 			.into();
 		let proposal = Box::new(proposal);
