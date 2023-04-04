@@ -33,7 +33,7 @@ runs:
     with:
       context: .
       file: Dockerfile
-      platforms: linux/amd64,linux/arm64
+      platforms: ${{ github.event.inputs.environment }}
       tags: ${{ steps.meta.outputs.tags }}
       push: true
       cache-from: type=local,src=/tmp/.buildx-cache-societal-node
