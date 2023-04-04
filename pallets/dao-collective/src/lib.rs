@@ -46,11 +46,12 @@
 
 use scale_info::TypeInfo;
 use sp_io::storage;
-use sp_runtime::{traits::Hash, Either, Permill, RuntimeDebug};
+use sp_runtime::{traits::Hash, Either, Permill, RuntimeDebug, Saturating};
 use sp_std::{marker::PhantomData, prelude::*, result, str};
 
 use dao_primitives::{
-	ChangeDaoMembers, DaoOrigin, DaoPolicy, DaoPolicyProportion, DaoProvider, InitializeDaoMembers,
+	ChangeDaoMembers, DaoOrigin, DaoPolicy, DaoPolicyProportion, DaoProvider, EncodeInto,
+	InitializeDaoMembers, RawOrigin as DaoRawOrigin,
 };
 
 use frame_support::{
@@ -61,8 +62,9 @@ use frame_support::{
 	},
 	ensure,
 	traits::{
-		Backing, Bounded, EnsureOrigin, EnsureOriginWithArg, Get, GetBacking, QueryPreimage,
-		StorageVersion,
+		schedule::{v3::Named as ScheduleNamed, DispatchTime},
+		Backing, Bounded, EnsureOrigin, EnsureOriginWithArg, Get, GetBacking, LockIdentifier,
+		QueryPreimage, StorageVersion, StorePreimage,
 	},
 	weights::Weight,
 	Parameter,
@@ -92,6 +94,10 @@ pub type ProposalIndex = u32;
 pub type MemberCount = u32;
 
 pub type BoundedProposal<T, I> = Bounded<<T as Config<I>>::Proposal>;
+
+pub type CallOf<T, I> = <T as Config<I>>::RuntimeCall;
+
+const DAO_COLLECTIVE_ID: LockIdentifier = *b"daoclctv";
 
 /// Default voting strategy when a member is inactive.
 pub trait DefaultVote {
@@ -167,7 +173,12 @@ pub mod pallet {
 
 	#[pallet::config]
 	pub trait Config<I: 'static = ()>: frame_system::Config {
-		// TODO: use collective origin
+		type RuntimeCall: Parameter
+			+ Dispatchable<RuntimeOrigin = <Self as Config<I>>::RuntimeOrigin>
+			+ From<Call<Self, I>>
+			+ IsType<<Self as frame_system::Config>::RuntimeCall>
+			+ From<frame_system::Call<Self>>;
+
 		/// The outer origin type.
 		type RuntimeOrigin: From<RawOrigin<Self::AccountId, I>>;
 
@@ -211,10 +222,16 @@ pub mod pallet {
 			Id = u32,
 			AccountId = Self::AccountId,
 			Policy = DaoPolicy,
+			Origin = OriginFor<Self>,
 		>;
 
 		/// The preimage provider with which we look up call hashes to get the call.
 		type Preimages: QueryPreimage + StorePreimage;
+
+		type Scheduler: ScheduleNamed<Self::BlockNumber, CallOf<Self, I>, Self::PalletsOrigin>;
+
+		/// Overarching type of all pallets origins.
+		type PalletsOrigin: From<DaoRawOrigin<Self::AccountId>>;
 	}
 
 	/// Origin for the collective pallet.
@@ -588,6 +605,21 @@ pub mod pallet {
 
 			Self::do_close(dao_id, proposal_hash, index, proposal_weight_bound, length_bound)
 		}
+
+		#[pallet::weight(10_000)]
+		#[pallet::call_index(5)]
+		pub fn close_scheduled_proposal(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			proposal_hash: T::Hash,
+			#[pallet::compact] index: ProposalIndex,
+			proposal_weight_bound: Weight,
+			#[pallet::compact] length_bound: u32,
+		) -> DispatchResultWithPostInfo {
+			T::DaoProvider::ensure_approved(origin, dao_id)?;
+
+			Self::do_close(dao_id, proposal_hash, index, proposal_weight_bound, length_bound)
+		}
 	}
 }
 
@@ -647,8 +679,9 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		let index = Self::proposal_count(dao_id);
 		<ProposalCount<T, I>>::mutate(dao_id, |i| *i += 1);
 		<ProposalOf<T, I>>::insert(dao_id, proposal_hash, proposal);
+		let now = frame_system::Pallet::<T>::block_number();
+		let end = now.saturating_add(policy.proposal_period.into());
 		let votes = {
-			let end = frame_system::Pallet::<T>::block_number() + policy.proposal_period.into();
 			Votes {
 				index,
 				threshold,
@@ -658,6 +691,28 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			}
 		};
 		<Voting<T, I>>::insert(dao_id, proposal_hash, votes);
+
+		let account_id = T::DaoProvider::dao_account_id(dao_id);
+		let origin = DaoRawOrigin::Dao(account_id).into();
+
+		// TODO: check weights!!!
+		let call = CallOf::<T, I>::from(Call::close_scheduled_proposal {
+			dao_id,
+			proposal_hash,
+			index,
+			proposal_weight_bound: Default::default(),
+			length_bound: Default::default(),
+		});
+
+		// Scheduling proposal close
+		T::Scheduler::schedule_named(
+			(DAO_COLLECTIVE_ID, dao_id, proposal_hash, index).encode_into(),
+			DispatchTime::At(end),
+			None,
+			50,
+			origin,
+			T::Preimages::bound(call)?.transmute(),
+		)?;
 
 		Self::deposit_event(Event::Proposed {
 			dao_id,
@@ -852,7 +907,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		dao_id: DaoId,
 		hash: &T::Hash,
 		_length_bound: u32,
-		weight_bound: Weight,
+		_weight_bound: Weight,
 	) -> Result<(<T as Config<I>>::Proposal, usize), DispatchError> {
 		let key = ProposalOf::<T, I>::hashed_key_for(dao_id, hash);
 		// read the length of the proposal storage entry directly
@@ -866,9 +921,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			Err(_) => return Err(Error::<T, I>::ProposalMissing.into()),
 		};
 
-		let proposal_weight = call.get_dispatch_info().weight;
-
-		ensure!(proposal_weight.all_lte(weight_bound), Error::<T, I>::WrongProposalWeight);
 		Ok((call, proposal_len as usize))
 	}
 

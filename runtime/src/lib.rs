@@ -603,6 +603,7 @@ impl pallet_collective::Config<TechnicalCollective> for Runtime {
 // TODO - Update settings
 type DaoCouncilCollective = pallet_dao_collective::Instance1;
 impl pallet_dao_collective::Config<DaoCouncilCollective> for Runtime {
+	type RuntimeCall = RuntimeCall;
 	type RuntimeOrigin = RuntimeOrigin;
 	type Proposal = RuntimeCall;
 	type RuntimeEvent = RuntimeEvent;
@@ -614,10 +615,13 @@ impl pallet_dao_collective::Config<DaoCouncilCollective> for Runtime {
 	type WeightInfo = pallet_dao_collective::weights::SubstrateWeight<Runtime>;
 	type DaoProvider = Dao;
 	type Preimages = Preimage;
+	type Scheduler = Scheduler;
+	type PalletsOrigin = OriginCaller;
 }
 
 type DaoTechnicalCommitteeCollective = pallet_dao_collective::Instance2;
 impl pallet_dao_collective::Config<DaoTechnicalCommitteeCollective> for Runtime {
+	type RuntimeCall = RuntimeCall;
 	type RuntimeOrigin = RuntimeOrigin;
 	type Proposal = RuntimeCall;
 	type RuntimeEvent = RuntimeEvent;
@@ -629,6 +633,8 @@ impl pallet_dao_collective::Config<DaoTechnicalCommitteeCollective> for Runtime 
 	type WeightInfo = pallet_dao_collective::weights::SubstrateWeight<Runtime>;
 	type DaoProvider = Dao;
 	type Preimages = Preimage;
+	type Scheduler = Scheduler;
+	type PalletsOrigin = OriginCaller;
 }
 
 parameter_types! {
