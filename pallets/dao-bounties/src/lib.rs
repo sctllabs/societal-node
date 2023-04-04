@@ -1012,7 +1012,7 @@ impl<T: Config<I>, I: 'static> pallet_dao_treasury::SpendFunds<T, I> for Pallet<
 							Some(token_id) => {
 								let budget_remaining = T::Assets::balance(
 									token_id,
-									&Self::bounty_account_id(dao_id, index),
+									&T::DaoProvider::dao_account_id(dao_id),
 								);
 
 								if bounty.value <= budget_remaining {
