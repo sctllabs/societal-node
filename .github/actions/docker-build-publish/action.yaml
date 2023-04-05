@@ -25,7 +25,7 @@ runs:
     with:
       context: .
       file: Dockerfile
-      platforms: ${{ github.event.inputs.environment }}
+      platforms: ${{ github.event.inputs.platform }}
       tags: ${{ steps.meta.outputs.tags }}
       push: true
       cache-from: type=registry,ref=${{ env.DOCKER_REPO }}:buildcache
