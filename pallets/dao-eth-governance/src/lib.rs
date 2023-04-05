@@ -29,7 +29,10 @@ use frame_support::{
 	ensure,
 	pallet_prelude::*,
 	traits::{
-		schedule::{v3::Named as ScheduleNamed, DispatchTime},
+		schedule::{
+			v3::{Named as ScheduleNamed, TaskName},
+			DispatchTime,
+		},
 		tokens::Balance,
 		Bounded, Get, LockIdentifier, QueryPreimage, StorageVersion, StorePreimage,
 	},
@@ -922,7 +925,7 @@ impl<T: Config> Pallet<T> {
 				nays: nays_balance,
 			});
 			let (_proposal_weight, _proposal_count) =
-				Self::do_approve_proposal(dao_id, index, proposal_hash, proposal);
+				Self::do_approve_proposal(dao_id, index, proposal_hash, proposal)?;
 
 			Ok((Some(Weight::from_ref_time(0)), Pays::Yes).into())
 		} else {
@@ -937,7 +940,7 @@ impl<T: Config> Pallet<T> {
 				nays: nays_balance,
 			});
 
-			let _proposal_count = Self::do_disapprove_proposal(dao_id, index, proposal_hash);
+			let _proposal_count = Self::do_disapprove_proposal(dao_id, index, proposal_hash)?;
 
 			Ok((Some(Weight::from_ref_time(0)), Pays::No).into())
 		}
@@ -986,7 +989,7 @@ impl<T: Config> Pallet<T> {
 		proposal_index: ProposalIndex,
 		proposal_hash: T::Hash,
 		proposal: <T as Config>::Proposal,
-	) -> (Weight, u32) {
+	) -> Result<(Weight, u32), DispatchError> {
 		Self::deposit_event(Event::Approved { dao_id, proposal_index, proposal_hash });
 
 		let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
@@ -1004,7 +1007,14 @@ impl<T: Config> Pallet<T> {
 		let proposal_weight = get_result_weight(result).unwrap_or(dispatch_weight); // P1
 
 		let proposal_count = Self::remove_proposal(dao_id, proposal_hash);
-		(proposal_weight, proposal_count)
+
+		T::Scheduler::cancel_named(Self::close_proposal_task_id(
+			dao_id,
+			proposal_hash,
+			proposal_index,
+		))?;
+
+		Ok((proposal_weight, proposal_count))
 	}
 
 	/// Removes a proposal from the pallet, and deposit the `Disapproved` event.
@@ -1012,10 +1022,18 @@ impl<T: Config> Pallet<T> {
 		dao_id: DaoId,
 		proposal_index: ProposalIndex,
 		proposal_hash: T::Hash,
-	) -> u32 {
+	) -> Result<u32, DispatchError> {
 		// disapproved
 		Self::deposit_event(Event::Disapproved { dao_id, proposal_index, proposal_hash });
-		Self::remove_proposal(dao_id, proposal_hash)
+		let num_proposals = Self::remove_proposal(dao_id, proposal_hash);
+
+		T::Scheduler::cancel_named(Self::close_proposal_task_id(
+			dao_id,
+			proposal_hash,
+			proposal_index,
+		))?;
+
+		Ok(num_proposals)
 	}
 
 	// Removes a proposal from the pallet, cleaning up votes and the vector of proposals.
@@ -1192,6 +1210,14 @@ impl<T: Config> Pallet<T> {
 		}
 
 		Ok(voting)
+	}
+
+	fn close_proposal_task_id(
+		dao_id: DaoId,
+		proposal_hash: T::Hash,
+		index: ProposalIndex,
+	) -> TaskName {
+		(DAO_ETH_GOVERNANCE_ID, dao_id, proposal_hash, index).encode_into()
 	}
 }
 
