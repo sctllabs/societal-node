@@ -165,7 +165,7 @@ benchmarks_instance_pallet! {
 		let bounty_id = BountyCount::<T, I>::get(dao_id) - 1;
 	}: _(RawOrigin::Signed(curator), dao_id, bounty_id, Vec::new())
 	verify {
-		assert_last_event::<T, I>(Event::BountyExtended { dao_id, index: bounty_id }.into())
+		assert_last_event::<T, I>(Event::BountyExtended { dao_id, index: bounty_id, update_due: 10_u32.into() }.into())
 	}
 
 	spend_funds {

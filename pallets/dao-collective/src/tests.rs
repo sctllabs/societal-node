@@ -391,7 +391,8 @@ fn close_works() {
 					proposal_index: 0,
 					proposal_hash: hash,
 					result: Err(DispatchError::BadOrigin)
-				}))
+				})),
+				record(RuntimeEvent::Scheduler(SchedulerEvent::Canceled { when: 4, index: 0 }))
 			]
 		);
 	});
@@ -585,7 +586,8 @@ fn close_with_no_prime_but_majority_works() {
 					proposal_index: 0,
 					proposal_hash: hash,
 					result: Err(DispatchError::BadOrigin)
-				}))
+				})),
+				record(RuntimeEvent::Scheduler(SchedulerEvent::Canceled { when: 4, index: 0 }))
 			]
 		);
 	});
@@ -1259,6 +1261,7 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 					proposal_hash: hash,
 					result: Ok(())
 				})),
+				record(RuntimeEvent::Scheduler(SchedulerEvent::Canceled { when: 4, index: 0 }))
 			]
 		);
 
@@ -1285,7 +1288,7 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 		assert_eq!(
 			System::events(),
 			vec![
-				record(RuntimeEvent::Scheduler(SchedulerEvent::Scheduled { when: 4, index: 1 })),
+				record(RuntimeEvent::Scheduler(SchedulerEvent::Scheduled { when: 4, index: 0 })),
 				record(RuntimeEvent::Collective(CollectiveEvent::Proposed {
 					dao_id: 0,
 					account: 1,
@@ -1343,6 +1346,7 @@ fn motions_approval_with_enough_votes_and_lower_voting_threshold_works() {
 					proposal_hash: hash,
 					result: Ok(())
 				})),
+				record(RuntimeEvent::Scheduler(SchedulerEvent::Canceled { when: 4, index: 0 }))
 			]
 		);
 	});
@@ -1422,6 +1426,7 @@ fn motions_disapproval_works() {
 					proposal_index: 0,
 					proposal_hash: hash
 				})),
+				record(RuntimeEvent::Scheduler(SchedulerEvent::Canceled { when: 4, index: 0 }))
 			]
 		);
 	});
@@ -1507,6 +1512,7 @@ fn motions_approval_works() {
 					proposal_hash: hash,
 					result: Err(DispatchError::BadOrigin)
 				})),
+				record(RuntimeEvent::Scheduler(SchedulerEvent::Canceled { when: 4, index: 0 }))
 			]
 		);
 	});
