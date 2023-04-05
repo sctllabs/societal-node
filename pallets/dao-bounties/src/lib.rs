@@ -289,7 +289,7 @@ pub mod pallet {
 		/// A bounty is cancelled.
 		BountyCanceled { dao_id: DaoId, index: BountyIndex },
 		/// A bounty expiry is extended.
-		BountyExtended { dao_id: DaoId, index: BountyIndex },
+		BountyExtended { dao_id: DaoId, index: BountyIndex, update_due: T::BlockNumber },
 	}
 
 	/// Number of bounty proposals that have been made.
@@ -875,6 +875,8 @@ pub mod pallet {
 
 			let dao_policy = T::DaoProvider::policy(dao_id)?;
 
+			let mut new_update_due = None;
+
 			Bounties::<T, I>::try_mutate_exists(
 				dao_id,
 				bounty_id,
@@ -887,6 +889,8 @@ pub mod pallet {
 							*update_due = (frame_system::Pallet::<T>::block_number() +
 								dao_policy.bounty_update_period.0.into())
 							.max(*update_due);
+
+							new_update_due = Some(*update_due);
 						},
 						_ => return Err(Error::<T, I>::UnexpectedStatus.into()),
 					}
@@ -895,7 +899,11 @@ pub mod pallet {
 				},
 			)?;
 
-			Self::deposit_event(Event::<T, I>::BountyExtended { dao_id, index: bounty_id });
+			Self::deposit_event(Event::<T, I>::BountyExtended {
+				dao_id,
+				index: bounty_id,
+				update_due: new_update_due.unwrap(),
+			});
 			Ok(())
 		}
 	}
