@@ -606,7 +606,20 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			let _ = ensure_signed(origin)?;
 
-			Self::do_close(dao_id, proposal_hash, index, proposal_weight_bound, length_bound)
+			match Self::do_close(dao_id, proposal_hash, index, proposal_weight_bound, length_bound)
+			{
+				Ok(post_info) => {
+					// Canceling previously scheduled proposal close task
+					T::Scheduler::cancel_named(Self::close_proposal_task_id(
+						dao_id,
+						proposal_hash,
+						index,
+					))?;
+
+					Ok(post_info)
+				},
+				Err(e) => Err(e),
+			}
 		}
 
 		#[pallet::weight(10_000)]
@@ -826,14 +839,8 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 				yes: yes_votes,
 				no: no_votes,
 			});
-			let (proposal_weight, proposal_count) = Self::do_approve_proposal(
-				dao_id,
-				seats,
-				yes_votes,
-				index,
-				proposal_hash,
-				proposal,
-			)?;
+			let (proposal_weight, proposal_count) =
+				Self::do_approve_proposal(dao_id, seats, yes_votes, index, proposal_hash, proposal);
 			return Ok((
 				Some(
 					T::WeightInfo::close_early_approved(len as u32, seats, proposal_count)
@@ -850,7 +857,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 				yes: yes_votes,
 				no: no_votes,
 			});
-			let proposal_count = Self::do_disapprove_proposal(dao_id, index, proposal_hash)?;
+			let proposal_count = Self::do_disapprove_proposal(dao_id, index, proposal_hash);
 			return Ok((
 				Some(T::WeightInfo::close_early_disapproved(seats, proposal_count)),
 				Pays::No,
@@ -885,14 +892,8 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 				yes: yes_votes,
 				no: no_votes,
 			});
-			let (proposal_weight, proposal_count) = Self::do_approve_proposal(
-				dao_id,
-				seats,
-				yes_votes,
-				index,
-				proposal_hash,
-				proposal,
-			)?;
+			let (proposal_weight, proposal_count) =
+				Self::do_approve_proposal(dao_id, seats, yes_votes, index, proposal_hash, proposal);
 			Ok((
 				Some(
 					T::WeightInfo::close_approved(len as u32, seats, proposal_count)
@@ -909,7 +910,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 				yes: yes_votes,
 				no: no_votes,
 			});
-			let proposal_count = Self::do_disapprove_proposal(dao_id, index, proposal_hash)?;
+			let proposal_count = Self::do_disapprove_proposal(dao_id, index, proposal_hash);
 			Ok((Some(T::WeightInfo::close_disapproved(seats, proposal_count)), Pays::No).into())
 		}
 	}
@@ -960,7 +961,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		proposal_index: ProposalIndex,
 		proposal_hash: T::Hash,
 		proposal: <T as Config<I>>::Proposal,
-	) -> Result<(Weight, u32), DispatchError> {
+	) -> (Weight, u32) {
 		Self::deposit_event(Event::Approved { dao_id, proposal_index, proposal_hash });
 
 		let dispatch_weight = proposal.get_dispatch_info().weight;
@@ -977,14 +978,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 
 		let proposal_count = Self::remove_proposal(dao_id, proposal_hash);
 
-		// Canceling previously scheduled proposal close task
-		T::Scheduler::cancel_named(Self::close_proposal_task_id(
-			dao_id,
-			proposal_hash,
-			proposal_index,
-		))?;
-
-		Ok((proposal_weight, proposal_count))
+		(proposal_weight, proposal_count)
 	}
 
 	/// Removes a proposal from the pallet, and deposit the `Disapproved` event.
@@ -992,18 +986,10 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		dao_id: DaoId,
 		proposal_index: ProposalIndex,
 		proposal_hash: T::Hash,
-	) -> Result<u32, DispatchError> {
+	) -> u32 {
 		// disapproved
 		Self::deposit_event(Event::Disapproved { dao_id, proposal_index, proposal_hash });
-		let num_proposals = Self::remove_proposal(dao_id, proposal_hash);
-
-		T::Scheduler::cancel_named(Self::close_proposal_task_id(
-			dao_id,
-			proposal_hash,
-			proposal_index,
-		))?;
-
-		Ok(num_proposals)
+		Self::remove_proposal(dao_id, proposal_hash)
 	}
 
 	// Removes a proposal from the pallet, cleaning up votes and the vector of proposals.
