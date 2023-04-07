@@ -1,7 +1,7 @@
 # This is an example build stage for the node template. Here we create the binary in a temporary image.
 
 # This is a base image to build substrate nodes
-FROM docker.io/paritytech/ci-linux:production as builder
+FROM docker.io/okalenyk/ci-linux:latest as builder
 
 WORKDIR /societal-node
 COPY . .
