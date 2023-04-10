@@ -20,6 +20,10 @@ on:
         required: false
         description: Specify platform to build for. Valid values are linux/amd64, linux/arm64
         default: linux/amd64
+      features:
+        required: false
+        description: Specify cargo features to build for. Valid values are parachain, runtime-benchmarks etc.
+        default: ""
   
 # Set an environment variable (that can be overriden) for the Docker Repo
 env:

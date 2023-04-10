@@ -3,9 +3,11 @@
 # This is a base image to build substrate nodes
 FROM docker.io/paritytech/ci-linux:production as builder
 
+ARG CARGO_FEATURES
+
 WORKDIR /societal-node
 COPY . .
-RUN cargo build --locked --release
+RUN cargo build --locked --release --features=$CARGO_FEATURES
 
 # This is the 2nd stage: a very small image where we copy the binary."
 FROM docker.io/library/ubuntu:20.04

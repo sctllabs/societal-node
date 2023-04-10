@@ -11,6 +11,8 @@ runs:
       tags: |
         type=raw,value=latest
         type=raw,value=${{ env.DOCKER_ENV_TAG }}
+        type=raw,value=parachain-latest
+        type=raw,value=${{ github.event.inputs.features == 'parachain' && 'parachain' || 'solo' }}-latest
         type=ref,event=branch,suffix=-latest
         type=sha,prefix=,format=long
 
@@ -25,6 +27,8 @@ runs:
     with:
       context: .
       file: Dockerfile
+      build-args: |
+        CARGO_FEATURES=${{ github.event.inputs.features }}
       platforms: ${{ github.event.inputs.platform }}
       tags: ${{ steps.meta.outputs.tags }}
       push: true
