@@ -54,6 +54,8 @@ impl<B: BlockNumberProvider + EthRpcProvider> EthRpcService for EthService<B> {
 	) -> Result<u128, DispatchError> {
 		let result = response?.result;
 
+		log::info!("result: {:?}", result);
+
 		let value = Result::unwrap_or(str::from_utf8(&result), "");
 		let value_stripped = value.strip_prefix("0x").unwrap_or(value);
 
@@ -75,6 +77,8 @@ impl<B: BlockNumberProvider + EthRpcProvider> EthRpcService for EthService<B> {
 		]
 		.concat();
 
+		log::info!("data: {:?}", data);
+
 		let params = json!([
 			{
 				"to": to,
@@ -82,6 +86,8 @@ impl<B: BlockNumberProvider + EthRpcProvider> EthRpcService for EthService<B> {
 			},
 			Self::block_number(block_number)
 		]);
+
+		log::info!("params: {:?}", params);
 
 		Self::fetch_from_eth(token_address, None, Some(params))
 	}
@@ -147,6 +153,8 @@ impl<B: BlockNumberProvider + EthRpcProvider> EthRpcService for EthService<B> {
 			match Self::fetch_n_parse(vec![body]) {
 				Ok(eth_rpc_response) => {
 					s_info.set(&eth_rpc_response);
+
+					log::info!("response ok");
 
 					return Ok(eth_rpc_response)
 				},

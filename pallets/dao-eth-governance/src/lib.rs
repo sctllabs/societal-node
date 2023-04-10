@@ -321,6 +321,8 @@ pub mod pallet {
 							},
 						};
 
+						log::info!("block number: {:?}", block_number);
+
 						let total_supply = match T::OffchainEthService::parse_token_balance(
 							T::OffchainEthService::fetch_token_total_supply(
 								token_address.clone(),
@@ -335,6 +337,8 @@ pub mod pallet {
 							},
 						};
 
+						log::info!("total supply: {:?}", total_supply);
+
 						match T::OffchainEthService::parse_token_balance(
 							T::OffchainEthService::fetch_token_balance_of(
 								token_address,
@@ -343,6 +347,8 @@ pub mod pallet {
 							),
 						) {
 							Ok(token_balance) => {
+								log::info!("token balance: {:?}", token_balance);
+
 								call = Some(Call::approve_propose {
 									dao_id,
 									threshold: total_supply,
@@ -1093,6 +1099,8 @@ impl<T: Config> Pallet<T> {
 		hash: T::Hash,
 		approve: bool,
 	) -> Result<(), DispatchError> {
+		log::info!("approving proposal: {:?}", hash);
+
 		let (pending_proposal, proposal) =
 			<PendingProposalOf<T>>::take(dao_id, hash).expect("Pending Proposal not found");
 
