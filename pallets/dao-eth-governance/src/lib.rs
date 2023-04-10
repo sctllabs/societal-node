@@ -468,6 +468,7 @@ pub mod pallet {
 			proposal_index: ProposalIndex,
 			proposal_hash: T::Hash,
 			proposal: T::Proposal,
+			block_number: u32,
 			threshold: TokenSupply,
 			meta: BoundedVec<u8, T::ProposalMetadataLimit>,
 		},
@@ -853,6 +854,7 @@ impl<T: Config> Pallet<T> {
 			proposal_index: index,
 			proposal_hash,
 			proposal: proposal_dispatch_data,
+			block_number,
 			threshold,
 			meta,
 		});
