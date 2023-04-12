@@ -403,7 +403,9 @@ async fn start_node_impl(
 		Arc::new(move |hash, data| network.announce_block(hash, data))
 	};
 
-	// TODO
+	#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+	let relay_chain_slot_duration = Duration::from_secs(12);
+	#[cfg(not(any(feature = "parachain", feature = "runtime-benchmarks")))]
 	let relay_chain_slot_duration = Duration::from_secs(6);
 
 	if validator {

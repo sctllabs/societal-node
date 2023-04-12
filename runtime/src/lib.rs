@@ -2424,7 +2424,7 @@ impl cumulus_pallet_parachain_system::CheckInherents<Block> for CheckInherents {
 		let inherent_data =
 			cumulus_primitives_timestamp::InherentDataProvider::from_relay_chain_slot_and_duration(
 				relay_chain_slot,
-				sp_std::time::Duration::from_secs(6),
+				sp_std::time::Duration::from_millis(MILLISECS_PER_BLOCK),
 			)
 			.create_inherent_data()
 			.expect("Could not create the timestamp inherent data");
