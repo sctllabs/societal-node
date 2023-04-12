@@ -1,0 +1,57 @@
+helm \
+  -n rococo-dev \
+  upgrade \
+  rococo-alice \
+  --install \
+  ../helm-charts/charts/node \
+  -f ./examples/rococo-values.yaml \
+  --set node.role="validator" \
+  --set node.customNodeKey="91cb59d86820419075b08e3043cd802ba3506388d8b161d2d4acd203af5194c1" \
+  --set node.perNodeServices.relayP2pService.enabled=true \
+  --set node.perNodeServices.relayP2pService.port=30333 \
+  --set "node.flags[0]=--alice"
+
+helm \
+  -n rococo-dev \
+  upgrade \
+  rococo-bob \
+  --install \
+  ../helm-charts/charts/node \
+  -f ./examples/rococo-values.yaml \
+  --set node.role="validator" \
+  --set "node.flags[0]=--bob" \
+  --set "node.flags[1]=--bootnodes" \
+  --set "node.flags[2]='/dns4/rococo-alice-node-0-relay-chain-p2p/tcp/30333/p2p/12D3KooWMeR4iQLRBNq87ViDf9W7f6cc9ydAPJgmq48rAH116WoC'"
+
+helm \
+  -n rococo-dev \
+  upgrade \
+  rococo-charlie \
+  --install \
+  ../helm-charts/charts/node \
+  -f ./examples/rococo-values.yaml \
+  --set node.role="validator" \
+  --set "node.flags[0]=--charlie" \
+  --set "node.flags[1]=--bootnodes" \
+  --set "node.flags[2]='/dns4/rococo-alice-node-0-relay-chain-p2p/tcp/30333/p2p/12D3KooWMeR4iQLRBNq87ViDf9W7f6cc9ydAPJgmq48rAH116WoC'"
+
+helm \
+  -n rococo-dev \
+  upgrade \
+  rococo-pool \
+  --install \
+  ../helm-charts/charts/node \
+  -f ./examples/rococo-values.yaml \
+  --set node.replicas=2 \
+  --set "node.flags[0]=--bootnodes" \
+  --set "node.flags[1]='/dns4/rococo-alice-node-0-relay-chain-p2p/tcp/30333/p2p/12D3KooWMeR4iQLRBNq87ViDf9W7f6cc9ydAPJgmq48rAH116WoC'"
+
+helm \
+  -n rococo-dev \
+  upgrade \
+  societal-parachain-node \
+  --install \
+  ../helm-charts/charts/node \
+  -f ./examples/parachain-values.yaml \
+  --set "node.collatorRelayChain.flags[0]=--bootnodes" \
+  --set "node.collatorRelayChain.flags[1]='/dns4/rococo-alice-node-0-relay-chain-p2p/tcp/30333/p2p/12D3KooWMeR4iQLRBNq87ViDf9W7f6cc9ydAPJgmq48rAH116WoC'"
