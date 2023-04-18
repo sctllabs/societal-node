@@ -2,7 +2,7 @@
 ##
 image:
  repository: parity/polkadot
- tag: v0.9.37
+ tag: latest
 
 node:
   chain: rococo-local
@@ -16,8 +16,14 @@ node:
     storageClass: gp2-custom
   resources:
     limits:
-      cpu: 1
-      memory: 2Gi
+      cpu: 3
+      memory: 14Gi
     requests:
-      cpu: 1
-      memory: 2Gi
+      cpu: 3
+      memory: 14Gi
+
+tolerations:
+  - key: "validator"
+    operator: "Equal"
+    value: "rococo"
+    effect: "NoSchedule"
