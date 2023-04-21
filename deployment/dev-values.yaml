@@ -2,7 +2,7 @@
 ##
 image:
   repository: societal/societal-node
-  tag: latest
+  tag: solo-latest
 
 ## Deploy a substrate node
 ## ref: https://docs.substrate.io/tutorials/v3/private-network/
@@ -19,7 +19,7 @@ node:
 
   # Enable Offchain Indexing.
   # https://docs.substrate.io/fundamentals/offchain-operations/
-  offchainIndexing: true
+  enableOffchainIndexing: true
 
   chainData:
     volumeSize: 20Gi
@@ -27,6 +27,14 @@ node:
 
   chainKeystore:
     storageClass: gp2
+
+  resources:
+    limits:
+      cpu: 1
+      memory: 2Gi
+    requests:
+      cpu: 1
+      memory: Gi
 
   ## Creates an ingress resource
   ##

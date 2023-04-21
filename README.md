@@ -23,13 +23,22 @@ Use Rust's native `cargo` command to build and launch the node:
 cargo run --release -- --dev
 ```
 
-### Build
+### Build(Solo chain mode)
 
 The `cargo run` command will perform an initial build. Use the following command to build the node
 without launching it:
 
 ```sh
 cargo build --release
+```
+
+### Build(Parachain mode)
+
+The `cargo run` command will perform an initial build. Use the following command to build the node
+without launching it:
+
+```sh
+cargo build --release --features=parachain
 ```
 
 ### Embedded Docs
@@ -52,7 +61,7 @@ node.
 This command will start the single-node development chain with non-persistent state:
 
 ```bash
-./target/release/societal-node --dev
+./target/release/societal-node --dev --enable-offchain-indexing true
 ```
 
 Purge the development chain's state:
@@ -64,7 +73,7 @@ Purge the development chain's state:
 Start the development chain with detailed logging:
 
 ```bash
-RUST_BACKTRACE=1 ./target/release/societal-node -ldebug --dev
+RUST_BACKTRACE=1 ./target/release/societal-node -ldebug --dev --enable-offchain-indexing true
 ```
 
 > Development chain means that the state of our chain will be in a tmp folder while the nodes are
@@ -130,13 +139,19 @@ by appending your own. A few useful ones are as follow.
 
 ```bash
 # Run Soceital node without re-compiling
-./scripts/docker_run.sh ./target/release/societal-node --dev --ws-external
+./scripts/docker_run.sh ./target/release/societal-node --dev --ws-external --enable-offchain-indexing true
 
 # Purge the local dev chain
 ./scripts/docker_run.sh ./target/release/societal-node purge-chain --dev
 
 # Check whether the code is compilable
 ./scripts/docker_run.sh cargo check
+```
+
+### Run Rococo Local Testnet with Societal Node Parachains
+```bash
+# Run Rococo local testnet docker-compose configuration
+./scripts/rococo_testnet_docker_run.sh
 ```
 
 ### Unit Test

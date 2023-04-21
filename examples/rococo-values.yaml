@@ -1,0 +1,29 @@
+## Image of Polkadot Relay Chain.
+##
+image:
+ repository: parity/polkadot
+ tag: latest
+
+node:
+  chain: rococo-local
+  customChainspecUrl: "https://societal-dev.s3.amazonaws.com/raw-local-chainspec.json"
+  forceDownloadChainspec: true
+  allowUnsafeRpcMethods: Unsafe
+  chainData:
+    volumeSize: 20Gi
+    storageClass: gp2-custom
+  chainKeystore:
+    storageClass: gp2-custom
+  resources:
+    limits:
+      cpu: 3
+      memory: 14Gi
+    requests:
+      cpu: 3
+      memory: 14Gi
+
+tolerations:
+  - key: "validator"
+    operator: "Equal"
+    value: "rococo"
+    effect: "NoSchedule"
