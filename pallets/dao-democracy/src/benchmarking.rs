@@ -20,7 +20,7 @@
 use super::*;
 
 use dao_primitives::{DaoOrigin, DaoPolicyProportion};
-use frame_benchmarking::{account, benchmarks, whitelist_account};
+use frame_benchmarking::{account, benchmarks, whitelist_account, BenchmarkError};
 use frame_support::{
 	assert_noop, assert_ok,
 	traits::{
@@ -185,7 +185,7 @@ benchmarks! {
 
 	emergency_cancel {
 		let dao_account_id: T::AccountId = funded_account::<T>("dao_account", 0);
-		let origin = T::CancellationOrigin::successful_origin(&DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) });
+		let origin = T::CancellationOrigin::try_successful_origin(&DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) }).map_err(|_| BenchmarkError::Weightless)?;
 		let ref_index = add_referendum::<T>(0).0;
 		assert_ok!(Democracy::<T>::referendum_status(0, ref_index));
 	}: _<T::RuntimeOrigin>(origin, 0, ref_index)
@@ -212,9 +212,9 @@ benchmarks! {
 
 		// Place our proposal in the external queue, too.
 		assert_ok!(
-			Democracy::<T>::external_propose(T::ExternalOrigin::successful_origin(&DaoOrigin { dao_account_id: dao_account_id.clone(), proportion: DaoPolicyProportion::AtLeast((0, 1)) }), 0, make_proposal::<T>(0))
+			Democracy::<T>::external_propose(T::ExternalOrigin::try_successful_origin(&DaoOrigin { dao_account_id: dao_account_id.clone(), proportion: DaoPolicyProportion::AtLeast((0, 1)) }).map_err(|_| BenchmarkError::Weightless)?, 0, make_proposal::<T>(0))
 		);
-		let origin = T::BlacklistOrigin::successful_origin(&DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) });
+		let origin = T::BlacklistOrigin::try_successful_origin(&DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) }).map_err(|_| BenchmarkError::Weightless)?;
 	}: _<T::RuntimeOrigin>(origin, 0, hash, Some(ref_index))
 	verify {
 		// Referendum has been canceled
@@ -227,7 +227,7 @@ benchmarks! {
 	// Worst case scenario, we external propose a previously blacklisted proposal
 	external_propose {
 		let dao_account_id: T::AccountId = funded_account::<T>("dao_account", 0);
-		let origin = T::ExternalOrigin::successful_origin(&DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) });
+		let origin = T::ExternalOrigin::try_successful_origin(&DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) }).map_err(|_| BenchmarkError::Weightless)?;
 		let proposal = make_proposal::<T>(0);
 		// Add proposal to blacklist with block number 0
 
@@ -247,7 +247,7 @@ benchmarks! {
 	external_propose_majority {
 		let dao_account_id: T::AccountId = funded_account::<T>("dao_account", 0);
 		let dao_origin = DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) };
-		let origin = T::ExternalMajorityOrigin::successful_origin(&dao_origin);
+		let origin = T::ExternalMajorityOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)?;
 		let proposal = make_proposal::<T>(0);
 	}: _<T::RuntimeOrigin>(origin, 0, proposal)
 	verify {
@@ -258,7 +258,7 @@ benchmarks! {
 	external_propose_default {
 		let dao_account_id: T::AccountId = funded_account::<T>("dao_account", 0);
 		let dao_origin = DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) };
-		let origin = T::ExternalDefaultOrigin::successful_origin(&dao_origin);
+		let origin = T::ExternalDefaultOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)?;
 		let proposal = make_proposal::<T>(0);
 	}: _<T::RuntimeOrigin>(origin, 0, proposal)
 	verify {
@@ -269,13 +269,13 @@ benchmarks! {
 	fast_track {
 		let dao_account_id: T::AccountId = funded_account::<T>("dao_account", 0);
 		let dao_origin = DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) };
-		let origin_propose = T::ExternalDefaultOrigin::successful_origin(&dao_origin);
+		let origin_propose = T::ExternalDefaultOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)?;
 		let proposal = make_proposal::<T>(0);
 		let proposal_hash = proposal.hash();
 		Democracy::<T>::external_propose_default(origin_propose, 0, proposal)?;
 
 		// NOTE: Instant origin may invoke a little bit more logic, but may not always succeed.
-		let origin_fast_track = T::FastTrackOrigin::successful_origin(&dao_origin);
+		let origin_fast_track = T::FastTrackOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)?;
 		let voting_period = T::BlockNumber::min_value();
 		let delay = 0u32;
 	}: _<T::RuntimeOrigin>(origin_fast_track, 0, proposal_hash, voting_period, delay.into())
@@ -290,7 +290,7 @@ benchmarks! {
 		let proposal = make_proposal::<T>(0);
 		let proposal_hash = proposal.hash();
 
-		let origin_propose = T::ExternalDefaultOrigin::successful_origin(&dao_origin);
+		let origin_propose = T::ExternalDefaultOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)?;
 		Democracy::<T>::external_propose_default(origin_propose, 0, proposal)?;
 
 		let mut vetoers: BoundedVec<T::AccountId, _> = Default::default();
@@ -300,7 +300,7 @@ benchmarks! {
 		vetoers.sort();
 		Blacklist::<T>::insert(0, proposal_hash, (T::BlockNumber::zero(), vetoers));
 
-		let origin = T::VetoOrigin::successful_origin();
+		let origin = T::VetoOrigin::try_successful_origin().map_err(|_| BenchmarkError::Weightless)?;
 		ensure!(NextExternal::<T>::get(0).is_some(), "no external proposal");
 	}: _<T::RuntimeOrigin>(origin, 0, proposal_hash)
 	verify {
@@ -317,7 +317,7 @@ benchmarks! {
 		for i in 0 .. T::MaxProposals::get() {
 			add_proposal::<T>(i)?;
 		}
-		let cancel_origin = T::CancelProposalOrigin::successful_origin(&dao_origin);
+		let cancel_origin = T::CancelProposalOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)?;
 	}: _<T::RuntimeOrigin>(cancel_origin, 0, 0)
 
 	cancel_referendum {
@@ -340,7 +340,7 @@ benchmarks! {
 		let dao_account_id: T::AccountId = funded_account::<T>("dao_account", 0);
 		let dao_origin = DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) };
 
-		let origin = T::ExternalMajorityOrigin::successful_origin(&dao_origin);
+		let origin = T::ExternalMajorityOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)?;
 		let proposal = make_proposal::<T>(r);
 		let call = Call::<T>::external_propose_majority { dao_id: 0, proposal };
 		call.dispatch_bypass_filter(origin)?;

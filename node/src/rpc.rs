@@ -10,11 +10,12 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use jsonrpsee::RpcModule;
 use sc_client_api::{AuxStore, Backend, BlockchainEvents, StateBackend, StorageProvider};
+use sc_network_sync::SyncingService;
 use sc_rpc::SubscriptionTaskExecutor;
 pub use sc_rpc_api::DenyUnsafe;
 use sc_transaction_pool_api::TransactionPool;
 use societal_node_runtime::{opaque::Block, AccountId, Balance, Hash, Index};
-use sp_api::ProvideRuntimeApi;
+use sp_api::{CallApiAt, ProvideRuntimeApi};
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 
@@ -24,10 +25,11 @@ use fc_rpc::{
 	SchemaV2Override, SchemaV3Override, StorageOverride,
 };
 use fc_rpc_core::types::{FeeHistoryCache, FeeHistoryCacheLimit, FilterPool};
+use fp_rpc::EthereumRuntimeRPCApi;
 use fp_storage::EthereumStorageSchema;
 use sc_network::NetworkService;
 use sc_transaction_pool::{ChainApi, Pool};
-use sp_runtime::traits::{BlakeTwo256, HashFor};
+use sp_runtime::traits::{Block as BlockT, HashFor};
 
 /// Full client dependencies.
 pub struct FullDeps<C, P, A: ChainApi> {
@@ -45,6 +47,8 @@ pub struct FullDeps<C, P, A: ChainApi> {
 	pub enable_dev_signer: bool,
 	/// Network service
 	pub network: Arc<NetworkService<Block, Hash>>,
+	/// Chain syncing service
+	pub sync: Arc<SyncingService<Block>>,
 	/// EthFilterApi pool.
 	pub filter_pool: Option<FilterPool>,
 	/// Frontier Backend.
@@ -67,37 +71,32 @@ pub struct FullDeps<C, P, A: ChainApi> {
 		Option<futures::channel::mpsc::Sender<sc_consensus_manual_seal::rpc::EngineCommand<Hash>>>,
 }
 
-pub fn overrides_handle<C, BE>(client: Arc<C>) -> Arc<OverrideHandle<Block>>
+pub fn overrides_handle<B, C, BE>(client: Arc<C>) -> Arc<OverrideHandle<B>>
 where
-	C: ProvideRuntimeApi<Block> + StorageProvider<Block, BE> + AuxStore,
-	C: HeaderBackend<Block> + HeaderMetadata<Block, Error = BlockChainError>,
-	C: Send + Sync + 'static,
-	C::Api: sp_api::ApiExt<Block>
-		+ fp_rpc::EthereumRuntimeRPCApi<Block>
-		+ fp_rpc::ConvertTransactionRuntimeApi<Block>,
-	BE: Backend<Block> + 'static,
-	BE::State: StateBackend<BlakeTwo256>,
+	B: BlockT,
+	C: ProvideRuntimeApi<B>,
+	C::Api: EthereumRuntimeRPCApi<B>,
+	C: HeaderBackend<B> + StorageProvider<B, BE> + 'static,
+	C: HeaderBackend<B>,
+	BE: Backend<B> + 'static,
 {
 	let mut overrides_map = BTreeMap::new();
 	overrides_map.insert(
 		EthereumStorageSchema::V1,
-		Box::new(SchemaV1Override::new(client.clone()))
-			as Box<dyn StorageOverride<_> + Send + Sync>,
+		Box::new(SchemaV1Override::new(client.clone())) as Box<dyn StorageOverride<_>>,
 	);
 	overrides_map.insert(
 		EthereumStorageSchema::V2,
-		Box::new(SchemaV2Override::new(client.clone()))
-			as Box<dyn StorageOverride<_> + Send + Sync>,
+		Box::new(SchemaV2Override::new(client.clone())) as Box<dyn StorageOverride<_>>,
 	);
 	overrides_map.insert(
 		EthereumStorageSchema::V3,
-		Box::new(SchemaV3Override::new(client.clone()))
-			as Box<dyn StorageOverride<_> + Send + Sync>,
+		Box::new(SchemaV3Override::new(client.clone())) as Box<dyn StorageOverride<_>>,
 	);
 
 	Arc::new(OverrideHandle {
 		schemas: overrides_map,
-		fallback: Box::new(RuntimeApiStorageOverride::new(client)),
+		fallback: Box::new(RuntimeApiStorageOverride::<B, C>::new(client)),
 	})
 }
 
@@ -105,6 +104,11 @@ where
 pub fn create_full<C, P, B, A>(
 	deps: FullDeps<C, P, A>,
 	subscription_task_executor: SubscriptionTaskExecutor,
+	pubsub_notification_sinks: Arc<
+		fc_mapping_sync::EthereumBlockNotificationSinks<
+			fc_mapping_sync::EthereumBlockNotification<Block>,
+		>,
+	>,
 ) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
 where
 	C: ProvideRuntimeApi<Block>
@@ -117,6 +121,7 @@ where
 		+ 'static
 		+ BlockchainEvents<Block>
 		+ StorageProvider<Block, B>,
+	C: CallApiAt<Block>,
 	C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Index>,
 	C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
 	C::Api: BlockBuilder<Block>,
@@ -145,6 +150,7 @@ where
 		is_authority,
 		enable_dev_signer,
 		network,
+		sync,
 		filter_pool,
 		frontier_backend,
 		max_past_logs,
@@ -170,7 +176,7 @@ where
 			pool.clone(),
 			graph,
 			Some(societal_node_runtime::TransactionConverter),
-			network.clone(),
+			sync.clone(),
 			signers,
 			overrides.clone(),
 			frontier_backend.clone(),
@@ -180,6 +186,7 @@ where
 			fee_history_cache,
 			fee_history_cache_limit,
 			10,
+			None,
 		)
 		.into_rpc(),
 	)?;
@@ -202,9 +209,10 @@ where
 		EthPubSub::new(
 			pool,
 			client.clone(),
-			network.clone(),
+			sync,
 			subscription_task_executor,
 			overrides,
+			pubsub_notification_sinks,
 		)
 		.into_rpc(),
 	)?;

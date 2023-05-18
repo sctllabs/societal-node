@@ -5,7 +5,7 @@ extern crate core;
 use fp_evm::{Log, PrecompileHandle};
 use frame_support::dispatch::{Dispatchable, GetDispatchInfo, PostDispatchInfo};
 use pallet_evm::AddressMapping;
-use precompile_utils::{data::Address, prelude::*};
+use precompile_utils::prelude::*;
 use sp_core::{ConstU32, H160, H256};
 use sp_std::{marker::PhantomData, prelude::*};
 
@@ -26,7 +26,7 @@ pub fn log_dao_registered(address: impl Into<H160>, dao_id: DaoId, who: impl Int
 		address.into(),
 		SELECTOR_LOG_DAO_REGISTERED,
 		who.into(),
-		H256::from_slice(&EvmDataWriter::new().write(dao_id).build()),
+		H256::from_slice(&solidity::encode_arguments(dao_id)),
 		Vec::new(),
 	)
 }

@@ -5,7 +5,7 @@
 use super::*;
 
 use dao_primitives::{DaoOrigin, DaoPolicyProportion};
-use frame_benchmarking::{account, benchmarks_instance_pallet, whitelisted_caller};
+use frame_benchmarking::{account, benchmarks_instance_pallet, whitelisted_caller, BenchmarkError};
 use frame_support::traits::EnsureOriginWithArg;
 use frame_system::RawOrigin;
 use sp_runtime::traits::Bounded;
@@ -20,7 +20,8 @@ fn create_approved_bounties<T: Config<I>, I: 'static>(n: u32) -> Result<(), &'st
 	for i in 0..n {
 		let (dao_id, origin, _caller, _curator, _fee, value, reason) =
 			setup_bounty::<T, I>(i, T::MaximumReasonLength::get());
-		let approve_origin = T::ApproveOrigin::successful_origin(&origin);
+		let approve_origin = T::ApproveOrigin::try_successful_origin(&origin)
+			.map_err(|_| BenchmarkError::Weightless)?;
 		Bounties::<T, I>::create_bounty(approve_origin, dao_id, value, reason)?;
 	}
 	ensure!(BountyApprovals::<T, I>::get(0).len() == n as usize, "Not all bounty approved");
@@ -60,7 +61,8 @@ fn init_bounty<T: Config<I>, I: 'static>(
 ) -> Result<(u32, DaoOrigin<T::AccountId>, T::AccountId, BountyIndex), &'static str> {
 	let (dao_id, origin, _caller, curator, fee, value, reason) =
 		setup_bounty::<T, I>(0, T::MaximumReasonLength::get());
-	let approve_origin = T::ApproveOrigin::successful_origin(&origin);
+	let approve_origin =
+		T::ApproveOrigin::try_successful_origin(&origin).map_err(|_| BenchmarkError::Weightless)?;
 	Bounties::<T, I>::create_bounty(approve_origin.clone(), dao_id, value, reason)?;
 	let bounty_id = BountyCount::<T, I>::get(dao_id) - 1;
 	Treasury::<T, I>::on_initialize(T::BlockNumber::zero());
@@ -82,17 +84,17 @@ fn assert_last_event<T: Config<I>, I: 'static>(generic_event: <T as Config<I>>::
 benchmarks_instance_pallet! {
 	create_bounty {
 		let (dao_id, origin, caller, curator, fee, value, reason) = setup_bounty::<T, I>(0, T::MaximumReasonLength::get());
-		let approve_origin = T::ApproveOrigin::successful_origin(&origin);
+		let approve_origin = T::ApproveOrigin::try_successful_origin(&origin).map_err(|_| BenchmarkError::Weightless)?;
 	}: _<T::RuntimeOrigin>(approve_origin, dao_id, value, reason)
 
 	propose_curator {
 		setup_pot_account::<T, I>();
 		let (dao_id, origin, caller, curator, fee, value, reason) = setup_bounty::<T, I>(0, T::MaximumReasonLength::get());
-		let approve_origin = T::ApproveOrigin::successful_origin(&origin);
+		let approve_origin = T::ApproveOrigin::try_successful_origin(&origin).map_err(|_| BenchmarkError::Weightless)?;
 		Bounties::<T, I>::create_bounty(approve_origin, dao_id, value, reason)?;
 		let bounty_id = BountyCount::<T, I>::get(dao_id) - 1;
 		Treasury::<T, I>::on_initialize(T::BlockNumber::zero());
-		let approve_origin = T::ApproveOrigin::successful_origin(&origin);
+		let approve_origin = T::ApproveOrigin::try_successful_origin(&origin).map_err(|_| BenchmarkError::Weightless)?;
 	}: _<T::RuntimeOrigin>(approve_origin, dao_id, bounty_id, curator, fee)
 
 	// Worst case when curator is inactive and any sender unassigns the curator.
@@ -109,7 +111,7 @@ benchmarks_instance_pallet! {
 	accept_curator {
 		setup_pot_account::<T, I>();
 		let (dao_id, origin, caller, curator, fee, value, reason) = setup_bounty::<T, I>(0, T::MaximumReasonLength::get());
-		let approve_origin = T::ApproveOrigin::successful_origin(&origin);
+		let approve_origin = T::ApproveOrigin::try_successful_origin(&origin).map_err(|_| BenchmarkError::Weightless)?;
 		Bounties::<T, I>::create_bounty(approve_origin.clone(), dao_id, value, reason)?;
 		let bounty_id = BountyCount::<T, I>::get(dao_id) - 1;
 		Treasury::<T, I>::on_initialize(T::BlockNumber::zero());
@@ -151,7 +153,7 @@ benchmarks_instance_pallet! {
 		let (dao_id, origin, curator, bounty_id) = init_bounty::<T, I>()?;
 		Treasury::<T, I>::on_initialize(T::BlockNumber::zero());
 		let bounty_id = BountyCount::<T, I>::get(dao_id) - 1;
-		let approve_origin = T::ApproveOrigin::successful_origin(&origin);
+		let approve_origin = T::ApproveOrigin::try_successful_origin(&origin).map_err(|_| BenchmarkError::Weightless)?;
 	}: close_bounty<T::RuntimeOrigin>(approve_origin, dao_id, bounty_id)
 	verify {
 		assert_last_event::<T, I>(Event::BountyCanceled { dao_id, index: bounty_id }.into())

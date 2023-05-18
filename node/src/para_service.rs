@@ -19,7 +19,7 @@ use cumulus_primitives_parachain_inherent::{
 };
 
 use cumulus_relay_chain_inprocess_interface::build_inprocess_relay_chain;
-use cumulus_relay_chain_interface::{RelayChainError, RelayChainInterface, RelayChainResult};
+use cumulus_relay_chain_interface::{RelayChainInterface, RelayChainResult};
 use cumulus_relay_chain_minimal_node::build_minimal_relay_chain_node;
 
 use futures::{prelude::*, StreamExt};
@@ -39,8 +39,8 @@ use sc_client_api::BlockchainEvents;
 use sc_consensus_babe::{self, SlotProportion};
 use sc_consensus_manual_seal::consensus::aura::AuraConsensusDataProvider;
 use sc_executor::NativeElseWasmExecutor;
-use sc_network::NetworkService;
-use sc_network_common::service::NetworkBlock;
+use sc_network::NetworkBlock;
+use sc_network_sync::SyncingService;
 use sc_service::{
 	config::Configuration, error::Error as ServiceError, BasePath, ImportQueue, PartialComponents,
 	TFullBackend, TaskManager,
@@ -300,10 +300,7 @@ async fn start_node_impl(
 		hwbench.clone(),
 	)
 	.await
-	.map_err(|e| match e {
-		RelayChainError::ServiceError(polkadot_service::Error::Sub(x)) => x,
-		s => s.to_string().into(),
-	})?;
+	.map_err(|e| sc_service::Error::Application(Box::new(e) as Box<_>))?;
 
 	let block_announce_validator = BlockAnnounceValidator::new(relay_chain_interface.clone(), id);
 
@@ -313,7 +310,7 @@ async fn start_node_impl(
 	let transaction_pool = params.transaction_pool.clone();
 	let import_queue_service = params.import_queue.service();
 
-	let (network, system_rpc_tx, tx_handler_controller, start_network) =
+	let (network, system_rpc_tx, tx_handler_controller, start_network, sync_service) =
 		sc_service::build_network(sc_service::BuildNetworkParams {
 			config: &parachain_config,
 			client: client.clone(),
@@ -323,7 +320,8 @@ async fn start_node_impl(
 			block_announce_validator_builder: Some(Box::new(|_| {
 				Box::new(block_announce_validator)
 			})),
-			warp_sync: None,
+			// TODO
+			warp_sync_params: None,
 		})?;
 
 	let overrides = crate::rpc::overrides_handle(client.clone());
@@ -334,6 +332,8 @@ async fn start_node_impl(
 		50,
 		prometheus_registry.clone(),
 	));
+
+	let pubsub_notification_sinks = build_pubsub_notification_sinks();
 
 	let rpc_builder = {
 		let client = client.clone();
@@ -346,6 +346,8 @@ async fn start_node_impl(
 		let fee_history_cache = fee_history_cache.clone();
 		let fee_history_cache_limit = cli.run.fee_history_limit;
 		let block_data_cache = block_data_cache.clone();
+		let sync = sync_service.clone();
+		let pubsub_notification_sinks = pubsub_notification_sinks.clone();
 
 		Box::new(move |deny_unsafe, subscription_task_executor| {
 			let deps = crate::rpc::FullDeps {
@@ -365,9 +367,15 @@ async fn start_node_impl(
 				block_data_cache: block_data_cache.clone(),
 				overrides: overrides.clone(),
 				enable_dev_signer: false,
+				sync: sync.clone(),
 			};
 
-			crate::rpc::create_full(deps, subscription_task_executor).map_err(Into::into)
+			crate::rpc::create_full(
+				deps,
+				subscription_task_executor,
+				pubsub_notification_sinks.clone(),
+			)
+			.map_err(Into::into)
 		})
 	};
 
@@ -382,6 +390,7 @@ async fn start_node_impl(
 		network: network.clone(),
 		system_rpc_tx,
 		tx_handler_controller,
+		sync_service: sync_service.clone(),
 		telemetry: telemetry.as_mut(),
 	})?;
 
@@ -399,14 +408,18 @@ async fn start_node_impl(
 	}
 
 	let announce_block = {
-		let network = network.clone();
-		Arc::new(move |hash, data| network.announce_block(hash, data))
+		let sync_service = sync_service.clone();
+		Arc::new(move |hash, data| sync_service.announce_block(hash, data))
 	};
 
 	#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 	let relay_chain_slot_duration = Duration::from_secs(12);
 	#[cfg(not(any(feature = "parachain", feature = "runtime-benchmarks")))]
 	let relay_chain_slot_duration = Duration::from_secs(6);
+
+	let overseer_handle = relay_chain_interface
+		.overseer_handle()
+		.map_err(|e| sc_service::Error::Application(Box::new(e)))?;
 
 	if validator {
 		let parachain_consensus = build_consensus(
@@ -416,7 +429,7 @@ async fn start_node_impl(
 			&task_manager,
 			relay_chain_interface.clone(),
 			transaction_pool,
-			network,
+			sync_service,
 			params.keystore_container.sync_keystore(),
 			force_authoring,
 			id,
@@ -435,6 +448,7 @@ async fn start_node_impl(
 			import_queue: import_queue_service,
 			collator_key: collator_key.expect("Command line arguments do not allow this. qed"),
 			relay_chain_slot_duration,
+			recovery_handle: Box::new(overseer_handle),
 		};
 
 		start_collator(params).await?;
@@ -447,6 +461,7 @@ async fn start_node_impl(
 			relay_chain_interface,
 			relay_chain_slot_duration,
 			import_queue: import_queue_service,
+			recovery_handle: Box::new(overseer_handle),
 		};
 
 		start_full_node(params)?;
@@ -464,7 +479,7 @@ fn build_consensus(
 	task_manager: &TaskManager,
 	relay_chain_interface: Arc<dyn RelayChainInterface>,
 	transaction_pool: Arc<sc_transaction_pool::FullPool<Block, FullClient>>,
-	sync_oracle: Arc<NetworkService<Block, H256>>,
+	sync_oracle: Arc<SyncingService<Block>>,
 	keystore: SyncCryptoStorePtr,
 	force_authoring: bool,
 	id: ParaId,
@@ -566,7 +581,7 @@ pub fn new_dev(
 			),
 	} = new_partial(&config, cli, true)?;
 
-	let (network, system_rpc_tx, tx_handler_controller, network_starter) =
+	let (network, system_rpc_tx, tx_handler_controller, network_starter, sync_service) =
 		sc_service::build_network(sc_service::BuildNetworkParams {
 			config: &config,
 			client: client.clone(),
@@ -574,7 +589,7 @@ pub fn new_dev(
 			spawn_handle: task_manager.spawn_handle(),
 			import_queue,
 			block_announce_validator_builder: None,
-			warp_sync: None,
+			warp_sync_params: None,
 		})?;
 
 	if config.offchain_worker.enabled {
@@ -691,6 +706,8 @@ pub fn new_dev(
 		);
 	}
 
+	let pubsub_notification_sinks = build_pubsub_notification_sinks();
+
 	// Frontier offchain DB task. Essential.
 	// Maps emulated ethereum data to substrate native data.
 	task_manager.spawn_essential_handle().spawn(
@@ -701,10 +718,13 @@ pub fn new_dev(
 			Duration::new(6, 0),
 			client.clone(),
 			backend.clone(),
+			overrides.clone(),
 			frontier_backend.clone(),
 			3,
 			0,
 			SyncStrategy::Parachain,
+			sync_service.clone(),
+			pubsub_notification_sinks.clone(),
 		)
 		.for_each(|()| futures::future::ready(())),
 	);
@@ -749,6 +769,8 @@ pub fn new_dev(
 		let network = network.clone();
 		let max_past_logs = cli.run.max_past_logs;
 		let fee_history_cache = fee_history_cache.clone();
+		let sync = sync_service.clone();
+		let pubsub_notification_sinks = pubsub_notification_sinks.clone();
 
 		move |deny_unsafe, subscription_task_executor| {
 			let deps = crate::rpc::FullDeps {
@@ -767,9 +789,15 @@ pub fn new_dev(
 				overrides: overrides.clone(),
 				block_data_cache: block_data_cache.clone(),
 				enable_dev_signer: false,
+				sync: sync.clone(),
 			};
 
-			crate::rpc::create_full(deps, subscription_task_executor).map_err(Into::into)
+			crate::rpc::create_full(
+				deps,
+				subscription_task_executor,
+				pubsub_notification_sinks.clone(),
+			)
+			.map_err(Into::into)
 		}
 	};
 
@@ -784,6 +812,7 @@ pub fn new_dev(
 		system_rpc_tx,
 		config,
 		tx_handler_controller,
+		sync_service: sync_service.clone(),
 		telemetry: None,
 	})?;
 
@@ -804,4 +833,20 @@ pub fn new_dev(
 
 	network_starter.start_network();
 	Ok(task_manager)
+}
+
+fn build_pubsub_notification_sinks() -> Arc<
+	fc_mapping_sync::EthereumBlockNotificationSinks<
+		fc_mapping_sync::EthereumBlockNotification<Block>,
+	>,
+> {
+	// Sinks for pubsub notifications.
+	// Everytime a new subscription is created, a new mpsc channel is added to the sink pool.
+	// The MappingSyncWorker sends through the channel on block import and the subscription emits a
+	// notification to the subscriber on receiving a message through this channel. This way we avoid
+	// race conditions when using native substrate block import notification stream.
+	let pubsub_notification_sinks: fc_mapping_sync::EthereumBlockNotificationSinks<
+		fc_mapping_sync::EthereumBlockNotification<Block>,
+	> = Default::default();
+	Arc::new(pubsub_notification_sinks)
 }
