@@ -2,7 +2,7 @@
 
 ## Launch Rococo Local Testnet
 
-- Please refer to the [Run Local Rococo Testnet with Societal Node Parachains](../README.md#run-local-rococo-testnet-with-societal-node-parachains) section of the README
+- Please refer to the [Run Local Rococo Testnet with Societal Node Parachains](../README.md#run-rococo-local-testnet-with-societal-node-parachains) section of the README
 
 ## Register Societal Parachain - Para ID 2000
 
@@ -21,7 +21,7 @@
 -  Connect to Societal Parachain(2000): `https://cloudflare-ipfs.com/ipns/dotapps.io/?rpc=ws%3A%2F%2Flocalhost%3A9954#/explorer`
 
 - Go to `Network --> Explorer` and check that blocks are produced and finalized
-  
+
 ## Register 2nd Parachain - Para ID 2001
 
 - Basically the same steps as in previous steps but different genesis/wasm files taking part
@@ -49,8 +49,8 @@
 - Use the following sovereign accounts for Parachains connected:
 
 ```
-ParaId 2000 - 5Ec4AhPUwPeyTFyuhGuBbD224mY85LKLMSqSSo33JYWCazU4 
-ParaId 2001 - 5Ec4AhPV91i9yNuiWuNunPf6AQCYDhFTTA4G5QCbtqYApH9E 
+ParaId 2000 - 5Ec4AhPUwPeyTFyuhGuBbD224mY85LKLMSqSSo33JYWCazU4
+ParaId 2001 - 5Ec4AhPV91i9yNuiWuNunPf6AQCYDhFTTA4G5QCbtqYApH9E
 ```
 
 - Please make sure you open bi-directional HRMP channel completing the guide from the previous step for both 2000 and 2001 parachains.
