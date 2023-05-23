@@ -2,12 +2,12 @@
 name = "eth-primitives"
 version = "4.0.0-dev"
 description = "Societal DAO HTTP Primitives"
-authors = ["Societal Labs <https://github.com/sctllabs"]
-homepage = "https://www.sctl.xyz"
+authors = { workspace = true }
+homepage = { workspace = true }
 edition = "2021"
 license = "Apache-2.0"
 publish = false
-repository = "https://github.com/sctllabs/societal-node"
+repository = { workspace = true }
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
@@ -18,22 +18,22 @@ targets = ["x86_64-unknown-linux-gnu"]
 codec = { package = "parity-scale-codec", version = "3.0.0", default-features = false, features = [
 	"derive",
 ] }
-hex = { version = "0.4.3", default-features = false }
-log = { version = "0.4.17" }
-serde = { version = "1.0.136", features = ["derive"], default-features = false }
-serde_json = { version = "1.0.79", features = ["alloc"], default-features = false }
+hex = { workspace = true }
+log = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["alloc"] }
 
 # Primitives
-sp-io = { version = "7.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.41" }
-sp-runtime = { version = "7.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.41" }
-sp-std = { version = "5.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.41" }
+sp-io = { workspace = true }
+sp-runtime = { workspace = true }
+sp-std = { workspace = true }
 
 # Frame dependencies
-frame-support = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.41" }
-node-primitives = { version = "2.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.41" }
+frame-support = { workspace = true }
+node-primitives = { workspace = true }
 
 # Local dependencies
-dao-primitives = { version = "4.0.0-dev", default-features = false, path = "../dao" }
+dao-primitives = { default-features = false, path = "../dao" }
 
 [features]
 default = ["std"]

@@ -1,7 +1,7 @@
 [package]
 name = "pallet-dao-eth-governance"
 version = "4.0.0-dev"
-authors = ["Societal Labs <https://github.com/sctllabs>"]
+authors = { workspace = true }
 edition = "2021"
 license = "Apache-2.0"
 homepage = "https://www.sctl.xyz"
@@ -16,27 +16,27 @@ targets = ["x86_64-unknown-linux-gnu"]
 
 # Third-party dependencies
 codec = { package = "parity-scale-codec", version = "3.0.0", default-features = false, features = ["derive"] }
-hex = { version = "0.4.3", default-features = false }
-log = { version = "0.4.17", default-features = false }
-scale-info = { version = "2.1.1", default-features = false, features = ["derive"] }
-serde = { version = "1.0.136", features = ["derive"], default-features = false }
-serde_json = { version = "1.0.79", features = ["alloc"], default-features = false }
+hex = { workspace = true }
+log = { workspace = true }
+scale-info = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["alloc"] }
 
 # Primitives
-sp-core = { version = "7.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.41" }
-sp-io = { version = "7.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.41" }
-sp-runtime = { version = "7.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.41" }
-sp-std = { version = "5.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.41" }
+sp-core = { workspace = true }
+sp-io = { workspace = true }
+sp-runtime = { workspace = true }
+sp-std = { workspace = true }
 
 # Frame dependencies
-frame-benchmarking = { version = "4.0.0-dev", default-features = false, optional = true, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.41" }
-frame-support = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.41" }
-frame-system = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.41" }
+frame-benchmarking = { workspace = true, optional = true }
+frame-support = { workspace = true }
+frame-system = { workspace = true }
 
 # Local dependencies
-eth-primitives = { version = "4.0.0-dev", default-features = false, path = "../../primitives/eth" }
-dao-primitives = { version = "4.0.0-dev", default-features = false, path = "../../primitives/dao" }
-pallet-dao-democracy = { version = "4.0.0-dev", default-features = false, path = "../dao-democracy" }
+eth-primitives = { default-features = false, path = "../../primitives/eth" }
+dao-primitives = { default-features = false, path = "../../primitives/dao" }
+pallet-dao-democracy = { default-features = false, path = "../dao-democracy" }
 
 [features]
 default = ["std"]

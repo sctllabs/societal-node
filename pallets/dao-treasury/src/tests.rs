@@ -475,7 +475,8 @@ fn treasury_account_doesnt_get_deleted() {
 		<Treasury as OnInitialize<u64>>::on_initialize(4);
 		Treasury::spend_dao_funds(0);
 		assert_eq!(Treasury::pot(0), 0); // Pot is emptied
-		assert_eq!(Balances::free_balance(<Test as Config>::DaoProvider::dao_account_id(0)), 1); // but the account is still there
+		assert_eq!(Balances::free_balance(<Test as Config>::DaoProvider::dao_account_id(0)), 1);
+		// but the account is still there
 	});
 }
 
