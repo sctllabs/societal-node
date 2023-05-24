@@ -1,0 +1,47 @@
+[package]
+name = "pallet-dao-bounties-precompile"
+version = "1.0.0-dev"
+description = "Societal DAO Bounties Pallet Eth Precompile"
+authors = { workspace = true }
+homepage = { workspace = true }
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+repository = { workspace = true }
+
+[dependencies]
+
+# Third-party dependencies
+log = { workspace = true }
+
+# Substrate
+frame-support = { workspace = true }
+frame-system = { workspace = true }
+parity-scale-codec = { version = "3.0.0", default-features = false, features = [ "derive" ] }
+sp-core = { workspace = true }
+sp-runtime = { workspace = true }
+sp-std = { workspace = true }
+
+# Frontier
+fp-evm = { workspace = true }
+pallet-evm = { workspace = true, features = [ "forbid-evm-reentrancy" ] }
+
+# Local Dependencies
+pallet-dao-bounties = { default-features = false, path = "../../pallets/dao-bounties" }
+
+# From Moonbeam
+precompile-utils = { workspace = true }
+
+[features]
+default = [ "std" ]
+std = [
+	"fp-evm/std",
+	"frame-support/std",
+	"frame-system/std",
+	"pallet-evm/std",
+	"pallet-dao-bounties/std",
+	"parity-scale-codec/std",
+	"precompile-utils/std",
+	"sp-runtime/std",
+	"sp-std/std",
+]
