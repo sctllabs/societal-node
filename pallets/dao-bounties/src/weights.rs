@@ -45,34 +45,34 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	// Storage: Bounties Bounties (r:1 w:1)
 	// Storage: Bounties BountyApprovals (r:1 w:1)
 	fn create_bounty() -> Weight {
-		Weight::from_ref_time(10_997_000 as u64)
+		Weight::from_parts(10_997_000 as u64, 0)
 			.saturating_add(T::DbWeight::get().reads(2 as u64))
 			.saturating_add(T::DbWeight::get().writes(2 as u64))
 	}
 	// Storage: Bounties Bounties (r:1 w:1)
 	fn propose_curator() -> Weight {
-		Weight::from_ref_time(8_967_000 as u64)
+		Weight::from_parts(8_967_000 as u64, 0)
 			.saturating_add(T::DbWeight::get().reads(1 as u64))
 			.saturating_add(T::DbWeight::get().writes(1 as u64))
 	}
 	// Storage: Bounties Bounties (r:1 w:1)
 	// Storage: System Account (r:1 w:1)
 	fn unassign_curator() -> Weight {
-		Weight::from_ref_time(28_665_000 as u64)
+		Weight::from_parts(28_665_000 as u64, 0)
 			.saturating_add(T::DbWeight::get().reads(2 as u64))
 			.saturating_add(T::DbWeight::get().writes(2 as u64))
 	}
 	// Storage: Bounties Bounties (r:1 w:1)
 	// Storage: System Account (r:1 w:1)
 	fn accept_curator() -> Weight {
-		Weight::from_ref_time(25_141_000 as u64)
+		Weight::from_parts(25_141_000 as u64, 0)
 			.saturating_add(T::DbWeight::get().reads(2 as u64))
 			.saturating_add(T::DbWeight::get().writes(2 as u64))
 	}
 	// Storage: Bounties Bounties (r:1 w:1)
 	// Storage: ChildBounties ParentChildBounties (r:1 w:0)
 	fn award_bounty() -> Weight {
-		Weight::from_ref_time(21_295_000 as u64)
+		Weight::from_parts(21_295_000 as u64, 0)
 			.saturating_add(T::DbWeight::get().reads(2 as u64))
 			.saturating_add(T::DbWeight::get().writes(1 as u64))
 	}
@@ -81,7 +81,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	// Storage: ChildBounties ChildrenCuratorFees (r:1 w:1)
 	// Storage: Bounties BountyDescriptions (r:0 w:1)
 	fn claim_bounty() -> Weight {
-		Weight::from_ref_time(67_951_000 as u64)
+		Weight::from_parts(67_951_000 as u64, 0)
 			.saturating_add(T::DbWeight::get().reads(5 as u64))
 			.saturating_add(T::DbWeight::get().writes(6 as u64))
 	}
@@ -90,7 +90,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	// Storage: System Account (r:1 w:1)
 	// Storage: Bounties BountyDescriptions (r:0 w:1)
 	fn close_bounty_proposed() -> Weight {
-		Weight::from_ref_time(33_654_000 as u64)
+		Weight::from_parts(33_654_000 as u64, 0)
 			.saturating_add(T::DbWeight::get().reads(3 as u64))
 			.saturating_add(T::DbWeight::get().writes(3 as u64))
 	}
@@ -99,13 +99,13 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	// Storage: System Account (r:2 w:2)
 	// Storage: Bounties BountyDescriptions (r:0 w:1)
 	fn close_bounty_active() -> Weight {
-		Weight::from_ref_time(50_582_000 as u64)
+		Weight::from_parts(50_582_000 as u64, 0)
 			.saturating_add(T::DbWeight::get().reads(4 as u64))
 			.saturating_add(T::DbWeight::get().writes(4 as u64))
 	}
 	// Storage: Bounties Bounties (r:1 w:1)
 	fn extend_bounty_expiry() -> Weight {
-		Weight::from_ref_time(18_322_000 as u64)
+		Weight::from_parts(18_322_000 as u64, 0)
 			.saturating_add(T::DbWeight::get().reads(1 as u64))
 			.saturating_add(T::DbWeight::get().writes(1 as u64))
 	}
@@ -113,9 +113,9 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	// Storage: Bounties Bounties (r:1 w:1)
 	// Storage: System Account (r:2 w:2)
 	fn spend_funds(b: u32, ) -> Weight {
-		Weight::from_ref_time(0 as u64)
+		Weight::from_parts(0 as u64, 0)
 			// Standard Error: 17_000
-			.saturating_add(Weight::from_ref_time(29_233_000 as u64).saturating_mul(b as u64))
+			.saturating_add(Weight::from_parts(29_233_000 as u64, 0).saturating_mul(b as u64))
 			.saturating_add(T::DbWeight::get().reads(1 as u64))
 			.saturating_add(T::DbWeight::get().reads((3 as u64).saturating_mul(b as u64)))
 			.saturating_add(T::DbWeight::get().writes(1 as u64))
@@ -128,34 +128,34 @@ impl WeightInfo for () {
 	// Storage: Bounties Bounties (r:1 w:1)
 	// Storage: Bounties BountyApprovals (r:1 w:1)
 	fn create_bounty() -> Weight {
-		Weight::from_ref_time(10_997_000 as u64)
+		Weight::from_parts(10_997_000 as u64, 0)
 			.saturating_add(RocksDbWeight::get().reads(2 as u64))
 			.saturating_add(RocksDbWeight::get().writes(2 as u64))
 	}
 	// Storage: Bounties Bounties (r:1 w:1)
 	fn propose_curator() -> Weight {
-		Weight::from_ref_time(8_967_000 as u64)
+		Weight::from_parts(8_967_000 as u64, 0)
 			.saturating_add(RocksDbWeight::get().reads(1 as u64))
 			.saturating_add(RocksDbWeight::get().writes(1 as u64))
 	}
 	// Storage: Bounties Bounties (r:1 w:1)
 	// Storage: System Account (r:1 w:1)
 	fn unassign_curator() -> Weight {
-		Weight::from_ref_time(28_665_000 as u64)
+		Weight::from_parts(28_665_000 as u64, 0)
 			.saturating_add(RocksDbWeight::get().reads(2 as u64))
 			.saturating_add(RocksDbWeight::get().writes(2 as u64))
 	}
 	// Storage: Bounties Bounties (r:1 w:1)
 	// Storage: System Account (r:1 w:1)
 	fn accept_curator() -> Weight {
-		Weight::from_ref_time(25_141_000 as u64)
+		Weight::from_parts(25_141_000 as u64, 0)
 			.saturating_add(RocksDbWeight::get().reads(2 as u64))
 			.saturating_add(RocksDbWeight::get().writes(2 as u64))
 	}
 	// Storage: Bounties Bounties (r:1 w:1)
 	// Storage: ChildBounties ParentChildBounties (r:1 w:0)
 	fn award_bounty() -> Weight {
-		Weight::from_ref_time(21_295_000 as u64)
+		Weight::from_parts(21_295_000 as u64, 0)
 			.saturating_add(RocksDbWeight::get().reads(2 as u64))
 			.saturating_add(RocksDbWeight::get().writes(1 as u64))
 	}
@@ -164,7 +164,7 @@ impl WeightInfo for () {
 	// Storage: ChildBounties ChildrenCuratorFees (r:1 w:1)
 	// Storage: Bounties BountyDescriptions (r:0 w:1)
 	fn claim_bounty() -> Weight {
-		Weight::from_ref_time(67_951_000 as u64)
+		Weight::from_parts(67_951_000 as u64, 0)
 			.saturating_add(RocksDbWeight::get().reads(5 as u64))
 			.saturating_add(RocksDbWeight::get().writes(6 as u64))
 	}
@@ -173,7 +173,7 @@ impl WeightInfo for () {
 	// Storage: System Account (r:1 w:1)
 	// Storage: Bounties BountyDescriptions (r:0 w:1)
 	fn close_bounty_proposed() -> Weight {
-		Weight::from_ref_time(33_654_000 as u64)
+		Weight::from_parts(33_654_000 as u64, 0)
 			.saturating_add(RocksDbWeight::get().reads(3 as u64))
 			.saturating_add(RocksDbWeight::get().writes(3 as u64))
 	}
@@ -182,13 +182,13 @@ impl WeightInfo for () {
 	// Storage: System Account (r:2 w:2)
 	// Storage: Bounties BountyDescriptions (r:0 w:1)
 	fn close_bounty_active() -> Weight {
-		Weight::from_ref_time(50_582_000 as u64)
+		Weight::from_parts(50_582_000 as u64, 0)
 			.saturating_add(RocksDbWeight::get().reads(4 as u64))
 			.saturating_add(RocksDbWeight::get().writes(4 as u64))
 	}
 	// Storage: Bounties Bounties (r:1 w:1)
 	fn extend_bounty_expiry() -> Weight {
-		Weight::from_ref_time(18_322_000 as u64)
+		Weight::from_parts(18_322_000 as u64, 0)
 			.saturating_add(RocksDbWeight::get().reads(1 as u64))
 			.saturating_add(RocksDbWeight::get().writes(1 as u64))
 	}
@@ -196,9 +196,9 @@ impl WeightInfo for () {
 	// Storage: Bounties Bounties (r:1 w:1)
 	// Storage: System Account (r:2 w:2)
 	fn spend_funds(b: u32, ) -> Weight {
-		Weight::from_ref_time(0 as u64)
+		Weight::from_parts(0 as u64, 0)
 			// Standard Error: 17_000
-			.saturating_add(Weight::from_ref_time(29_233_000 as u64).saturating_mul(b as u64))
+			.saturating_add(Weight::from_parts(29_233_000 as u64, 0).saturating_mul(b as u64))
 			.saturating_add(RocksDbWeight::get().reads(1 as u64))
 			.saturating_add(RocksDbWeight::get().reads((3 as u64).saturating_mul(b as u64)))
 			.saturating_add(RocksDbWeight::get().writes(1 as u64))

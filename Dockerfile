@@ -6,6 +6,7 @@ FROM docker.io/paritytech/ci-linux:production as builder
 ARG CARGO_FEATURES
 
 WORKDIR /societal-node
+RUN rustup target add wasm32-unknown-unknown --toolchain nightly
 COPY . .
 RUN cargo build --locked --release --features=$CARGO_FEATURES
 

@@ -2,32 +2,35 @@
 name = "pallet-dao-membership-precompile"
 version = "1.0.0-dev"
 description = "Societal DAO Membership Pallet Eth Precompile"
-authors = ["Societal Labs <https://github.com/sctllabs"]
-homepage = "https://www.sctl.xyz"
+authors = { workspace = true }
+homepage = { workspace = true }
 edition = "2021"
 license = "Apache-2.0"
 publish = false
-repository = "https://github.com/sctllabs/societal-node"
+repository = { workspace = true }
 
 [dependencies]
-log = "0.4"
+
+# Third-party dependencies
+log = { workspace = true }
 
 # Substrate
-frame-support = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37", default-features = false }
-frame-system = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37", default-features = false }
+frame-support = { workspace = true }
+frame-system = { workspace = true }
 parity-scale-codec = { version = "3.0.0", default-features = false, features = [ "derive" ] }
-sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37", default-features = false }
-sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37", default-features = false }
-sp-std = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.37", default-features = false }
+sp-core = { workspace = true }
+sp-runtime = { workspace = true }
+sp-std = { workspace = true }
 
 # Frontier
-fp-evm = { git = "https://github.com/sctllabs/frontier", branch = "polkadot-v0.9.37", default-features = false }
-pallet-evm = { git = "https://github.com/sctllabs/frontier", branch = "polkadot-v0.9.37", default-features = false, features = [ "forbid-evm-reentrancy" ] }
+fp-evm = { workspace = true }
+pallet-evm = { workspace = true, features = [ "forbid-evm-reentrancy" ] }
 
 # Local Dependencies
-pallet-dao-membership = { version = "4.0.0-dev", default-features = false, path = "../../pallets/dao-membership" }
+pallet-dao-membership = { default-features = false, path = "../../pallets/dao-membership" }
+
 # From Moonbeam
-precompile-utils = { version = "0.1.0", default-features = false, git = "https://github.com/sctllabs/moonbeam.git", branch = "moonbeam-polkadot-v0.9.37" }
+precompile-utils = { workspace = true }
 
 [features]
 default = [ "std" ]

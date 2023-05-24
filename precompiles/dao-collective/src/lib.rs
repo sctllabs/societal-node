@@ -37,7 +37,7 @@ pub fn log_executed(address: impl Into<H160>, dao_id: DaoId, hash: H256) -> Log 
 	log3(
 		address.into(),
 		SELECTOR_LOG_EXECUTED,
-		H256::from_slice(&EvmDataWriter::new().write(dao_id).build()),
+		H256::from_slice(&solidity::encode_arguments(dao_id)),
 		hash,
 		Vec::new(),
 	)
@@ -54,9 +54,9 @@ pub fn log_proposed(
 		address.into(),
 		SELECTOR_LOG_PROPOSED,
 		who.into(),
-		H256::from_slice(&EvmDataWriter::new().write(dao_id).build()),
-		H256::from_slice(&EvmDataWriter::new().write(index).build()),
-		EvmDataWriter::new().write(hash).build(),
+		H256::from_slice(&solidity::encode_arguments(dao_id)),
+		H256::from_slice(&solidity::encode_arguments(index)),
+		solidity::encode_arguments(hash),
 	)
 }
 
@@ -71,9 +71,9 @@ pub fn log_voted(
 		address.into(),
 		SELECTOR_LOG_VOTED,
 		who.into(),
-		H256::from_slice(&EvmDataWriter::new().write(dao_id).build()),
+		H256::from_slice(&solidity::encode_arguments(dao_id)),
 		hash,
-		EvmDataWriter::new().write(voted).build(),
+		&*solidity::encode_arguments(voted),
 	)
 }
 
@@ -81,7 +81,7 @@ pub fn log_closed(address: impl Into<H160>, dao_id: DaoId, hash: H256) -> Log {
 	log3(
 		address.into(),
 		SELECTOR_LOG_CLOSED,
-		H256::from_slice(&EvmDataWriter::new().write(dao_id).build()),
+		H256::from_slice(&solidity::encode_arguments(dao_id)),
 		hash,
 		Vec::new(),
 	)
@@ -220,7 +220,7 @@ where
 				dao_id,
 				proposal_hash: proposal_hash.into(),
 				index: proposal_index,
-				proposal_weight_bound: Weight::from_ref_time(proposal_weight_bound),
+				proposal_weight_bound: Weight::from_parts(proposal_weight_bound, 0),
 				length_bound,
 			},
 		)?;

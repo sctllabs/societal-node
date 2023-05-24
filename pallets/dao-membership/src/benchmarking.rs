@@ -22,19 +22,28 @@
 
 use super::{Pallet as Membership, *};
 use dao_primitives::{DaoOrigin, DaoPolicyProportion};
-use frame_benchmarking::{account, benchmarks_instance_pallet, whitelist};
+use frame_benchmarking::{account, benchmarks_instance_pallet, whitelist, BenchmarkError};
 use frame_support::assert_ok;
 use frame_system::RawOrigin;
 
 const SEED: u32 = 0;
 
 fn set_members<T: Config<I>, I: 'static>(members: Vec<T::AccountId>) {
-	let approve_origin = T::ApproveOrigin::successful_origin(&DaoOrigin {
+	match T::ApproveOrigin::try_successful_origin(&DaoOrigin {
 		dao_account_id: account("member", 0, SEED),
 		proportion: DaoPolicyProportion::AtLeast((1, 1)),
-	});
-
-	assert_ok!(<Membership<T, I>>::reset_members(approve_origin.clone(), 0, members.clone()));
+	})
+	.map_err(|_| BenchmarkError::Weightless)
+	{
+		Ok(approve_origin) => {
+			assert_ok!(<Membership<T, I>>::reset_members(
+				approve_origin.clone(),
+				0,
+				members.clone()
+			));
+		},
+		Err(_) => {},
+	};
 }
 
 benchmarks_instance_pallet! {
@@ -45,10 +54,10 @@ benchmarks_instance_pallet! {
 		set_members::<T, I>(members);
 		let new_member = account::<T::AccountId>("add", m, SEED);
 	}: {
-		assert_ok!(<Membership<T, I>>::add_member(T::ApproveOrigin::successful_origin(&DaoOrigin {
+		assert_ok!(<Membership<T, I>>::add_member(T::ApproveOrigin::try_successful_origin(&DaoOrigin {
 		dao_account_id: account("member", 0, SEED),
 		proportion: DaoPolicyProportion::AtLeast((1, 1)),
-	}), 0, new_member.clone()));
+	}).map_err(|_| BenchmarkError::Weightless)?, 0, new_member.clone()));
 	}
 	verify {
 		assert!(<Members<T, I>>::get(0).contains(&new_member));
@@ -63,10 +72,10 @@ benchmarks_instance_pallet! {
 
 		let to_remove = members.first().cloned().unwrap();
 	}: {
-		assert_ok!(<Membership<T, I>>::remove_member(T::ApproveOrigin::successful_origin(&DaoOrigin {
+		assert_ok!(<Membership<T, I>>::remove_member(T::ApproveOrigin::try_successful_origin(&DaoOrigin {
 		dao_account_id: account("member", 0, SEED),
 		proportion: DaoPolicyProportion::AtLeast((1, 1)),
-	}), 0, to_remove.clone()));
+	}).map_err(|_| BenchmarkError::Weightless)?, 0, to_remove.clone()));
 	} verify {
 		assert!(!<Members<T, I>>::get(0).contains(&to_remove));
 		#[cfg(test)] crate::mock::clean();
@@ -81,10 +90,10 @@ benchmarks_instance_pallet! {
 		let remove = members.first().cloned().unwrap();
 	}: {
 		assert_ok!(<Membership<T, I>>::swap_member(
-			T::ApproveOrigin::successful_origin(&DaoOrigin {
+			T::ApproveOrigin::try_successful_origin(&DaoOrigin {
 		dao_account_id: account("member", 0, SEED),
 		proportion: DaoPolicyProportion::AtLeast((1, 1)),
-	}),
+	}).map_err(|_| BenchmarkError::Weightless)?,
 			0,
 			remove.clone(),
 			add.clone(),
@@ -102,10 +111,10 @@ benchmarks_instance_pallet! {
 		set_members::<T, I>(members.clone());
 		let mut new_members = (m..2*m).map(|i| account("member", i, SEED)).collect::<Vec<T::AccountId>>();
 	}: {
-		assert_ok!(<Membership<T, I>>::reset_members(T::ApproveOrigin::successful_origin(&DaoOrigin {
+		assert_ok!(<Membership<T, I>>::reset_members(T::ApproveOrigin::try_successful_origin(&DaoOrigin {
 		dao_account_id: account("member", 0, SEED),
 		proportion: DaoPolicyProportion::AtLeast((1, 1)),
-	}), 0, new_members.clone()));
+	}).map_err(|_| BenchmarkError::Weightless)?, 0, new_members.clone()));
 	} verify {
 		new_members.sort();
 		assert_eq!(<Members<T, I>>::get(0), new_members);

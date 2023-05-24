@@ -28,6 +28,8 @@ use fc_db::Backend as FrontierBackend;
 use fc_mapping_sync::{MappingSyncWorker, SyncStrategy};
 use fc_rpc::{EthTask, OverrideHandle};
 use fc_rpc_core::types::{FeeHistoryCache, FeeHistoryCacheLimit, FilterPool};
+use sc_network_common::sync::warp::WarpSyncParams;
+use sc_network_sync::SyncingService;
 use sc_rpc::SubscriptionTaskExecutor;
 
 // Our native executor instance.
@@ -88,7 +90,7 @@ pub fn new_partial(
 			(
 				FrontierBlockImport<
 					Block,
-					sc_finality_grandpa::GrandpaBlockImport<
+					sc_consensus_grandpa::GrandpaBlockImport<
 						FullBackend,
 						Block,
 						FullClient,
@@ -96,9 +98,9 @@ pub fn new_partial(
 					>,
 					FullClient,
 				>,
-				sc_finality_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
+				sc_consensus_grandpa::LinkHalf<Block, FullClient, FullSelectChain>,
 			),
-			sc_finality_grandpa::SharedVoterState,
+			sc_consensus_grandpa::SharedVoterState,
 			Option<Telemetry>,
 			Arc<FrontierBackend<Block>>,
 			Option<FilterPool>,
@@ -161,7 +163,7 @@ pub fn new_partial(
 	let fee_history_cache: FeeHistoryCache = Arc::new(Mutex::new(BTreeMap::new()));
 	let fee_history_cache_limit: FeeHistoryCacheLimit = cli.run.fee_history_limit;
 
-	let (grandpa_block_import, grandpa_link) = sc_finality_grandpa::block_import(
+	let (grandpa_block_import, grandpa_link) = sc_consensus_grandpa::block_import(
 		client.clone(),
 		&(client.clone() as Arc<_>),
 		select_chain.clone(),
@@ -209,7 +211,7 @@ pub fn new_partial(
 		transaction_pool,
 		other: (
 			import_setup,
-			sc_finality_grandpa::SharedVoterState::empty(),
+			sc_consensus_grandpa::SharedVoterState::empty(),
 			telemetry,
 			frontier_backend,
 			filter_pool,
@@ -239,7 +241,7 @@ pub fn new_full_base(
 	with_startup_data: impl FnOnce(
 		&FrontierBlockImport<
 			Block,
-			sc_finality_grandpa::GrandpaBlockImport<
+			sc_consensus_grandpa::GrandpaBlockImport<
 				FullBackend,
 				Block,
 				FullClient,
@@ -279,7 +281,7 @@ pub fn new_full_base(
 	} = new_partial(&config, cli, false)?;
 
 	let shared_voter_state = rpc_setup;
-	let grandpa_protocol_name = sc_finality_grandpa::protocol_standard_name(
+	let grandpa_protocol_name = sc_consensus_grandpa::protocol_standard_name(
 		&client.block_hash(0).ok().flatten().expect("Genesis block exists; qed"),
 		&config.chain_spec,
 	);
@@ -287,14 +289,23 @@ pub fn new_full_base(
 	config
 		.network
 		.extra_sets
-		.push(sc_finality_grandpa::grandpa_peers_set_config(grandpa_protocol_name.clone()));
-	let warp_sync = Arc::new(sc_finality_grandpa::warp_proof::NetworkProvider::new(
-		backend.clone(),
-		import_setup.1.shared_authority_set().clone(),
-		Vec::default(),
-	));
+		.push(sc_consensus_grandpa::grandpa_peers_set_config(grandpa_protocol_name.clone()));
 
-	let (network, system_rpc_tx, tx_handler_controller, network_starter) =
+	let (_, grandpa_link) = &import_setup;
+
+	config
+		.network
+		.extra_sets
+		.push(sc_consensus_grandpa::grandpa_peers_set_config(grandpa_protocol_name.clone()));
+	let warp_sync: Arc<dyn sc_network::config::WarpSyncProvider<Block>> =
+		Arc::new(sc_consensus_grandpa::warp_proof::NetworkProvider::new(
+			backend.clone(),
+			grandpa_link.shared_authority_set().clone(),
+			Vec::default(),
+		));
+	let warp_sync_params = Some(WarpSyncParams::WithProvider(warp_sync));
+
+	let (network, system_rpc_tx, tx_handler_controller, network_starter, sync_service) =
 		sc_service::build_network(sc_service::BuildNetworkParams {
 			config: &config,
 			client: client.clone(),
@@ -302,10 +313,8 @@ pub fn new_full_base(
 			spawn_handle: task_manager.spawn_handle(),
 			import_queue,
 			block_announce_validator_builder: None,
-			warp_sync: Some(warp_sync),
+			warp_sync_params,
 		})?;
-
-	let (_, _) = &import_setup;
 
 	let client = client;
 	let select_chain = select_chain;
@@ -349,6 +358,20 @@ pub fn new_full_base(
 	let enable_grandpa = !config.disable_grandpa;
 	let prometheus_registry = config.prometheus_registry().cloned();
 
+	// TODO
+	// Channel for the rpc handler to communicate with the authorship task.
+	// let (command_sink, commands_stream) = mpsc::channel(1000);
+
+	// Sinks for pubsub notifications.
+	// Everytime a new subscription is created, a new mpsc channel is added to the sink pool.
+	// The MappingSyncWorker sends through the channel on block import and the subscription emits a
+	// notification to the subscriber on receiving a message through this channel. This way we avoid
+	// race conditions when using native substrate block import notification stream.
+	let pubsub_notification_sinks: fc_mapping_sync::EthereumBlockNotificationSinks<
+		fc_mapping_sync::EthereumBlockNotification<Block>,
+	> = Default::default();
+	let pubsub_notification_sinks = Arc::new(pubsub_notification_sinks);
+
 	let rpc_builder = {
 		let client = client.clone();
 		let pool = transaction_pool.clone();
@@ -360,6 +383,8 @@ pub fn new_full_base(
 		let overrides = overrides.clone();
 		let fee_history_cache = fee_history_cache.clone();
 		let max_past_logs = cli.run.max_past_logs;
+		let sync = sync_service.clone();
+		let pubsub_notification_sinks = pubsub_notification_sinks.clone();
 
 		move |deny_unsafe, subscription_executor: SubscriptionTaskExecutor| {
 			let deps = crate::rpc::FullDeps {
@@ -370,6 +395,7 @@ pub fn new_full_base(
 				is_authority,
 				enable_dev_signer,
 				network: network.clone(),
+				sync: sync.clone(),
 				filter_pool: filter_pool.clone(),
 				frontier_backend: frontier_backend.clone(),
 				max_past_logs,
@@ -380,7 +406,8 @@ pub fn new_full_base(
 				block_data_cache: block_data_cache.clone(),
 			};
 
-			crate::rpc::create_full(deps, subscription_executor).map_err(Into::into)
+			crate::rpc::create_full(deps, subscription_executor, pubsub_notification_sinks.clone())
+				.map_err(Into::into)
 		}
 	};
 
@@ -395,6 +422,7 @@ pub fn new_full_base(
 		task_manager: &mut task_manager,
 		system_rpc_tx,
 		tx_handler_controller,
+		sync_service: sync_service.clone(),
 		telemetry: telemetry.as_mut(),
 	})?;
 
@@ -407,6 +435,8 @@ pub fn new_full_base(
 		overrides,
 		fee_history_cache,
 		fee_history_cache_limit,
+		sync_service.clone(),
+		pubsub_notification_sinks,
 	);
 
 	if let Some(hwbench) = hwbench {
@@ -460,8 +490,8 @@ pub fn new_full_base(
 				force_authoring,
 				backoff_authoring_blocks,
 				keystore: keystore_container.sync_keystore(),
-				sync_oracle: network.clone(),
-				justification_sync_link: network.clone(),
+				sync_oracle: sync_service.clone(),
+				justification_sync_link: sync_service.clone(),
 				block_proposal_slot_portion: SlotProportion::new(2f32 / 3f32),
 				max_block_proposal_slot_portion: None,
 				telemetry: telemetry.as_ref().map(|x| x.handle()),
@@ -479,7 +509,7 @@ pub fn new_full_base(
 	let keystore =
 		if role.is_authority() { Some(keystore_container.sync_keystore()) } else { None };
 
-	let config = sc_finality_grandpa::Config {
+	let config = sc_consensus_grandpa::Config {
 		// FIXME #1578 make this available through chainspec
 		gossip_duration: std::time::Duration::from_millis(333),
 		justification_period: 512,
@@ -498,14 +528,15 @@ pub fn new_full_base(
 		// and vote data availability than the observer. The observer has not
 		// been tested extensively yet and having most nodes in a network run it
 		// could lead to finality stalls.
-		let grandpa_config = sc_finality_grandpa::GrandpaParams {
+		let grandpa_config = sc_consensus_grandpa::GrandpaParams {
 			config,
 			link: grandpa_link,
 			network: network.clone(),
 			telemetry: telemetry.as_ref().map(|x| x.handle()),
-			voting_rule: sc_finality_grandpa::VotingRulesBuilder::default().build(),
+			voting_rule: sc_consensus_grandpa::VotingRulesBuilder::default().build(),
 			prometheus_registry,
 			shared_voter_state,
+			sync: sync_service,
 		};
 
 		// the GRANDPA voter task is considered infallible, i.e.
@@ -513,7 +544,7 @@ pub fn new_full_base(
 		task_manager.spawn_essential_handle().spawn_blocking(
 			"grandpa-voter",
 			None,
-			sc_finality_grandpa::run_grandpa_voter(grandpa_config)?,
+			sc_consensus_grandpa::run_grandpa_voter(grandpa_config)?,
 		);
 	}
 
@@ -540,6 +571,12 @@ fn spawn_frontier_tasks(
 	overrides: Arc<OverrideHandle<Block>>,
 	fee_history_cache: FeeHistoryCache,
 	fee_history_cache_limit: FeeHistoryCacheLimit,
+	sync: Arc<SyncingService<Block>>,
+	pubsub_notification_sinks: Arc<
+		fc_mapping_sync::EthereumBlockNotificationSinks<
+			fc_mapping_sync::EthereumBlockNotification<Block>,
+		>,
+	>,
 ) {
 	task_manager.spawn_essential_handle().spawn(
 		"frontier-mapping-sync-worker",
@@ -549,10 +586,13 @@ fn spawn_frontier_tasks(
 			Duration::new(6, 0),
 			client.clone(),
 			backend,
+			overrides.clone(),
 			frontier_backend,
 			3,
 			0,
 			SyncStrategy::Normal,
+			sync,
+			pubsub_notification_sinks,
 		)
 		.for_each(|()| future::ready(())),
 	);

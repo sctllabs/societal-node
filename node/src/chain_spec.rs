@@ -16,10 +16,10 @@ use societal_node_runtime::{
 #[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 use societal_node_runtime::{ParachainInfoConfig, PolkadotXcmConfig};
 
+use sc_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::UncheckedInto, sr25519, Pair, Public, H160, U256};
-use sp_finality_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::{
 	traits::{IdentifyAccount, Verify},
 	Perbill,
@@ -296,7 +296,7 @@ pub fn testnet_genesis(
 		aura_ext: Default::default(),
 		nomination_pools: NominationPoolsConfig {
 			min_create_bond: 10 * DOLLARS,
-			min_join_bond: 1 * DOLLARS,
+			min_join_bond: DOLLARS,
 			..Default::default()
 		},
 		authority_discovery: AuthorityDiscoveryConfig { keys: vec![] },

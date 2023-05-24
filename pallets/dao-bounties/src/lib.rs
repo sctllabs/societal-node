@@ -171,7 +171,6 @@ pub mod pallet {
 	use frame_support::traits::{OnUnbalanced, TryDrop};
 
 	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T, I = ()>(_);
 
 	#[pallet::config]

@@ -41,7 +41,7 @@ pub fn log_executed(address: impl Into<H160>, dao_id: DaoId, hash: H256) -> Log 
 	log3(
 		address.into(),
 		SELECTOR_LOG_EXECUTED,
-		H256::from_slice(&EvmDataWriter::new().write(dao_id).build()),
+		H256::from_slice(&solidity::encode_arguments(dao_id)),
 		hash,
 		Vec::new(),
 	)
@@ -59,10 +59,10 @@ pub fn log_proposed(
 		address.into(),
 		SELECTOR_LOG_PROPOSED,
 		who.into(),
-		H256::from_slice(&EvmDataWriter::new().write(dao_id).build()),
-		H256::from_slice(&EvmDataWriter::new().write(index).build()),
+		H256::from_slice(&solidity::encode_arguments(dao_id)),
+		H256::from_slice(&solidity::encode_arguments(index)),
 		hash,
-		EvmDataWriter::new().write(threshold).build(),
+		&*solidity::encode_arguments(threshold),
 	)
 }
 
@@ -78,10 +78,10 @@ pub fn log_voted(
 		address.into(),
 		SELECTOR_LOG_VOTED,
 		who.into(),
-		H256::from_slice(&EvmDataWriter::new().write(dao_id).build()),
+		H256::from_slice(&solidity::encode_arguments(dao_id)),
 		hash,
-		H256::from_slice(&EvmDataWriter::new().write(aye).build()),
-		EvmDataWriter::new().write(balance).build(),
+		H256::from_slice(&solidity::encode_arguments(aye)),
+		&*solidity::encode_arguments(balance),
 	)
 }
 
@@ -89,7 +89,7 @@ pub fn log_closed(address: impl Into<H160>, dao_id: DaoId, hash: H256) -> Log {
 	log3(
 		address.into(),
 		SELECTOR_LOG_CLOSED,
-		H256::from_slice(&EvmDataWriter::new().write(dao_id).build()),
+		H256::from_slice(&solidity::encode_arguments(dao_id)),
 		hash,
 		Vec::new(),
 	)
@@ -109,7 +109,7 @@ where
 		From<<Runtime as frame_system::Config>::RuntimeCall>,
 	<<Runtime as frame_system::Config>::RuntimeCall as Dispatchable>::RuntimeOrigin:
 		From<Option<Runtime::AccountId>>,
-	BalanceOf<Runtime>: TryFrom<u128> + TryInto<u128> + Into<u128> + EvmData,
+	BalanceOf<Runtime>: TryFrom<u128> + TryInto<u128> + Into<u128> + solidity::Codec,
 	H256: From<<Runtime as frame_system::Config>::Hash>
 		+ Into<<Runtime as frame_system::Config>::Hash>,
 {
@@ -221,7 +221,7 @@ where
 				dao_id,
 				proposal_hash: proposal_hash.into(),
 				index: proposal_index,
-				proposal_weight_bound: Weight::from_ref_time(proposal_weight_bound),
+				proposal_weight_bound: Weight::from_parts(proposal_weight_bound, 0),
 				length_bound,
 			},
 		)?;

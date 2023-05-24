@@ -74,7 +74,6 @@ pub mod pallet {
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
 
 	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
 	#[pallet::storage_version(STORAGE_VERSION)]
 	pub struct Pallet<T>(_);
 
@@ -518,7 +517,7 @@ impl<T: Config> Pallet<T> {
 			});
 			let (_proposal_weight, _proposal_count) =
 				Self::do_approve_proposal(dao_id, index, proposal_hash, proposal);
-			return Ok((Some(Weight::from_ref_time(0)), Pays::Yes).into())
+			return Ok((Some(Weight::from_parts(10_000, 0)), Pays::Yes).into())
 		} else if disapproved {
 			Self::deposit_event(Event::Closed {
 				dao_id,
@@ -529,14 +528,14 @@ impl<T: Config> Pallet<T> {
 			});
 
 			let _proposal_count = Self::do_disapprove_proposal(dao_id, index, proposal_hash);
-			return Ok((Some(Weight::from_ref_time(0)), Pays::No).into())
+			return Ok((Some(Weight::from_parts(10_000, 0)), Pays::No).into())
 		}
 
 		// Only allow actual closing of the proposal after the voting period has ended.
 		ensure!(frame_system::Pallet::<T>::block_number() >= voting.end, Error::<T>::TooEarly);
 
 		// TODO
-		Ok((Some(Weight::from_ref_time(0)), Pays::No).into())
+		Ok((Some(Weight::from_parts(10_000, 0)), Pays::No).into())
 	}
 
 	/// Ensure that the right proposal bounds were passed and get the proposal from storage.

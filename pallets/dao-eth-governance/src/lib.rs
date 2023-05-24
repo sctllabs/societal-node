@@ -125,7 +125,6 @@ pub mod pallet {
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
 
 	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
 	#[pallet::storage_version(STORAGE_VERSION)]
 	pub struct Pallet<T>(_);
 
@@ -942,7 +941,7 @@ impl<T: Config> Pallet<T> {
 			let (_proposal_weight, _proposal_count) =
 				Self::do_approve_proposal(dao_id, index, proposal_hash, proposal);
 
-			Ok((Some(Weight::from_ref_time(0)), Pays::Yes).into())
+			Ok((Some(Weight::from_parts(10_000, 0)), Pays::Yes).into())
 		} else {
 			// Only allow actual closing of the proposal after the voting period has ended.
 			ensure!(frame_system::Pallet::<T>::block_number() >= voting.end, Error::<T>::TooEarly);
@@ -957,7 +956,7 @@ impl<T: Config> Pallet<T> {
 
 			let _proposal_count = Self::do_disapprove_proposal(dao_id, index, proposal_hash);
 
-			Ok((Some(Weight::from_ref_time(0)), Pays::No).into())
+			Ok((Some(Weight::from_parts(10_000, 0)), Pays::No).into())
 		}
 	}
 
@@ -1034,9 +1033,8 @@ impl<T: Config> Pallet<T> {
 	) -> u32 {
 		// disapproved
 		Self::deposit_event(Event::Disapproved { dao_id, proposal_index, proposal_hash });
-		let num_proposals = Self::remove_proposal(dao_id, proposal_hash);
 
-		num_proposals
+		Self::remove_proposal(dao_id, proposal_hash)
 	}
 
 	// Removes a proposal from the pallet, cleaning up votes and the vector of proposals.
