@@ -83,7 +83,7 @@ impl<B: BlockNumberProvider + EthRpcProvider> EthRpcService for EthService<B> {
 			Self::block_number(block_number)
 		]);
 
-		Self::fetch_from_eth(token_address, None, Some(params))
+		Self::fetch_from_eth(token_address, None, Some(params), false)
 	}
 
 	fn fetch_token_total_supply(
@@ -98,13 +98,14 @@ impl<B: BlockNumberProvider + EthRpcProvider> EthRpcService for EthService<B> {
 			},
 			Self::block_number(block_number)
 		]);
-		Self::fetch_from_eth(token_address, None, Some(params))
+		Self::fetch_from_eth(token_address, None, Some(params), false)
 	}
 
 	fn fetch_from_eth(
 		token_address: Vec<u8>,
 		method: Option<Value>,
 		params: Option<Value>,
+		cache: bool,
 	) -> Result<EthRPCResponse, DispatchError> {
 		let key_suffix = &token_address[..];
 		let key_vec = &[
@@ -146,7 +147,9 @@ impl<B: BlockNumberProvider + EthRpcProvider> EthRpcService for EthService<B> {
 
 			match Self::fetch_n_parse(vec![body]) {
 				Ok(eth_rpc_response) => {
-					s_info.set(&eth_rpc_response);
+					if cache {
+						s_info.set(&eth_rpc_response);
+					}
 
 					return Ok(eth_rpc_response)
 				},
@@ -239,6 +242,7 @@ impl EthRpcService for () {
 		_token_address: Vec<u8>,
 		_method: Option<Value>,
 		_params: Option<Value>,
+		_cache: bool,
 	) -> Result<EthRPCResponse, DispatchError> {
 		Ok(EthRPCResponse { result: vec![] })
 	}
@@ -276,6 +280,7 @@ pub trait EthRpcService {
 		token_address: Vec<u8>,
 		method: Option<Value>,
 		params: Option<Value>,
+		cache: bool,
 	) -> Result<EthRPCResponse, DispatchError>;
 	fn fetch_n_parse(body: Vec<&[u8]>) -> Result<EthRPCResponse, DispatchError>;
 	fn fetch_from_remote(body: Vec<&[u8]>) -> Result<Vec<u8>, DispatchError>;

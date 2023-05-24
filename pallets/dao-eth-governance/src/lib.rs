@@ -310,6 +310,7 @@ pub mod pallet {
 								token_address.clone(),
 								Some(json!("eth_blockNumber")),
 								None,
+								false,
 							),
 						) {
 							Ok(block_number) => block_number,
