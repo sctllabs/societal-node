@@ -11,9 +11,9 @@ node:
   allowUnsafeRpcMethods: Unsafe
   chainData:
     volumeSize: 20Gi
-    storageClass: gp2-custom
+    storageClass: gp2
   chainKeystore:
-    storageClass: gp2-custom
+    storageClass: gp2
   resources:
     limits:
       cpu: 3
