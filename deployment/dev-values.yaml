@@ -15,7 +15,7 @@ node:
 
   customChainspecPath: ""
 
-  allowUnsafeRpcMethods: Unsafe
+  # allowUnsafeRpcMethods: Unsafe
 
   # Enable Offchain Indexing.
   # https://docs.substrate.io/fundamentals/offchain-operations/
