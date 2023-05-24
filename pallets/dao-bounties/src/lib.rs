@@ -950,11 +950,11 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			status: BountyStatus::Approved,
 		};
 
-		Bounties::<T, I>::insert(dao_id, index, &bounty);
-		BountyDescriptions::<T, I>::insert(dao_id, index, bounded_description);
-
 		BountyApprovals::<T, I>::try_append(dao_id, index)
 			.map_err(|()| Error::<T, I>::TooManyQueued)?;
+
+		Bounties::<T, I>::insert(dao_id, index, &bounty);
+		BountyDescriptions::<T, I>::insert(dao_id, index, bounded_description);
 
 		Self::deposit_event(Event::<T, I>::BountyCreated {
 			dao_id,
