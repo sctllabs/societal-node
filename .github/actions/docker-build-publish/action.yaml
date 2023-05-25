@@ -12,6 +12,7 @@ runs:
         type=raw,value=latest
         type=raw,value=${{ env.DOCKER_ENV_TAG }}
         type=raw,value=${{ github.event.inputs.features == 'parachain' && 'parachain' || 'solo' }}-latest
+        type=raw,value=${{ github.event.inputs.features == 'parachain' && 'parachain' || 'solo' }}-${{ env.DOCKER_ENV_TAG }}
         type=ref,event=branch,suffix=-latest
         type=sha,prefix=,format=long
 
