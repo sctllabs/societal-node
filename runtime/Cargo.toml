@@ -145,6 +145,7 @@ eth-primitives = { default-features = false, path = "../primitives/eth" }
 pallet-dao = { default-features = false, path = "../pallets/dao" }
 pallet-dao-assets = { workspace = true }
 pallet-dao-bounties = { default-features = false, path = "../pallets/dao-bounties" }
+pallet-dao-bounties-precompile = { default-features = false, path = "../precompiles/dao-bounties" }
 pallet-dao-collective = { default-features = false, path = "../pallets/dao-collective" }
 pallet-dao-collective-precompile = { default-features = false, path = "../precompiles/dao-collective" }
 pallet-dao-democracy = { default-features = false, path = "../pallets/dao-democracy" }

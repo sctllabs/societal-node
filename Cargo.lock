@@ -6353,6 +6353,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-dao-bounties-precompile"
+version = "1.0.0-dev"
+dependencies = [
+ "fp-evm",
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-dao-bounties",
+ "pallet-evm",
+ "parity-scale-codec",
+ "precompile-utils",
+ "sp-core",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-dao-collective"
 version = "4.0.0-dev"
 dependencies = [
@@ -11792,6 +11809,7 @@ dependencies = [
  "pallet-dao",
  "pallet-dao-assets 4.0.0-dev (git+https://github.com/sctllabs/societal-node?branch=polkadot-v0.9.41-assets)",
  "pallet-dao-bounties",
+ "pallet-dao-bounties-precompile",
  "pallet-dao-collective",
  "pallet-dao-collective-precompile",
  "pallet-dao-democracy",

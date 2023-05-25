@@ -3,7 +3,7 @@ version: "3.2"
 services:
   dev:
     container_name: societal-node
-    image: societal/societal-node:latest
+    image: societal/societal-node:solo-latest
     working_dir: /societal-node
     ports:
       - "9944:9944"

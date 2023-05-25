@@ -2,6 +2,7 @@ use crate::{
 	DaoCouncilCollective, DaoCouncilMembership, DaoTechnicalCommitteeCollective, LocalAssetInstance,
 };
 use frame_support::parameter_types;
+use pallet_dao_bounties_precompile::DaoBountiesPrecompile;
 use pallet_dao_collective_precompile::DaoCollectivePrecompile;
 use pallet_dao_democracy_precompile::DaoDemocracyPrecompile;
 use pallet_dao_eth_governance_precompile::DaoEthGovernancePrecompile;
@@ -63,6 +64,7 @@ pub type FrontierPrecompiles<R> = PrecompileSetBuilder<
 				PrecompileAt<AddressU64<2052>, DaoMembershipPrecompile<R, DaoCouncilMembership>>,
 				PrecompileAt<AddressU64<2053>, DaoDemocracyPrecompile<R>>,
 				PrecompileAt<AddressU64<2054>, DaoEthGovernancePrecompile<R>>,
+				PrecompileAt<AddressU64<2055>, DaoBountiesPrecompile<R>>,
 			),
 		>,
 		// TODO: use foreign assets when xcm integrated

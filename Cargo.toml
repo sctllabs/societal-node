@@ -11,6 +11,7 @@ members = [
     "pallets/dao-membership",
     "pallets/dao-treasury",
 	"precompiles/dao",
+	"precompiles/dao-bounties",
 	"precompiles/dao-collective",
 	"precompiles/dao-democracy",
 	"precompiles/dao-eth-governance",
