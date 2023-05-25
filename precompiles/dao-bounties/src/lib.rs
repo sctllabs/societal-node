@@ -8,7 +8,7 @@ use pallet_evm::AddressMapping;
 use parity_scale_codec::Decode;
 use precompile_utils::prelude::*;
 use sp_core::{H160, H256};
-use sp_std::marker::PhantomData;
+use sp_std::{marker::PhantomData, vec};
 
 /// Dao ID. Just a `u32`.
 pub type DaoId = u32;
@@ -21,6 +21,8 @@ pub const SELECTOR_LOG_BOUNTY_CURATOR_ACCEPTED: [u8; 32] =
 /// Solidity selector of the Curator Unassigned log.
 pub const SELECTOR_LOG_BOUNTY_CURATOR_UNASSIGNED: [u8; 32] =
 	keccak256!("BountyCuratorUnassigned(uint32,uint32)");
+/// Solidity selector of the Bounty Extended log.
+pub const SELECTOR_LOG_BOUNTY_EXTENDED: [u8; 32] = keccak256!("BountyExtended(uint32,uint32)");
 /// Solidity selector of the Bounty Awarded log.
 pub const SELECTOR_LOG_BOUNTY_AWARDED: [u8; 32] =
 	keccak256!("BountyAwarded(uint32,uint32,address)");
@@ -51,6 +53,15 @@ pub fn log_bounty_curator_unassigned(
 	log2(
 		address.into(),
 		SELECTOR_LOG_BOUNTY_CURATOR_UNASSIGNED,
+		H256::from_slice(&solidity::encode_arguments(dao_id)),
+		&*solidity::encode_arguments(bounty_id),
+	)
+}
+
+pub fn log_bounty_extended(address: impl Into<H160>, dao_id: DaoId, bounty_id: BountyId) -> Log {
+	log2(
+		address.into(),
+		SELECTOR_LOG_BOUNTY_EXTENDED,
 		H256::from_slice(&solidity::encode_arguments(dao_id)),
 		&*solidity::encode_arguments(bounty_id),
 	)
@@ -139,6 +150,31 @@ where
 		RuntimeHelper::<Runtime>::try_dispatch(handle, Some(origin).into(), call)?;
 
 		let log = log_bounty_curator_unassigned(handle.context().address, dao_id, bounty_id);
+
+		handle.record_log_costs(&[&log])?;
+		log.record(handle)?;
+
+		Ok(bounty_id)
+	}
+
+	#[precompile::public("extendBounty(uint32,uint32)")]
+	fn extend_bounty(
+		handle: &mut impl PrecompileHandle,
+		dao_id: DaoId,
+		bounty_id: BountyId,
+	) -> EvmResult<u32> {
+		handle.record_cost(RuntimeHelper::<Runtime>::db_read_gas_cost())?;
+
+		let origin = Runtime::AddressMapping::into_account_id(handle.context().caller);
+		let call = pallet_dao_bounties::Call::<Runtime>::extend_bounty_expiry {
+			dao_id,
+			bounty_id,
+			remark: vec![],
+		};
+
+		RuntimeHelper::<Runtime>::try_dispatch(handle, Some(origin).into(), call)?;
+
+		let log = log_bounty_extended(handle.context().address, dao_id, bounty_id);
 
 		handle.record_log_costs(&[&log])?;
 		log.record(handle)?;
