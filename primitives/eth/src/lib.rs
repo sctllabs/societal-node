@@ -124,8 +124,10 @@ impl<B: BlockNumberProvider + EthRpcProvider> EthRpcService for EthService<B> {
 		let key = [&b"societal-dao::eth::"[..19], key_vec].concat();
 		let s_info = StorageValueRef::persistent(&key[..]);
 
-		if let Ok(Some(eth_rpc_response)) = s_info.get::<EthRPCResponse>() {
-			return Ok(eth_rpc_response)
+		if cache {
+			if let Ok(Some(eth_rpc_response)) = s_info.get::<EthRPCResponse>() {
+				return Ok(eth_rpc_response)
+			}
 		}
 
 		let lock_key = [&b"societal-dao::eth::lock::"[..25], key_vec].concat();
