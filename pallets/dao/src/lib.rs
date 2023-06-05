@@ -35,6 +35,7 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+pub mod weights;
 
 #[cfg(feature = "runtime-benchmarks")]
 type BalanceOf<T> =
@@ -134,6 +135,7 @@ struct IndexingData<Hash>(Vec<u8>, OffchainData<Hash>);
 #[frame_support::pallet]
 pub mod pallet {
 	pub use super::*;
+	use crate::weights::WeightInfo;
 	use eth_primitives::EthRpcService;
 	use frame_support::traits::{
 		schedule::{
@@ -255,6 +257,9 @@ pub mod pallet {
 		type SpendDaoFunds: SpendDaoFunds<u32>;
 
 		type DaoReferendumScheduler: DaoReferendumScheduler<u32>;
+
+		/// Weight information for extrinsics in this pallet.
+		type WeightInfo: WeightInfo;
 	}
 
 	/// Origin for the dao pallet.
@@ -452,8 +457,7 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		// TODO: calculate dynamic weight
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(4).ref_time())]
+		#[pallet::weight(T::WeightInfo::create_dao())]
 		#[pallet::call_index(0)]
 		pub fn create_dao(
 			origin: OriginFor<T>,
@@ -643,7 +647,7 @@ pub mod pallet {
 			Self::do_register_dao(dao, policy, council, technical_committee)
 		}
 
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::approve_dao())]
 		#[pallet::call_index(2)]
 		pub fn approve_dao(
 			origin: OriginFor<T>,
@@ -665,7 +669,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::update_dao_metadata())]
 		#[pallet::call_index(3)]
 		pub fn update_dao_metadata(
 			origin: OriginFor<T>,
@@ -688,7 +692,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::update_dao_policy())]
 		#[pallet::call_index(4)]
 		pub fn update_dao_policy(
 			origin: OriginFor<T>,
@@ -712,7 +716,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::mint_dao_token())]
 		#[pallet::call_index(5)]
 		pub fn mint_dao_token(
 			origin: OriginFor<T>,
@@ -735,7 +739,7 @@ pub mod pallet {
 			}
 		}
 
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::spend_dao_funds())]
 		#[pallet::call_index(6)]
 		pub fn spend_dao_funds(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
 			Self::ensure_approved(origin, dao_id)?;
@@ -745,6 +749,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		// TODO: weights for referendum extrinsics
 		#[pallet::weight(10_000)]
 		#[pallet::call_index(7)]
 		pub fn launch_dao_referendum(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
@@ -996,7 +1001,7 @@ impl<T: Config> EthRpcProvider for Pallet<T> {
 pub struct EnsureDao<AccountId>(PhantomData<AccountId>);
 impl<
 		O: Into<Result<RawOrigin<AccountId>, O>> + From<RawOrigin<AccountId>>,
-		AccountId: PartialEq<AccountId> + Decode,
+		AccountId: PartialEq<AccountId> + Decode + Clone,
 	> EnsureOriginWithArg<O, DaoOrigin<AccountId>> for EnsureDao<AccountId>
 {
 	type Success = ();
@@ -1013,10 +1018,10 @@ impl<
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin(_dao_origin: &DaoOrigin<AccountId>) -> Result<O, ()> {
-		let zero_account_id =
-			AccountId::decode(&mut sp_runtime::traits::TrailingZeroInput::zeroes())
-				.expect("infinite length input; no invalid inputs for type; qed");
-		Ok(O::from(RawOrigin::Dao(zero_account_id)))
+	fn try_successful_origin(dao_origin: &DaoOrigin<AccountId>) -> Result<O, ()> {
+		let dao_account_id = match dao_origin {
+			ref origin => &origin.clone().dao_account_id,
+		};
+		Ok(O::from(RawOrigin::Dao(dao_account_id.clone())))
 	}
 }

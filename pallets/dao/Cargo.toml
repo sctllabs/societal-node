@@ -41,6 +41,7 @@ eth-primitives = { default-features = false, path = "../../primitives/eth" }
 
 [dev-dependencies]
 pallet-balances = { workspace = true }
+pallet-dao-assets = { workspace = true }
 pallet-scheduler = { workspace = true }
 sp-io = { workspace = true }
 sp-runtime = { workspace = true }
@@ -52,6 +53,7 @@ std = [
 	"frame-benchmarking/std",
 	"frame-support/std",
 	"frame-system/std",
+	"pallet-dao-assets/std",
 	"scale-info/std",
 	"sp-core/std",
 	"sp-io/std",

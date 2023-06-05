@@ -1,18 +1,9 @@
 use crate as pallet_dao;
 use dao_primitives::{ContainsDaoMember, InitializeDaoMembers, RawOrigin};
 use frame_support::{
-	dispatch::{DispatchError, DispatchResult},
+	dispatch::DispatchError,
 	ord_parameter_types, parameter_types,
-	traits::{
-		tokens::{
-			fungibles::{
-				metadata::{Inspect as MetadataInspect, Mutate as MetadataMutate},
-				Create, Inspect, Mutate,
-			},
-			DepositConsequence, WithdrawConsequence,
-		},
-		ConstU16, ConstU32, ConstU64,
-	},
+	traits::{ConstU16, ConstU32, ConstU64},
 	PalletId,
 };
 use frame_system as system;
@@ -22,9 +13,12 @@ use sp_runtime::{
 	traits::{BlakeTwo256, Extrinsic as ExtrinsicT, IdentityLookup},
 };
 
-use crate::crypto;
-use frame_support::traits::{fungibles::Transfer, AsEnsureOriginWithArg, EqualPrivilegeOnly};
-use frame_system::EnsureRoot;
+use crate::{crypto, EnsureDao};
+use frame_support::{
+	instances::Instance1,
+	traits::{AsEnsureOriginWithArg, EqualPrivilegeOnly},
+};
+use frame_system::{EnsureNone, EnsureRoot, EnsureSigned};
 use serde_json::{json, Value};
 use sp_core::sr25519::{Public, Signature};
 use sp_runtime::{
@@ -48,6 +42,7 @@ frame_support::construct_runtime!(
 		Balances: pallet_balances::{Pallet, Call, Storage, Event<T>},
 		DaoFactory: pallet_dao::{Pallet, Call, Storage, Event<T>},
 		Scheduler: pallet_scheduler::{Pallet, Call, Storage, Event<T>},
+		Assets: pallet_dao_assets::<Instance1>::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
@@ -183,132 +178,6 @@ impl ContainsDaoMember<u32, AccountId> for TestTechnicalCommitteeProvider {
 	}
 }
 
-pub struct TestAssetProvider;
-impl Create<AccountId> for TestAssetProvider {
-	fn create(
-		_id: u128,
-		_admin: AccountId,
-		_is_sufficient: bool,
-		_min_balance: u128,
-	) -> DispatchResult {
-		Ok(())
-	}
-}
-
-impl Inspect<AccountId> for TestAssetProvider {
-	type AssetId = u128;
-	type Balance = u128;
-
-	fn total_issuance(asset: Self::AssetId) -> Self::Balance {
-		if asset == 2 {
-			return 1
-		}
-
-		0
-	}
-
-	fn minimum_balance(_asset: Self::AssetId) -> Self::Balance {
-		1
-	}
-
-	fn balance(_asset: Self::AssetId, _who: &AccountId) -> Self::Balance {
-		0
-	}
-
-	fn reducible_balance(
-		_asset: Self::AssetId,
-		_who: &AccountId,
-		_keep_alive: bool,
-	) -> Self::Balance {
-		0
-	}
-
-	fn can_deposit(
-		_asset: Self::AssetId,
-		_who: &AccountId,
-		_amount: Self::Balance,
-		_mint: bool,
-	) -> DepositConsequence {
-		DepositConsequence::Success
-	}
-
-	fn can_withdraw(
-		_asset: Self::AssetId,
-		_who: &AccountId,
-		_amount: Self::Balance,
-	) -> WithdrawConsequence<Self::Balance> {
-		WithdrawConsequence::Success
-	}
-
-	fn asset_exists(_asset: Self::AssetId) -> bool {
-		true
-	}
-}
-
-impl Mutate<AccountId> for TestAssetProvider {
-	fn mint_into(_asset: u128, _who: &AccountId, _amount: u128) -> DispatchResult {
-		Ok(())
-	}
-
-	fn burn_from(_asset: u128, _who: &AccountId, _amount: u128) -> Result<u128, DispatchError> {
-		Ok(0)
-	}
-
-	fn slash(_asset: u128, _who: &AccountId, _amount: u128) -> Result<u128, DispatchError> {
-		Ok(0)
-	}
-}
-
-impl MetadataInspect<AccountId> for TestAssetProvider {
-	fn name(asset: u128) -> Vec<u8> {
-		if asset == TokenId::get() {
-			return TokenName::get().as_bytes().to_vec()
-		}
-
-		vec![]
-	}
-
-	fn symbol(asset: u128) -> Vec<u8> {
-		if asset == TokenId::get() {
-			return TokenSymbol::get().as_bytes().to_vec()
-		}
-
-		vec![]
-	}
-
-	fn decimals(asset: u128) -> u8 {
-		if asset == TokenId::get() {
-			return TokenDecimals::get()
-		}
-
-		0
-	}
-}
-
-impl MetadataMutate<AccountId> for TestAssetProvider {
-	fn set(
-		_asset: u128,
-		_from: &AccountId,
-		_name: Vec<u8>,
-		_symbol: Vec<u8>,
-		_decimals: u8,
-	) -> DispatchResult {
-		Ok(())
-	}
-}
-
-impl Transfer<AccountId> for TestAssetProvider {
-	fn transfer(
-		_asset: u128,
-		_source: &AccountId,
-		_dest: &AccountId,
-		amount: u128,
-		_keep_alive: bool,
-	) -> Result<Self::Balance, DispatchError> {
-		Ok(amount)
-	}
-}
-
 impl pallet_scheduler::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeOrigin = RuntimeOrigin;
@@ -331,15 +200,16 @@ impl pallet_dao::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type PalletId = DaoPalletId;
 	type Currency = pallet_balances::Pallet<Test>;
-	type DaoStringLimit = ConstU32<20>;
-	type DaoMetadataLimit = ConstU32<20>;
+	type DaoNameLimit = ConstU32<20>;
+	type DaoStringLimit = ConstU32<100>;
+	type DaoMetadataLimit = ConstU32<750>;
 	type AssetId = u128;
 	type Balance = u128;
 	type CouncilProvider = TestCouncilProvider;
-	type AssetProvider = TestAssetProvider;
+	type AssetProvider = Assets;
 	type AuthorityId = crypto::TestAuthId;
-	type DaoMaxCouncilMembers = ConstU32<20>;
-	type DaoMaxTechnicalCommitteeMembers = ConstU32<20>;
+	type DaoMaxCouncilMembers = ConstU32<100>;
+	type DaoMaxTechnicalCommitteeMembers = ConstU32<100>;
 	type TechnicalCommitteeProvider = TestTechnicalCommitteeProvider;
 	type OffchainEthService = ();
 	type RuntimeCall = RuntimeCall;
@@ -350,6 +220,29 @@ impl pallet_dao::Config for Test {
 	type Preimages = ();
 	type SpendDaoFunds = ();
 	type DaoReferendumScheduler = ();
+	type WeightInfo = ();
+}
+
+impl pallet_dao_assets::Config<Instance1> for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type Balance = u128;
+	type RemoveItemsLimit = ConstU32<1000>;
+	type AssetId = u128;
+	type AssetIdParameter = codec::Compact<u128>;
+	type Currency = Balances;
+	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
+	type ForceOrigin = EnsureRoot<AccountId>;
+	type AssetDeposit = ConstU64<0>;
+	type AssetAccountDeposit = ConstU64<10>;
+	type MetadataDepositBase = ConstU64<0>;
+	type MetadataDepositPerByte = ConstU64<0>;
+	type ApprovalDeposit = ConstU64<0>;
+	type StringLimit = ConstU32<50>;
+	type Freezer = Assets;
+	type Extra = ();
+	type CallbackHandle = ();
+	type WeightInfo = pallet_dao_assets::weights::SubstrateWeight<Test>;
+	type MaxLocks = ConstU32<10>;
 }
 
 // Build genesis storage according to the mock runtime.
