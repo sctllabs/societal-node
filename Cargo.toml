@@ -211,20 +211,20 @@ parachain-info = { git = "https://github.com/sctllabs/cumulus.git", branch = "po
 
 # Local Dependencies
 eth-primitives = { version = "4.0.0-dev", default-features = false, path = "../primitives/eth" }
-pallet-dao = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao" }
+pallet-dao = { version = "4.0.0-dev", default-features = false, path = "./pallets/dao" }
 pallet-dao-assets = { version = "4.0.0-dev", default-features = false, git = "https://github.com/sctllabs/societal-node", branch = "polkadot-v0.9.41-assets" }
-pallet-dao-bounties = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-bounties" }
-pallet-dao-collective = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-collective" }
-pallet-dao-collective-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao-collective" }
-pallet-dao-democracy = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-democracy" }
-pallet-dao-democracy-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao-democracy" }
-pallet-dao-eth-governance = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-eth-governance" }
-pallet-dao-eth-governance-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao-eth-governance" }
-pallet-dao-membership = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-membership" }
-pallet-dao-membership-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao-membership" }
-pallet-dao-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao" }
-pallet-dao-treasury = { version = "4.0.0-dev", default-features = false, path = "../pallets/dao-treasury" }
-pallet-dao-treasury-precompile = { version = "1.0.0-dev", default-features = false, path = "../precompiles/dao-treasury" }
+pallet-dao-bounties = { version = "4.0.0-dev", default-features = false, path = "./pallets/dao-bounties" }
+pallet-dao-collective = { version = "4.0.0-dev", default-features = false, path = "./pallets/dao-collective" }
+pallet-dao-collective-precompile = { version = "1.0.0-dev", default-features = false, path = "./precompiles/dao-collective" }
+pallet-dao-democracy = { version = "4.0.0-dev", default-features = false, path = "./pallets/dao-democracy" }
+pallet-dao-democracy-precompile = { version = "1.0.0-dev", default-features = false, path = "./precompiles/dao-democracy" }
+pallet-dao-eth-governance = { version = "4.0.0-dev", default-features = false, path = "./pallets/dao-eth-governance" }
+pallet-dao-eth-governance-precompile = { version = "1.0.0-dev", default-features = false, path = "./precompiles/dao-eth-governance" }
+pallet-dao-membership = { version = "4.0.0-dev", default-features = false, path = "./pallets/dao-membership" }
+pallet-dao-membership-precompile = { version = "1.0.0-dev", default-features = false, path = "./precompiles/dao-membership" }
+pallet-dao-precompile = { version = "1.0.0-dev", default-features = false, path = "./precompiles/dao" }
+pallet-dao-treasury = { version = "4.0.0-dev", default-features = false, path = "./pallets/dao-treasury" }
+pallet-dao-treasury-precompile = { version = "1.0.0-dev", default-features = false, path = "./precompiles/dao-treasury" }
 
 # Substrate (client)
 sc-authority-discovery = { version = "0.10.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.41" }
