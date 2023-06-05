@@ -1666,6 +1666,7 @@ impl pallet_dao::Config for Runtime {
 	type Preimages = Preimage;
 	type SpendDaoFunds = DaoTreasury;
 	type DaoReferendumScheduler = DaoDemocracy;
+	type WeightInfo = pallet_dao::weights::SubstrateWeight<Runtime>;
 }
 
 parameter_types! {
