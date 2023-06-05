@@ -159,7 +159,7 @@ fn create_dao_works() {
 					.ok()
 					.unwrap(),
 				config: DaoConfig {
-					name: BoundedVec::<u8, <Test as Config>::DaoStringLimit>::try_from(
+					name: BoundedVec::<u8, <Test as Config>::DaoNameLimit>::try_from(
 						DaoName::get().as_bytes().to_vec()
 					)
 					.unwrap(),
@@ -167,7 +167,7 @@ fn create_dao_works() {
 						DaoPurpose::get().as_bytes().to_vec()
 					)
 					.unwrap(),
-					metadata: BoundedVec::<u8, <Test as Config>::DaoStringLimit>::try_from(
+					metadata: BoundedVec::<u8, <Test as Config>::DaoMetadataLimit>::try_from(
 						DaoMetadata::get().as_bytes().to_vec()
 					)
 					.unwrap(),

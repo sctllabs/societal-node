@@ -90,9 +90,9 @@ pub struct DaoPayload {
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
-pub struct DaoConfig<BoundedString, BoundedMetadata> {
+pub struct DaoConfig<BoundedName, BoundedString, BoundedMetadata> {
 	/// Name of the DAO.
-	pub name: BoundedString,
+	pub name: BoundedName,
 	/// Purpose of this DAO.
 	pub purpose: BoundedString,
 	/// Generic metadata. Can be used to store additional data.
@@ -215,25 +215,26 @@ pub enum DaoToken<TokenId, BoundedString> {
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
-pub struct Dao<AccountId, TokenId, BoundedString, BoundedMetadata> {
+pub struct Dao<AccountId, TokenId, BoundedName, BoundedString, BoundedMetadata> {
 	pub founder: AccountId,
 	pub account_id: AccountId,
 	pub token: DaoToken<TokenId, BoundedString>,
 	pub status: DaoStatus,
-	pub config: DaoConfig<BoundedString, BoundedMetadata>,
+	pub config: DaoConfig<BoundedName, BoundedString, BoundedMetadata>,
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct PendingDao<
 	AccountId,
 	TokenId,
+	BoundedName,
 	BoundedString,
 	BoundedMetadata,
 	BoundedCouncilMembers,
 	BoundedTechnicalCommittee,
 	BlockNumber,
 > {
-	pub dao: Dao<AccountId, TokenId, BoundedString, BoundedMetadata>,
+	pub dao: Dao<AccountId, TokenId, BoundedName, BoundedString, BoundedMetadata>,
 	pub policy: DaoPolicy,
 	pub council: BoundedCouncilMembers,
 	pub technical_committee: BoundedTechnicalCommittee,
@@ -436,6 +437,7 @@ pub enum RawOrigin<AccountId> {
 	Dao(AccountId),
 }
 
+#[derive(Clone)]
 pub struct DaoOrigin<AccountId> {
 	pub dao_account_id: AccountId,
 	pub proportion: DaoPolicyProportion,

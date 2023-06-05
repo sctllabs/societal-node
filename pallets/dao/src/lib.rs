@@ -43,6 +43,7 @@ type BalanceOf<T> =
 type DaoOf<T> = Dao<
 	<T as frame_system::Config>::AccountId,
 	<T as Config>::AssetId,
+	BoundedVec<u8, <T as Config>::DaoNameLimit>,
 	BoundedVec<u8, <T as Config>::DaoStringLimit>,
 	BoundedVec<u8, <T as Config>::DaoMetadataLimit>,
 >;
@@ -51,6 +52,7 @@ type PolicyOf = DaoPolicy;
 type PendingDaoOf<T> = PendingDao<
 	<T as frame_system::Config>::AccountId,
 	<T as Config>::AssetId,
+	BoundedVec<u8, <T as Config>::DaoNameLimit>,
 	BoundedVec<u8, <T as Config>::DaoStringLimit>,
 	BoundedVec<u8, <T as Config>::DaoMetadataLimit>,
 	BoundedVec<<T as frame_system::Config>::AccountId, <T as Config>::DaoMaxCouncilMembers>,
@@ -192,6 +194,9 @@ pub mod pallet {
 
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
+
+		#[pallet::constant]
+		type DaoNameLimit: Get<u32>;
 
 		#[pallet::constant]
 		type DaoStringLimit: Get<u32>;
@@ -385,8 +390,11 @@ pub mod pallet {
 			council: BoundedVec<T::AccountId, T::DaoMaxCouncilMembers>,
 			technical_committee: BoundedVec<T::AccountId, T::DaoMaxTechnicalCommitteeMembers>,
 			token: DaoToken<T::AssetId, BoundedVec<u8, T::DaoStringLimit>>,
-			config:
-				DaoConfig<BoundedVec<u8, T::DaoStringLimit>, BoundedVec<u8, T::DaoMetadataLimit>>,
+			config: DaoConfig<
+				BoundedVec<u8, T::DaoNameLimit>,
+				BoundedVec<u8, T::DaoStringLimit>,
+				BoundedVec<u8, T::DaoMetadataLimit>,
+			>,
 			policy: DaoPolicy,
 		},
 		DaoPendingApproval {
@@ -394,8 +402,11 @@ pub mod pallet {
 			founder: T::AccountId,
 			account_id: T::AccountId,
 			token: DaoToken<T::AssetId, BoundedVec<u8, T::DaoStringLimit>>,
-			config:
-				DaoConfig<BoundedVec<u8, T::DaoStringLimit>, BoundedVec<u8, T::DaoMetadataLimit>>,
+			config: DaoConfig<
+				BoundedVec<u8, T::DaoNameLimit>,
+				BoundedVec<u8, T::DaoStringLimit>,
+				BoundedVec<u8, T::DaoMetadataLimit>,
+			>,
 			policy: DaoPolicy,
 		},
 		DaoTokenTransferred {
@@ -459,7 +470,7 @@ pub mod pallet {
 			let dao_id = <NextDaoId<T>>::get();
 			let dao_account_id = Self::account_id(dao_id);
 
-			let dao_name = BoundedVec::<u8, T::DaoStringLimit>::try_from(name)
+			let dao_name = BoundedVec::<u8, T::DaoNameLimit>::try_from(name)
 				.map_err(|_| Error::<T>::NameTooLong)?;
 
 			let dao_purpose = BoundedVec::<u8, T::DaoStringLimit>::try_from(purpose)

@@ -1631,6 +1631,7 @@ impl pallet_hotfix_sufficients::Config for Runtime {
 
 parameter_types! {
 	pub const DaoPalletId: PalletId = PalletId(*b"py/sctld");
+	pub const DaoNameLimit: u32 = 20;
 	pub const DaoStringLimit: u32 = 100;
 	pub const DaoMetadataLimit: u32 = 750;
 	pub const DaoMaxCouncilMembers: u32 = 100; // TODO
@@ -1643,6 +1644,7 @@ impl pallet_dao::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
 	type PalletId = DaoPalletId;
+	type DaoNameLimit = DaoNameLimit;
 	type DaoStringLimit = DaoStringLimit;
 	type DaoMetadataLimit = DaoMetadataLimit;
 	type DaoMaxCouncilMembers = DaoMaxCouncilMembers;
