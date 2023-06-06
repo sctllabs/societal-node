@@ -904,17 +904,10 @@ impl pallet_membership::Config<pallet_membership::Instance1> for Runtime {
 type DaoCouncilMembership = pallet_dao_membership::Instance1;
 impl pallet_dao_membership::Config<DaoCouncilMembership> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-
-	// TODO: dynamic properties - move to dao-primitives for generic types
-	type ApproveOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
-	>;
 	type MembershipInitialized = DaoCouncil;
 	type MembershipChanged = DaoCouncil;
 	type MaxMembers = TechnicalMaxMembers;
 	type WeightInfo = pallet_dao_membership::weights::SubstrateWeight<Runtime>;
-
 	type DaoProvider = Dao;
 }
 
@@ -922,17 +915,10 @@ impl pallet_dao_membership::Config<DaoCouncilMembership> for Runtime {
 type DaoTechnicalCommitteeMembership = pallet_dao_membership::Instance2;
 impl pallet_dao_membership::Config<DaoTechnicalCommitteeMembership> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-
-	// TODO: dynamic properties - move to dao-primitives for generic types
-	type ApproveOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoTechnicalCommitteeCollective>,
-	>;
 	type MembershipInitialized = DaoTechnicalCommittee;
 	type MembershipChanged = DaoTechnicalCommittee;
 	type MaxMembers = TechnicalMaxMembers;
 	type WeightInfo = pallet_dao_membership::weights::SubstrateWeight<Runtime>;
-
 	type DaoProvider = Dao;
 }
 
@@ -2043,6 +2029,7 @@ mod benches {
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
 		[pallet_dao, Dao]
+		[pallet_dao_membership, DaoCouncilMembers]
 	);
 }
 

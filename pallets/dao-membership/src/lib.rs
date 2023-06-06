@@ -33,10 +33,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_support::{
-	dispatch::DispatchError,
-	pallet_prelude::DispatchResult,
-	traits::{EnsureOriginWithArg, Get},
-	BoundedVec,
+	dispatch::DispatchError, pallet_prelude::DispatchResult, traits::Get, BoundedVec,
 };
 use frame_system::pallet_prelude::OriginFor;
 use sp_std::prelude::*;
@@ -65,7 +62,6 @@ pub type DaoId = u32;
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use dao_primitives::DaoOrigin;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
@@ -81,9 +77,6 @@ pub mod pallet {
 		/// The overarching event type.
 		type RuntimeEvent: From<Event<Self, I>>
 			+ IsType<<Self as frame_system::Config>::RuntimeEvent>;
-
-		/// Required origin for adding a member (though can always be Root).
-		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
 
 		/// The receiver of the signal for when the membership has been initialized. This happens
 		/// pre-genesis and will usually be the same as `MembershipChanged`. If you need to do
@@ -148,9 +141,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		/// Add a member `who` to the set.
-		///
-		/// May only be called from `T::AddOrigin`.
-		#[pallet::weight(50_000_000)]
+		#[pallet::weight(T::WeightInfo::add_member())]
 		#[pallet::call_index(0)]
 		pub fn add_member(
 			origin: OriginFor<T>,
@@ -174,9 +165,7 @@ pub mod pallet {
 		}
 
 		/// Remove a member `who` from the set.
-		///
-		/// May only be called from `T::RemoveOrigin`.
-		#[pallet::weight(50_000_000)]
+		#[pallet::weight(T::WeightInfo::remove_member())]
 		#[pallet::call_index(1)]
 		pub fn remove_member(
 			origin: OriginFor<T>,
@@ -198,9 +187,7 @@ pub mod pallet {
 		}
 
 		/// Swap out one member `remove` for another `add`.
-		///
-		/// May only be called from `T::SwapOrigin`.
-		#[pallet::weight(50_000_000)]
+		#[pallet::weight(T::WeightInfo::swap_member())]
 		#[pallet::call_index(2)]
 		pub fn swap_member(
 			origin: OriginFor<T>,
@@ -235,9 +222,7 @@ pub mod pallet {
 
 		/// Change the membership to a new set, disregarding the existing membership. Be nice and
 		/// pass `members` pre-sorted.
-		///
-		/// May only be called from `T::ResetOrigin`.
-		#[pallet::weight(50_000_000)]
+		#[pallet::weight(T::WeightInfo::reset_members())]
 		#[pallet::call_index(3)]
 		pub fn reset_members(
 			origin: OriginFor<T>,
@@ -259,9 +244,7 @@ pub mod pallet {
 		}
 
 		/// Swap out the sending member for some other key `new`.
-		///
-		/// May only be called from `Signed` origin of a current member.
-		#[pallet::weight(50_000_000)]
+		#[pallet::weight(T::WeightInfo::change_key())]
 		#[pallet::call_index(4)]
 		pub fn change_key(
 			origin: OriginFor<T>,
@@ -340,7 +323,6 @@ impl<T: Config<I>, I: 'static> DaoSortedMembers<T::AccountId> for Pallet<T, I> {
 	}
 }
 
-// TODO: make abstraction to frame InitializeMembers
 impl<T: Config<I>, I: 'static> InitializeDaoMembers<DaoId, T::AccountId> for Pallet<T, I> {
 	fn initialize_members(
 		dao_id: DaoId,

@@ -182,7 +182,6 @@ impl DaoProvider<H256> for TestDaoProvider {
 
 impl Config for Test {
 	type RuntimeEvent = RuntimeEvent;
-	type ApproveOrigin = AsEnsureOriginWithArg<EnsureSignedBy<One, u64>>;
 	type MembershipInitialized = TestChangeMembers;
 	type MembershipChanged = TestChangeMembers;
 	type MaxMembers = ConstU32<10>;
