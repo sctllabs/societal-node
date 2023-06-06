@@ -73,6 +73,25 @@ fn setup_dao_payload<T: Config>(is_eth: bool) -> Vec<u8> {
 	serde_json::to_vec(&dao_json).ok().unwrap()
 }
 
+fn setup_dao<T: Config>(is_eth: bool) -> Result<(), DispatchError> {
+	let caller = account("caller", 0, SEED);
+	let data = setup_dao_payload::<T>(is_eth);
+
+	DaoFactory::<T>::create_dao(RawOrigin::Signed(caller).into(), vec![], vec![], data)
+}
+
+fn get_dao_origin<T: Config>(
+	dao_id: DaoId,
+) -> Result<T::RuntimeOrigin, BenchmarkError> {
+	let dao_account_id = DaoFactory::<T>::dao_account_id(dao_id);
+	let dao_origin = DaoOrigin {
+		dao_account_id: dao_account_id.clone(),
+		proportion: DaoPolicyProportion::AtLeast((1, 1)),
+	};
+
+	T::ApproveOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)
+}
+
 benchmarks! {
 	create_dao {
 		let caller = account("caller", 0, SEED);
@@ -97,14 +116,7 @@ benchmarks! {
 	}
 
 	approve_dao {
-		let caller = account("caller", 0, SEED);
-
-		let value: BalanceOf<T> = 100u32.into();
-		let _ = T::Currency::make_free_balance_be(&caller, value);
-
-		let data = setup_dao_payload::<T>(true);
-		DaoFactory::<T>::create_dao(RawOrigin::Signed(caller).into(), vec![], vec![], data)?;
-
+		setup_dao::<T>(true)?;
 		let dao_hash = PendingDaos::<T>::iter_keys().next().unwrap();
 	}: _(RawOrigin::None, dao_hash, true)
 	verify {
@@ -112,14 +124,7 @@ benchmarks! {
 	}
 
 	update_dao_metadata {
-		let caller = account("caller", 0, SEED);
-
-		let value: BalanceOf<T> = 100u32.into();
-		let _ = T::Currency::make_free_balance_be(&caller, value);
-
-		let data = setup_dao_payload::<T>(false);
-		DaoFactory::<T>::create_dao(RawOrigin::Signed(caller.clone()).into(), vec![], vec![], data)?;
-
+		setup_dao::<T>(false)?;
 		let new_metadata = "Lorem Lorem dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor \
 			incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud \
 			exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure \
@@ -129,30 +134,15 @@ benchmarks! {
 			sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim \
 			veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo \
 			consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum do";
-
-		let dao_account_id = DaoFactory::<T>::dao_account_id(0);
-		let dao_origin = DaoOrigin {
-			dao_account_id,
-			proportion: DaoPolicyProportion::AtLeast((1, 1))
-		};
-		let origin = T::ApproveOrigin::try_successful_origin(&dao_origin)
-			.map_err(|_| BenchmarkError::Weightless)?;
+		let origin = get_dao_origin::<T>(0)?;
 	}: _<T::RuntimeOrigin>(origin, 0, new_metadata.as_bytes().to_vec())
 	verify {
 		let DaoConfig { metadata, .. } = Daos::<T>::get(0).unwrap().config;
-
 		assert_eq!(metadata.to_vec(), new_metadata.as_bytes().to_vec());
 	}
 
 	update_dao_policy {
-		let caller = account("caller", 0, SEED);
-
-		let value: BalanceOf<T> = 100u32.into();
-		let _ = T::Currency::make_free_balance_be(&caller, value);
-
-		let data = setup_dao_payload::<T>(false);
-		DaoFactory::<T>::create_dao(RawOrigin::Signed(caller.clone()).into(), vec![], vec![], data)?;
-
+		setup_dao::<T>(false)?;
 		let new_proposal_period = 500000;
 		let policy = json!({
 			"proposal_period": new_proposal_period,
@@ -182,60 +172,25 @@ benchmarks! {
 			  }
 			}
 		});
-
-		let dao_account_id = DaoFactory::<T>::dao_account_id(0);
-		let dao_origin = DaoOrigin {
-			dao_account_id,
-			proportion: DaoPolicyProportion::AtLeast((1, 1))
-		};
-		let origin = T::ApproveOrigin::try_successful_origin(&dao_origin)
-			.map_err(|_| BenchmarkError::Weightless)?;
+		let origin = get_dao_origin::<T>(0)?;
 	}: _<T::RuntimeOrigin>(origin, 0, serde_json::to_vec(&policy).ok().unwrap())
 	verify {
 		let DaoPolicy { proposal_period, .. } = Policies::<T>::get(0).unwrap();
-
 		assert_eq!(proposal_period, new_proposal_period);
 	}
 
 	mint_dao_token {
-		let caller = account("caller", 0, SEED);
-
-		let value: BalanceOf<T> = 100u32.into();
-		let _ = T::Currency::make_free_balance_be(&caller, value);
-
-		let data = setup_dao_payload::<T>(false);
-		DaoFactory::<T>::create_dao(RawOrigin::Signed(caller.clone()).into(), vec![], vec![], data)?;
-
-		let dao_account_id = DaoFactory::<T>::dao_account_id(0);
-		let dao_origin = DaoOrigin {
-			dao_account_id,
-			proportion: DaoPolicyProportion::AtLeast((1, 1))
-		};
-		let origin = T::ApproveOrigin::try_successful_origin(&dao_origin)
-			.map_err(|_| BenchmarkError::Weightless)?;
+		setup_dao::<T>(false)?;
+		let origin = get_dao_origin::<T>(0)?;
 	}: _<T::RuntimeOrigin>(origin, 0, 100_u32.into())
 	verify {
 		let dao_token_supply = T::AssetProvider::total_issuance(0.into());
-
 		assert_eq!(dao_token_supply, 101_u32.into());
 	}
 
 	spend_dao_funds {
-		let caller = account("caller", 0, SEED);
-
-		let value: BalanceOf<T> = 100u32.into();
-		let _ = T::Currency::make_free_balance_be(&caller, value);
-
-		let data = setup_dao_payload::<T>(false);
-		DaoFactory::<T>::create_dao(RawOrigin::Signed(caller.clone()).into(), vec![], vec![], data)?;
-
-		let dao_account_id = DaoFactory::<T>::dao_account_id(0);
-		let dao_origin = DaoOrigin {
-			dao_account_id,
-			proportion: DaoPolicyProportion::AtLeast((1, 1))
-		};
-		let origin = T::ApproveOrigin::try_successful_origin(&dao_origin)
-			.map_err(|_| BenchmarkError::Weightless)?;
+		setup_dao::<T>(false)?;
+		let origin = get_dao_origin::<T>(0)?;
 	}: _<T::RuntimeOrigin>(origin, 0)
 	verify { }
 
