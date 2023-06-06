@@ -236,6 +236,21 @@ impl DaoProvider<H256> for TestDaoProvider {
 	) -> Result<Option<Self::NFTCollectionId>, DispatchError> {
 		Err(Error::<Test, Instance1>::NotMember.into())
 	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn create_dao(
+		_founder: Self::AccountId,
+		_council: Vec<Self::AccountId>,
+		_technical_committee: Vec<Self::AccountId>,
+		_data: Vec<u8>,
+	) -> Result<(), DispatchError> {
+		Ok(())
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()> {
+		Self::ApproveOrigin::try_successful_origin(dao_origin)
+	}
 }
 
 parameter_types! {

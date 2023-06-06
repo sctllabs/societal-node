@@ -467,184 +467,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin.clone())?;
 
-			let DaoPayload { name, purpose, metadata, token, token_id, token_address, policy } =
-				serde_json::from_slice::<DaoPayload>(&data)
-					.map_err(|_| Error::<T>::InvalidInput)?;
-
-			let dao_id = <NextDaoId<T>>::get();
-			let dao_account_id = Self::account_id(dao_id);
-
-			let dao_name = BoundedVec::<u8, T::DaoNameLimit>::try_from(name)
-				.map_err(|_| Error::<T>::NameTooLong)?;
-
-			let dao_purpose = BoundedVec::<u8, T::DaoStringLimit>::try_from(purpose)
-				.map_err(|_| Error::<T>::PurposeTooLong)?;
-
-			let dao_metadata = BoundedVec::<u8, T::DaoMetadataLimit>::try_from(metadata)
-				.map_err(|_| Error::<T>::MetadataTooLong)?;
-
-			let min = <T as Config>::Currency::minimum_balance();
-			let _ = <T as Config>::Currency::make_free_balance_be(&dao_account_id, min);
-
-			// setting submitter as a Dao council by default
-			let mut council_members: Vec<T::AccountId> = vec![who.clone()];
-			for account in council {
-				if council_members.contains(&account) {
-					continue
-				}
-
-				council_members.push(account);
-			}
-
-			let council = BoundedVec::<T::AccountId, T::DaoMaxCouncilMembers>::try_from(
-				council_members.clone(),
-			)
-			.map_err(|_| Error::<T>::CouncilMembersOverflow)?;
-
-			let mut technical_committee_members: Vec<T::AccountId> = vec![];
-			for account in technical_committee.into_iter() {
-				if technical_committee_members.contains(&account) {
-					continue
-				}
-
-				technical_committee_members.push(account);
-			}
-
-			let technical_committee =
-				BoundedVec::<T::AccountId, T::DaoMaxTechnicalCommitteeMembers>::try_from(
-					technical_committee_members.clone(),
-				)
-				.map_err(|_| Error::<T>::CouncilMembersOverflow)?;
-
-			let founder = who;
-			let config = DaoConfig { name: dao_name, purpose: dao_purpose, metadata: dao_metadata };
-
-			ensure!(policy.spend_period.0 >= T::DaoMinTreasurySpendPeriod::get(), "Value too low");
-
-			let mut has_token_id: Option<AssetId<T>> = None;
-
-			if let Some(token) = token {
-				let token_id = Self::u128_to_asset_id(token.token_id);
-				has_token_id = Some(token_id);
-
-				let metadata = token.metadata;
-
-				let token_min_balance: Balance<T> =
-					Self::u128_to_balance(token.min_balance.unwrap_or(TOKEN_MIN_BALANCE));
-				let token_initial_balance: Balance<T> =
-					Self::u128_to_balance(token.initial_balance.unwrap_or(TOKEN_MIN_BALANCE));
-				if token_min_balance.is_zero() ||
-					token_initial_balance.is_zero() ||
-					token_initial_balance < token_min_balance
-				{
-					return Err(Error::<T>::TokenBalanceInvalid.into())
-				}
-
-				let issuance =
-					T::AssetProvider::total_issuance(token_id).try_into().unwrap_or(0u128);
-
-				if issuance > 0 {
-					return Err(Error::<T>::TokenAlreadyExists.into())
-				} else {
-					T::AssetProvider::create(
-						token_id,
-						dao_account_id.clone(),
-						true,
-						token_min_balance,
-					)
-					.map_err(|_| Error::<T>::TokenCreateFailed)?;
-
-					T::AssetProvider::set(
-						token_id,
-						&dao_account_id,
-						metadata.name,
-						metadata.symbol,
-						metadata.decimals,
-					)
-					.map_err(|_| Error::<T>::TokenMetadataFailed)?;
-
-					if token_initial_balance.gt(&Self::u128_to_balance(0)) {
-						T::AssetProvider::mint_into(
-							token_id,
-							&dao_account_id,
-							token_initial_balance,
-						)
-						.map_err(|_| Error::<T>::TokenMintFailed)?;
-					}
-				}
-			}
-
-			if has_token_id.is_none() {
-				if let Some(id) = token_id {
-					let token_id = Self::u128_to_asset_id(id);
-					has_token_id = Some(token_id);
-
-					let issuance =
-						T::AssetProvider::total_issuance(token_id).try_into().unwrap_or(0u128);
-
-					if issuance == 0 {
-						return Err(Error::<T>::TokenNotExists.into())
-					}
-				} else if let Some(token_address) = token_address {
-					let address =
-						BoundedVec::<u8, T::DaoStringLimit>::try_from(token_address.clone())
-							.map_err(|_| Error::<T>::TokenAddressInvalid)?;
-
-					let dao = Dao {
-						founder,
-						config,
-						account_id: dao_account_id,
-						token: DaoToken::EthTokenAddress(address),
-						status: DaoStatus::Pending,
-					};
-
-					let dao_hash = T::Hashing::hash_of(&dao);
-
-					let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
-					let data: IndexingData<T::Hash> = IndexingData(
-						b"approve_dao".to_vec(),
-						OffchainData::ApproveDao { dao_hash, token_address },
-					);
-
-					offchain_index::set(&key, &data.encode());
-
-					let dao_event_source = dao.clone();
-
-					PendingDaos::<T>::insert(
-						dao_hash,
-						PendingDao {
-							dao,
-							policy: policy.clone(),
-							council,
-							technical_committee,
-							block_number: frame_system::Pallet::<T>::block_number(),
-						},
-					);
-
-					Self::deposit_event(Event::DaoPendingApproval {
-						dao_id,
-						founder: dao_event_source.founder,
-						account_id: dao_event_source.account_id,
-						token: dao_event_source.token,
-						config: dao_event_source.config,
-						policy,
-					});
-
-					return Ok(())
-				} else {
-					return Err(Error::<T>::TokenNotProvided.into())
-				}
-			}
-
-			let dao = Dao {
-				founder,
-				config,
-				account_id: dao_account_id,
-				token: DaoToken::FungibleToken(has_token_id.unwrap()),
-				status: DaoStatus::Success,
-			};
-
-			Self::do_register_dao(dao, policy, council, technical_committee)
+			Self::do_create_dao(who, council, technical_committee, data)
 		}
 
 		#[pallet::weight(T::WeightInfo::approve_dao())]
@@ -790,6 +613,191 @@ pub mod pallet {
 
 		fn bake_dao_referendum_task_id(dao_id: DaoId) -> TaskName {
 			(DAO_FACTORY_ID, DAO_REFERENDUM_BAKE_ID, dao_id).encode_into()
+		}
+
+		pub fn do_create_dao(
+			founder: T::AccountId,
+			council: Vec<T::AccountId>,
+			technical_committee: Vec<T::AccountId>,
+			data: Vec<u8>,
+		) -> DispatchResult {
+			let DaoPayload { name, purpose, metadata, token, token_id, token_address, policy } =
+				serde_json::from_slice::<DaoPayload>(&data)
+					.map_err(|_| Error::<T>::InvalidInput)?;
+
+			let dao_id = <NextDaoId<T>>::get();
+			let dao_account_id = Self::account_id(dao_id);
+
+			let dao_name = BoundedVec::<u8, T::DaoNameLimit>::try_from(name)
+				.map_err(|_| Error::<T>::NameTooLong)?;
+
+			let dao_purpose = BoundedVec::<u8, T::DaoStringLimit>::try_from(purpose)
+				.map_err(|_| Error::<T>::PurposeTooLong)?;
+
+			let dao_metadata = BoundedVec::<u8, T::DaoMetadataLimit>::try_from(metadata)
+				.map_err(|_| Error::<T>::MetadataTooLong)?;
+
+			let min = <T as Config>::Currency::minimum_balance();
+			let _ = <T as Config>::Currency::make_free_balance_be(&dao_account_id, min);
+
+			// setting submitter as a Dao council by default
+			let mut council_members: Vec<T::AccountId> = vec![founder.clone()];
+			for account in council {
+				if council_members.contains(&account) {
+					continue
+				}
+
+				council_members.push(account);
+			}
+
+			let council = BoundedVec::<T::AccountId, T::DaoMaxCouncilMembers>::try_from(
+				council_members.clone(),
+			)
+			.map_err(|_| Error::<T>::CouncilMembersOverflow)?;
+
+			let mut technical_committee_members: Vec<T::AccountId> = vec![];
+			for account in technical_committee.into_iter() {
+				if technical_committee_members.contains(&account) {
+					continue
+				}
+
+				technical_committee_members.push(account);
+			}
+
+			let technical_committee =
+				BoundedVec::<T::AccountId, T::DaoMaxTechnicalCommitteeMembers>::try_from(
+					technical_committee_members.clone(),
+				)
+				.map_err(|_| Error::<T>::CouncilMembersOverflow)?;
+
+			let config = DaoConfig { name: dao_name, purpose: dao_purpose, metadata: dao_metadata };
+
+			ensure!(policy.spend_period.0 >= T::DaoMinTreasurySpendPeriod::get(), "Value too low");
+
+			let mut has_token_id: Option<AssetId<T>> = None;
+
+			if let Some(token) = token {
+				let token_id = Self::u128_to_asset_id(token.token_id);
+				has_token_id = Some(token_id);
+
+				let metadata = token.metadata;
+
+				let token_min_balance: Balance<T> =
+					Self::u128_to_balance(token.min_balance.unwrap_or(TOKEN_MIN_BALANCE));
+				let token_initial_balance: Balance<T> =
+					Self::u128_to_balance(token.initial_balance.unwrap_or(TOKEN_MIN_BALANCE));
+				if token_min_balance.is_zero() ||
+					token_initial_balance.is_zero() ||
+					token_initial_balance < token_min_balance
+				{
+					return Err(Error::<T>::TokenBalanceInvalid.into())
+				}
+
+				let issuance =
+					T::AssetProvider::total_issuance(token_id).try_into().unwrap_or(0u128);
+
+				if issuance > 0 {
+					return Err(Error::<T>::TokenAlreadyExists.into())
+				} else {
+					T::AssetProvider::create(
+						token_id,
+						dao_account_id.clone(),
+						true,
+						token_min_balance,
+					)
+					.map_err(|_| Error::<T>::TokenCreateFailed)?;
+
+					T::AssetProvider::set(
+						token_id,
+						&dao_account_id,
+						metadata.name,
+						metadata.symbol,
+						metadata.decimals,
+					)
+					.map_err(|_| Error::<T>::TokenMetadataFailed)?;
+
+					if token_initial_balance.gt(&Self::u128_to_balance(0)) {
+						T::AssetProvider::mint_into(
+							token_id,
+							&dao_account_id,
+							token_initial_balance,
+						)
+						.map_err(|_| Error::<T>::TokenMintFailed)?;
+					}
+				}
+			}
+
+			if has_token_id.is_none() {
+				if let Some(id) = token_id {
+					let token_id = Self::u128_to_asset_id(id);
+					has_token_id = Some(token_id);
+
+					let issuance =
+						T::AssetProvider::total_issuance(token_id).try_into().unwrap_or(0u128);
+
+					if issuance == 0 {
+						return Err(Error::<T>::TokenNotExists.into())
+					}
+				} else if let Some(token_address) = token_address {
+					let address =
+						BoundedVec::<u8, T::DaoStringLimit>::try_from(token_address.clone())
+							.map_err(|_| Error::<T>::TokenAddressInvalid)?;
+
+					let dao = Dao {
+						founder,
+						config,
+						account_id: dao_account_id,
+						token: DaoToken::EthTokenAddress(address),
+						status: DaoStatus::Pending,
+					};
+
+					let dao_hash = T::Hashing::hash_of(&dao);
+
+					let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
+					let data: IndexingData<T::Hash> = IndexingData(
+						b"approve_dao".to_vec(),
+						OffchainData::ApproveDao { dao_hash, token_address },
+					);
+
+					offchain_index::set(&key, &data.encode());
+
+					let dao_event_source = dao.clone();
+
+					PendingDaos::<T>::insert(
+						dao_hash,
+						PendingDao {
+							dao,
+							policy: policy.clone(),
+							council,
+							technical_committee,
+							block_number: frame_system::Pallet::<T>::block_number(),
+						},
+					);
+
+					Self::deposit_event(Event::DaoPendingApproval {
+						dao_id,
+						founder: dao_event_source.founder,
+						account_id: dao_event_source.account_id,
+						token: dao_event_source.token,
+						config: dao_event_source.config,
+						policy,
+					});
+
+					return Ok(())
+				} else {
+					return Err(Error::<T>::TokenNotProvided.into())
+				}
+			}
+
+			let dao = Dao {
+				founder,
+				config,
+				account_id: dao_account_id,
+				token: DaoToken::FungibleToken(has_token_id.unwrap()),
+				status: DaoStatus::Success,
+			};
+
+			Self::do_register_dao(dao, policy, council, technical_committee)
 		}
 
 		pub fn do_register_dao(
@@ -982,6 +990,21 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 		Self::ApproveOrigin::ensure_origin(origin, &dao_origin)?;
 
 		Ok(dao_origin)
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn create_dao(
+		who: T::AccountId,
+		council: Vec<T::AccountId>,
+		technical_committee: Vec<T::AccountId>,
+		data: Vec<u8>,
+	) -> Result<(), DispatchError> {
+		Self::do_create_dao(who, council, technical_committee, data)
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()> {
+		Self::ApproveOrigin::try_successful_origin(dao_origin)
 	}
 }
 

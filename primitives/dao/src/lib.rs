@@ -324,6 +324,19 @@ pub trait DaoProvider<Hash> {
 		origin: Self::Origin,
 		dao_id: Self::Id,
 	) -> DispatchResultWithDaoOrigin<Self::AccountId>;
+
+	/// Note: Should only be used for benchmarking.
+	#[cfg(feature = "runtime-benchmarks")]
+	fn create_dao(
+		founder: Self::AccountId,
+		council: Vec<Self::AccountId>,
+		technical_committee: Vec<Self::AccountId>,
+		data: Vec<u8>,
+	) -> Result<(), DispatchError>;
+
+	/// Note: Should only be used for benchmarking.
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()>;
 }
 
 pub trait InitializeDaoMembers<DaoId, AccountId> {

@@ -193,6 +193,7 @@ pub use weights::WeightInfo;
 mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
+#[cfg(feature = "dao_democracy_tests")]
 pub mod benchmarking;
 
 const DEMOCRACY_ID: LockIdentifier = *b"democrac";

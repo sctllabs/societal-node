@@ -80,9 +80,7 @@ fn setup_dao<T: Config>(is_eth: bool) -> Result<(), DispatchError> {
 	DaoFactory::<T>::create_dao(RawOrigin::Signed(caller).into(), vec![], vec![], data)
 }
 
-fn get_dao_origin<T: Config>(
-	dao_id: DaoId,
-) -> Result<T::RuntimeOrigin, BenchmarkError> {
+fn get_dao_origin<T: Config>(dao_id: DaoId) -> Result<T::RuntimeOrigin, BenchmarkError> {
 	let dao_account_id = DaoFactory::<T>::dao_account_id(dao_id);
 	let dao_origin = DaoOrigin {
 		dao_account_id: dao_account_id.clone(),

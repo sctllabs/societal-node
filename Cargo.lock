@@ -1983,6 +1983,7 @@ dependencies = [
 name = "dao-primitives"
 version = "4.0.0-dev"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -6505,6 +6506,8 @@ dependencies = [
  "log",
  "parity-scale-codec",
  "scale-info",
+ "serde",
+ "serde_json",
  "sp-core",
  "sp-io",
  "sp-runtime",
@@ -11776,6 +11779,7 @@ dependencies = [
  "cumulus-primitives-core",
  "cumulus-primitives-timestamp",
  "cumulus-primitives-utility",
+ "dao-primitives",
  "eth-primitives",
  "fp-rpc",
  "fp-self-contained",

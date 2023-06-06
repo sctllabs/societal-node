@@ -141,6 +141,7 @@ pallet-collator-selection = { workspace = true }
 parachain-info = { workspace = true }
 
 # Local Dependencies
+dao-primitives = { default-features = false, path = "../primitives/dao" }
 eth-primitives = { default-features = false, path = "../primitives/eth" }
 pallet-dao = { default-features = false, path = "../pallets/dao" }
 pallet-dao-assets = { workspace = true }
@@ -269,6 +270,7 @@ std = [
 	"xcm-executor/std",
 ]
 runtime-benchmarks = [
+	"dao-primitives/runtime-benchmarks",
 	"cumulus-pallet-session-benchmarking/runtime-benchmarks",
 	"cumulus-pallet-xcmp-queue/runtime-benchmarks",
 	"frame-benchmarking/runtime-benchmarks",

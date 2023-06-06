@@ -15,7 +15,7 @@ use dao_primitives::{
 };
 use frame_support::{
 	ord_parameter_types, parameter_types,
-	traits::{AsEnsureOriginWithArg, ConstU32, ConstU64},
+	traits::{AsEnsureOriginWithArg, ConstU32, ConstU64, EnsureOriginWithArg},
 	weights::Weight,
 	PalletId,
 };
@@ -162,6 +162,21 @@ impl DaoProvider<H256> for TestDaoProvider {
 		_id: Self::Id,
 	) -> Result<Option<Self::NFTCollectionId>, DispatchError> {
 		Err(Error::<Test>::NotMember.into())
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn create_dao(
+		_founder: Self::AccountId,
+		_council: Vec<Self::AccountId>,
+		_technical_committee: Vec<Self::AccountId>,
+		_data: Vec<u8>,
+	) -> Result<(), DispatchError> {
+		Ok(())
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()> {
+		Self::ApproveOrigin::try_successful_origin(dao_origin)
 	}
 }
 
