@@ -34,7 +34,7 @@ frame-system = { workspace = true }
 scale-info = { workspace = true, features = ["derive"] }
 
 # Local Dependencies
-dao-primitives = { default-features = false, path = "../../primitives/dao" }
+dao-primitives = { workspace = true }
 pallet-dao-assets = { workspace = true }
 
 [dev-dependencies]

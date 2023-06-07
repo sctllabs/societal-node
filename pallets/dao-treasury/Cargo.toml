@@ -35,7 +35,7 @@ frame-system = { workspace = true }
 pallet-balances = { workspace = true }
 
 # Local Dependencies
-dao-primitives = { default-features = false, path = "../../primitives/dao" }
+dao-primitives = { workspace = true }
 
 [dev-dependencies]
 sp-core = { workspace = true }

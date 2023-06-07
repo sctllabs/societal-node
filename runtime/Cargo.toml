@@ -141,23 +141,23 @@ pallet-collator-selection = { workspace = true }
 parachain-info = { workspace = true }
 
 # Local Dependencies
-dao-primitives = { default-features = false, path = "../primitives/dao" }
-eth-primitives = { default-features = false, path = "../primitives/eth" }
-pallet-dao = { default-features = false, path = "../pallets/dao" }
+dao-primitives = { workspace = true }
+eth-primitives = { workspace = true }
+pallet-dao = { workspace = true }
 pallet-dao-assets = { workspace = true }
-pallet-dao-bounties = { default-features = false, path = "../pallets/dao-bounties" }
-pallet-dao-bounties-precompile = { default-features = false, path = "../precompiles/dao-bounties" }
-pallet-dao-collective = { default-features = false, path = "../pallets/dao-collective" }
-pallet-dao-collective-precompile = { default-features = false, path = "../precompiles/dao-collective" }
-pallet-dao-democracy = { default-features = false, path = "../pallets/dao-democracy" }
-pallet-dao-democracy-precompile = { default-features = false, path = "../precompiles/dao-democracy" }
-pallet-dao-eth-governance = { default-features = false, path = "../pallets/dao-eth-governance" }
-pallet-dao-eth-governance-precompile = { default-features = false, path = "../precompiles/dao-eth-governance" }
-pallet-dao-membership = { default-features = false, path = "../pallets/dao-membership" }
-pallet-dao-membership-precompile = { default-features = false, path = "../precompiles/dao-membership" }
-pallet-dao-precompile = { default-features = false, path = "../precompiles/dao" }
-pallet-dao-treasury = { default-features = false, path = "../pallets/dao-treasury" }
-pallet-dao-treasury-precompile = { default-features = false, path = "../precompiles/dao-treasury" }
+pallet-dao-bounties = { workspace = true }
+pallet-dao-bounties-precompile = { workspace = true }
+pallet-dao-collective = { workspace = true }
+pallet-dao-collective-precompile = { workspace = true }
+pallet-dao-democracy = { workspace = true }
+pallet-dao-democracy-precompile = { workspace = true }
+pallet-dao-eth-governance = { workspace = true }
+pallet-dao-eth-governance-precompile = { workspace = true }
+pallet-dao-membership = { workspace = true }
+pallet-dao-membership-precompile = { workspace = true }
+pallet-dao-precompile = { workspace = true }
+pallet-dao-treasury = { workspace = true }
+pallet-dao-treasury-precompile = { workspace = true }
 
 [build-dependencies]
 substrate-wasm-builder = { workspace = true }

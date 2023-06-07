@@ -33,7 +33,7 @@ frame-support = { workspace = true }
 frame-system = { workspace = true }
 
 # Local Dependencies
-dao-primitives = { default-features = false, path = "../../primitives/dao" }
+dao-primitives = { workspace = true }
 
 [features]
 default = ["std"]

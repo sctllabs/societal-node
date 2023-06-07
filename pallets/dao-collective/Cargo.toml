@@ -31,7 +31,7 @@ frame-support = { workspace = true }
 frame-system = { workspace = true }
 
 # Local dependencies
-dao-primitives = { default-features = false, path = "../../primitives/dao" }
+dao-primitives = { workspace = true }
 
 [dev-dependencies]
 pallet-preimage = { workspace = true }
