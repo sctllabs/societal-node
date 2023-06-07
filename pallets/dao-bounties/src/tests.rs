@@ -140,7 +140,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 	}
 
 	fn dao_token(_id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
-		Ok(DaoToken::FungibleToken(1))
+		Ok(DaoToken::FungibleToken(0))
 	}
 
 	fn policy(_id: Self::Id) -> Result<Self::Policy, DispatchError> {

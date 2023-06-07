@@ -2030,6 +2030,7 @@ mod benches {
 		[pallet_timestamp, Timestamp]
 		[pallet_dao, Dao]
 		[pallet_dao_membership, DaoCouncilMembers]
+		[pallet_dao_bounties, DaoBounties]
 	);
 }
 
