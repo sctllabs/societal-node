@@ -26,10 +26,9 @@
 //! Collective system: Members of a set of account IDs can make their collective feelings known
 //! through dispatched calls from one of two specialized origins.
 //!
-//! The membership can be provided in one of two ways: either directly, using the Root-dispatchable
-//! function `set_members`, or indirectly, through implementing the `ChangeMembers`.
+//! The membership can be provided through implementing the `ChangeMembers`.
 //! The pallet assumes that the amount of members stays at or below `MaxMembers` for its weight
-//! calculations, but enforces this neither in `set_members` nor in `change_members_sorted`.
+//! calculations, but enforces this in `change_members_sorted`.
 //!
 //! Voting happens through motions comprising a proposal (i.e. a curried dispatchable) plus a
 //! number of approvals required for it to pass and be called. Motions are open for members to
@@ -365,117 +364,20 @@ pub mod pallet {
 	// Note that councillor operations are assigned to the operational class.
 	#[pallet::call]
 	impl<T: Config<I>, I: 'static> Pallet<T, I> {
-		/// Set the collective's membership.
-		///
-		/// - `new_members`: The new member list. Be nice to the chain and provide it sorted.
-		/// - `old_count`: The upper bound for the previous number of members in storage. Used for
-		///   weight estimation.
-		///
-		/// Requires root origin.
-		///
-		/// NOTE: Does not enforce the expected `MaxMembers` limit on the amount of members, but
-		///       the weight estimations rely on it to estimate dispatchable weight.
-		///
-		/// # WARNING:
-		///
-		/// The `pallet-collective` can also be managed by logic outside of the pallet through the
-		/// implementation of the trait [`ChangeMembers`].
-		/// Any call to `set_members` must be careful that the member set doesn't get out of sync
-		/// with other logic managing the member set.
-		///
-		/// # <weight>
-		/// ## Weight
-		/// - `O(MP + N)` where:
-		///   - `M` old-members-count (code- and governance-bounded)
-		///   - `N` new-members-count (code- and governance-bounded)
-		///   - `P` proposals-count (code-bounded)
-		/// - DB:
-		///   - 1 storage mutation (codec `O(M)` read, `O(N)` write) for reading and writing the
-		///     members
-		///   - 1 storage read (codec `O(P)`) for reading the proposals
-		///   - `P` storage mutations (codec `O(M)`) for updating the votes for each proposal
-		/// # </weight>
-		#[pallet::weight((
-			T::WeightInfo::set_members(
-				*old_count, // M
-				new_members.len() as u32, // N
-				T::MaxProposals::get() // P
-			),
-			DispatchClass::Operational
-		))]
-		#[pallet::call_index(0)]
-		// TODO: should be proceeded via dao origin - no roots allowed
-		pub fn set_members(
-			origin: OriginFor<T>,
-			dao_id: DaoId,
-			new_members: Vec<T::AccountId>,
-			old_count: MemberCount,
-		) -> DispatchResultWithPostInfo {
-			ensure_root(origin)?;
-			if new_members.len() > T::MaxMembers::get() as usize {
-				log::error!(
-					target: "runtime::collective",
-					"New members count ({}) exceeds maximum amount of members expected ({}).",
-					new_members.len(),
-					T::MaxMembers::get(),
-				);
-			}
-
-			let old = Members::<T, I>::get(dao_id);
-			if old.len() > old_count as usize {
-				log::warn!(
-					target: "runtime::collective",
-					"Wrong count used to estimate set_members weight. expected ({}) vs actual ({})",
-					old_count,
-					old.len(),
-				);
-			}
-			let mut new_members = new_members;
-			new_members.sort();
-			<Self as ChangeDaoMembers<DaoId, T::AccountId>>::set_members_sorted(
-				dao_id,
-				&new_members,
-				&old,
-			);
-
-			// TODO: revise weights across all functions
-			// TODO: max proposals per dao
-			Ok(Some(T::WeightInfo::set_members(
-				old.len() as u32,         // M
-				new_members.len() as u32, // N
-				T::MaxProposals::get(),   // P
-			))
-			.into())
-		}
-
 		/// Add a new proposal to either be voted on or executed directly.
 		///
 		/// Requires the sender to be member.
 		///
 		/// `threshold` determines whether `proposal` is executed directly (`threshold < 2`)
 		/// or put up for voting.
-		///
-		/// # <weight>
-		/// ## Weight
-		/// - `O(B + M + P1)` or `O(B + M + P2)` where:
-		///   - `B` is `proposal` size in bytes (length-fee-bounded)
-		///   - `M` is members-count (code- and governance-bounded)
-		///   - branching is influenced by `threshold` where:
-		///     - `P1` is proposal execution complexity (`threshold < 2`)
-		///     - `P2` is proposals-count (code-bounded) (`threshold >= 2`)
-		/// - DB:
-		///   - 1 storage read `is_member` (codec `O(M)`)
-		///   - 1 storage read `ProposalOf::contains_key` (codec `O(1)`)
-		///   - DB accesses influenced by `threshold`:
-		///     - EITHER storage accesses done by `proposal` (`threshold < 2`)
-		///     - OR proposal insertion (`threshold <= 2`)
-		///       - 1 storage mutation `Proposals` (codec `O(P2)`)
-		///       - 1 storage mutation `ProposalCount` (codec `O(1)`)
-		///       - 1 storage write `ProposalOf` (codec `O(B)`)
-		///       - 1 storage write `Voting` (codec `O(M)`)
-		///   - 1 event
-		/// # </weight>
-		#[pallet::weight(10_000)]
+		#[pallet::weight((
+			T::WeightInfo::propose_with_meta(
+				*length_bound,
+				T::MaxMembers::get(),
+				T::MaxProposals::get()
+			),
+			DispatchClass::Operational
+		))]
 		#[pallet::call_index(1)]
 		pub fn propose(
 			origin: OriginFor<T>,
@@ -488,7 +390,14 @@ pub mod pallet {
 		}
 
 		/// Adds a new proposal with temporary meta field for arbitrary data indexed by node indexer
-		#[pallet::weight(10_000)]
+		#[pallet::weight((
+			T::WeightInfo::propose_with_meta(
+				*length_bound,
+				T::MaxMembers::get(),
+				T::MaxProposals::get()
+			),
+			DispatchClass::Operational
+		))]
 		#[pallet::call_index(2)]
 		pub fn propose_with_meta(
 			origin: OriginFor<T>,
@@ -515,7 +424,7 @@ pub mod pallet {
 			let (proposal_len, active_proposals) =
 				Self::do_propose_proposed(who, dao_id, proposal, length_bound, meta)?;
 
-			Ok(Some(T::WeightInfo::propose_proposed(
+			Ok(Some(T::WeightInfo::propose_with_meta(
 				proposal_len,         // B
 				members.len() as u32, // M
 				active_proposals,     // P2
@@ -530,15 +439,10 @@ pub mod pallet {
 		/// Transaction fees will be waived if the member is voting on any particular proposal
 		/// for the first time and the call is successful. Subsequent vote changes will charge a
 		/// fee.
-		/// # <weight>
-		/// ## Weight
-		/// - `O(M)` where `M` is members-count (code- and governance-bounded)
-		/// - DB:
-		///   - 1 storage read `Members` (codec `O(M)`)
-		///   - 1 storage mutation `Voting` (codec `O(M)`)
-		/// - 1 event
-		/// # </weight>
-		#[pallet::weight((T::WeightInfo::vote(T::MaxMembers::get()), DispatchClass::Operational))]
+		#[pallet::weight((
+			T::WeightInfo::vote(T::MaxMembers::get()),
+			DispatchClass::Operational
+		))]
 		#[pallet::call_index(3)]
 		pub fn vote(
 			origin: OriginFor<T>,
@@ -576,24 +480,23 @@ pub mod pallet {
 		///
 		/// + `proposal_weight_bound`: The maximum amount of weight consumed by executing the closed
 		/// proposal.
+		/// proposal.
 		/// + `length_bound`: The upper bound for the length of the proposal in storage. Checked via
 		/// `storage::read` so it is `size_of::<u32>() == 4` larger than the pure length.
-		///
-		/// # <weight>
-		/// ## Weight
-		/// - `O(B + M + P1 + P2)` where:
-		///   - `B` is `proposal` size in bytes (length-fee-bounded)
-		///   - `M` is members-count (code- and governance-bounded)
-		///   - `P1` is the complexity of `proposal` preimage.
-		///   - `P2` is proposal-count (code-bounded)
-		/// - DB:
-		///  - 1 storage read (`Members`: codec `O(M)`)
-		///  - 3 mutations (`Voting`: codec `O(M)`, `ProposalOf`: codec `O(B)`, `Proposals`: codec
-		///    `O(P2)`)
-		///  - any mutations done while executing `proposal` (`P1`)
-		/// - up to 3 events
-		/// # </weight>
-		#[pallet::weight(10_000)]
+		#[pallet::weight((
+			{
+				let b = *length_bound;
+				let m = T::MaxMembers::get();
+				let p1 = *proposal_weight_bound;
+				let p2 = T::MaxProposals::get();
+				T::WeightInfo::close_early_approved(b, m, p2)
+					.max(T::WeightInfo::close_early_disapproved(m, p2))
+					.max(T::WeightInfo::close_approved(b, m, p2))
+					.max(T::WeightInfo::close_disapproved(m, p2))
+					.saturating_add(p1.into())
+			},
+			DispatchClass::Operational
+		))]
 		#[pallet::call_index(4)]
 		pub fn close(
 			origin: OriginFor<T>,
@@ -621,7 +524,20 @@ pub mod pallet {
 			}
 		}
 
-		#[pallet::weight(10_000)]
+		#[pallet::weight((
+			{
+				let b = *length_bound;
+				let m = T::MaxMembers::get();
+				let p1 = *proposal_weight_bound;
+				let p2 = T::MaxProposals::get();
+				T::WeightInfo::close_early_approved(b, m, p2)
+					.max(T::WeightInfo::close_early_disapproved(m, p2))
+					.max(T::WeightInfo::close_approved(b, m, p2))
+					.max(T::WeightInfo::close_disapproved(m, p2))
+					.saturating_add(p1.into())
+			},
+			DispatchClass::Operational
+		))]
 		#[pallet::call_index(5)]
 		pub fn close_scheduled_proposal(
 			origin: OriginFor<T>,
@@ -661,7 +577,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		who: T::AccountId,
 		dao_id: DaoId,
 		proposal: BoundedProposal<T, I>,
-		_length_bound: MemberCount,
+		length_bound: MemberCount,
 		meta: Option<Vec<u8>>,
 	) -> Result<(u32, u32), DispatchError> {
 		let proposal_len = proposal.encoded_size();
@@ -710,12 +626,24 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		let account_id = T::DaoProvider::dao_account_id(dao_id);
 		let origin = DaoRawOrigin::Dao(account_id).into();
 
-		// TODO: check weights!!!
+		let proposal_weight_bound = {
+			let b = length_bound;
+			let m = T::MaxMembers::get();
+			let p1: Weight = Default::default();
+			let p2 = T::MaxProposals::get();
+
+			T::WeightInfo::close_early_approved(b, m, p2)
+				.max(T::WeightInfo::close_early_disapproved(m, p2))
+				.max(T::WeightInfo::close_approved(b, m, p2))
+				.max(T::WeightInfo::close_disapproved(m, p2))
+				.saturating_add(p1.into())
+		};
+
 		let call = CallOf::<T, I>::from(Call::close_scheduled_proposal {
 			dao_id,
 			proposal_hash,
 			index,
-			proposal_weight_bound: Default::default(),
+			proposal_weight_bound,
 			length_bound: Default::default(),
 		});
 
@@ -939,20 +867,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		Ok((call, proposal_len as usize))
 	}
 
-	/// Weight:
-	/// If `approved`:
-	/// - the weight of `proposal` preimage.
-	/// - two events deposited.
-	/// - two removals, one mutation.
-	/// - computation and i/o `O(P + L)` where:
-	///   - `P` is number of active proposals,
-	///   - `L` is the encoded length of `proposal` preimage.
-	///
-	/// If not `approved`:
-	/// - one event deposited.
-	/// Two removals, one mutation.
-	/// Computation and i/o `O(P)` where:
-	/// - `P` is number of active proposals
 	fn do_approve_proposal(
 		dao_id: DaoId,
 		seats: MemberCount,
@@ -1012,24 +926,11 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 	}
 }
 
-// TODO re-work pallet-membership for Dao members management
 impl<T: Config<I>, I: 'static> ChangeDaoMembers<DaoId, T::AccountId> for Pallet<T, I> {
 	/// Update the members of the collective. Votes are updated.
 	///
 	/// NOTE: Does not enforce the expected `MaxMembers` limit on the amount of members, but
 	///       the weight estimations rely on it to estimate dispatchable weight.
-	///
-	/// # <weight>
-	/// ## Weight
-	/// - `O(MP + N)`
-	///   - where `M` old-members-count (governance-bounded)
-	///   - where `N` new-members-count (governance-bounded)
-	///   - where `P` proposals-count
-	/// - DB:
-	///   - 1 storage read (codec `O(P)`) for reading the proposals
-	///   - `P` storage mutations for updating the votes (codec `O(M)`)
-	///   - 1 storage write (codec `O(N)`) for storing the new members
-	/// # </weight>
 	fn change_members_sorted(
 		dao_id: DaoId,
 		_incoming: &[T::AccountId],
@@ -1189,7 +1090,6 @@ impl<
 	}
 }
 
-// TODO: make abstraction to frame InitializeMembers
 impl<T: Config<I>, I: 'static> InitializeDaoMembers<DaoId, T::AccountId> for Pallet<T, I> {
 	fn initialize_members(dao_id: DaoId, members: Vec<T::AccountId>) -> Result<(), DispatchError> {
 		// considering we've checked everything in membership pallet

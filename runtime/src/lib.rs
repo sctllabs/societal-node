@@ -563,9 +563,9 @@ impl pallet_aura::Config for Runtime {
 
 parameter_types! {
 	pub const CouncilMotionDuration: BlockNumber = 5 * DAYS;
-	pub const CouncilMaxProposals: u32 = 100;
+	pub const CouncilMaxProposals: u32 = 50;
 	pub const CouncilMaxMembers: u32 = 100;
-	pub const CollectiveMaxVotes: u32 = 50;
+	pub const CollectiveMaxVotes: u32 = 100;
 }
 
 // TODO - Update settings
@@ -1117,7 +1117,7 @@ parameter_types! {
 	pub const MinimumDeposit: Balance = 100 * DOLLARS;
 	pub const EnactmentPeriod: BlockNumber = 30 * 24 * 60 * MINUTES;
 	pub const CooloffPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
-	pub const MaxProposals: u32 = 100;
+	pub const MaxProposals: u32 = 50;
 }
 
 // TODO - Update settings
@@ -2029,8 +2029,9 @@ mod benches {
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
 		[pallet_dao, Dao]
-		[pallet_dao_membership, DaoCouncilMembers]
 		[pallet_dao_bounties, DaoBounties]
+		[pallet_dao_collective, DaoCouncil]
+		[pallet_dao_membership, DaoCouncilMembers]
 	);
 }
 
