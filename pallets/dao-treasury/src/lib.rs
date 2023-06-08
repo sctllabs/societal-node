@@ -149,9 +149,6 @@ pub mod pallet {
 			+ From<u128>
 			+ Ord;
 
-		/// Origin from which approvals must come.
-		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
-
 		/// The overarching event type.
 		type RuntimeEvent: From<Event<Self, I>>
 			+ IsType<<Self as frame_system::Config>::RuntimeEvent>;
@@ -296,7 +293,8 @@ pub mod pallet {
 	impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		/// Propose and approve a spend of treasury funds.
 		///
-		/// - `origin`: Must be `ApproveOrigin` with the `Success` value being at least `amount`.
+		/// - `origin`: Must be Dao `ApproveOrigin` with the `Success` value being at least
+		///   `amount`.
 		/// - `dao_id`: DAO ID.
 		/// - `amount`: The amount to be transferred from the treasury to the `beneficiary`.
 		/// - `beneficiary`: The destination account for the transfer.
@@ -337,7 +335,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::transfer_token())]
 		#[pallet::call_index(1)]
 		pub fn transfer_token(
 			origin: OriginFor<T>,
@@ -360,7 +358,7 @@ pub mod pallet {
 			}
 		}
 
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::transfer_token())]
 		#[pallet::call_index(2)]
 		pub fn transfer_token_by_id(
 			origin: OriginFor<T>,
@@ -426,8 +424,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			});
 			proposals_approvals_len
 		});
-
-		total_weight += T::WeightInfo::on_initialize_proposals(proposals_len);
 
 		// Call Runtime hooks to external pallet using treasury to compute spend funds.
 		T::SpendFunds::spend_funds(

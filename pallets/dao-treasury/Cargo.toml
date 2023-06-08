@@ -23,6 +23,7 @@ impl-trait-for-tuples = { workspace = true }
 log = { workspace = true }
 scale-info = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["derive"], optional = true }
+serde_json = { workspace = true, features = ["alloc"] }
 
 # Primitives
 sp-runtime = { workspace = true }

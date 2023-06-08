@@ -206,7 +206,6 @@ parameter_types! {
 impl pallet_dao_treasury::Config for Test {
 	type PalletId = TreasuryPalletId;
 	type Currency = pallet_balances::Pallet<Test>;
-	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
 	type Burn = Burn;
@@ -222,7 +221,6 @@ impl pallet_dao_treasury::Config for Test {
 impl pallet_dao_treasury::Config<Instance1> for Test {
 	type PalletId = TreasuryPalletId2;
 	type Currency = pallet_balances::Pallet<Test>;
-	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
 	type Burn = Burn;

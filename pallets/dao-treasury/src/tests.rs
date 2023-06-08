@@ -162,7 +162,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 	}
 
 	fn dao_token(_id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
-		todo!()
+		Ok(DaoToken::FungibleToken(0))
 	}
 
 	fn ensure_approved(
@@ -334,7 +334,6 @@ impl Config for Test {
 	type PalletId = TreasuryPalletId;
 	type Currency = pallet_balances::Pallet<Test>;
 	type AssetId = u128;
-	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
 	type Burn = Burn;

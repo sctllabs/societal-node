@@ -697,10 +697,6 @@ impl pallet_dao_treasury::Config for Runtime {
 	type PalletId = DaoTreasuryPalletId;
 	type Currency = Balances;
 	type AssetId = AssetId;
-	type ApproveOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
-	>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
 	type Burn = Burn;
@@ -2032,6 +2028,7 @@ mod benches {
 		[pallet_dao_bounties, DaoBounties]
 		[pallet_dao_collective, DaoCouncil]
 		[pallet_dao_membership, DaoCouncilMembers]
+		[pallet_dao_treasury, DaoTreasury]
 	);
 }
 
