@@ -189,11 +189,9 @@ pub use vote_threshold::{Approved, VoteThreshold};
 pub use weights::WeightInfo;
 
 #[cfg(test)]
-#[cfg(feature = "dao_democracy_tests")]
 mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
-#[cfg(feature = "dao_democracy_tests")]
 pub mod benchmarking;
 
 const DEMOCRACY_ID: LockIdentifier = *b"democrac";
@@ -222,7 +220,7 @@ pub mod pallet {
 	use frame_support::{
 		dispatch::{GetDispatchInfo, PostDispatchInfo},
 		pallet_prelude::*,
-		traits::{EnsureOriginWithArg, TryDrop},
+		traits::{fungibles::Transfer, EnsureOriginWithArg, TryDrop},
 	};
 	use frame_system::pallet_prelude::*;
 	use sp_core::H256;
@@ -257,7 +255,8 @@ pub mod pallet {
 			> + Inspect<Self::AccountId>
 			+ InspectHold<Self::AccountId>
 			+ MutateHold<Self::AccountId>
-			+ BalancedHold<Self::AccountId>;
+			+ BalancedHold<Self::AccountId>
+			+ Transfer<Self::AccountId>;
 
 		type Proposal: Parameter
 			+ Dispatchable<
@@ -347,6 +346,7 @@ pub mod pallet {
 			AccountId = Self::AccountId,
 			AssetId = u128,
 			Policy = DaoPolicy,
+			Origin = OriginFor<Self>,
 		>;
 	}
 
@@ -572,7 +572,7 @@ pub mod pallet {
 		/// - `value`: The amount of deposit (must be at least `MinimumDeposit`).
 		///
 		/// Emits `Proposed`.
-		#[pallet::weight(T::WeightInfo::propose())]
+		#[pallet::weight(T::WeightInfo::propose_with_meta())]
 		#[pallet::call_index(0)]
 		pub fn propose(
 			origin: OriginFor<T>,
@@ -584,7 +584,7 @@ pub mod pallet {
 		}
 
 		/// Adds a new proposal with temporary meta field for arbitrary data indexed by node indexer
-		#[pallet::weight(T::WeightInfo::propose())]
+		#[pallet::weight(T::WeightInfo::propose_with_meta())]
 		#[pallet::call_index(1)]
 		pub fn propose_with_meta(
 			origin: OriginFor<T>,
@@ -955,10 +955,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		// TODO: no roots allowed
 		/// Remove a referendum.
-		///
-		/// The dispatch origin of this call must be _Root_.
 		///
 		/// - `ref_index`: The index of the referendum to cancel.
 		///
@@ -970,7 +967,15 @@ pub mod pallet {
 			dao_id: DaoId,
 			#[pallet::compact] ref_index: ReferendumIndex,
 		) -> DispatchResult {
-			ensure_root(origin)?;
+			let GovernanceV1Policy { cancellation_origin, .. } =
+				Self::ensure_democracy_supported(dao_id)?;
+
+			let dao_account_id = T::DaoProvider::dao_account_id(dao_id);
+			T::CancellationOrigin::ensure_origin(
+				origin,
+				&DaoOrigin { dao_account_id, proportion: cancellation_origin },
+			)?;
+
 			Self::internal_cancel_referendum(dao_id, ref_index);
 			Ok(())
 		}
@@ -1033,20 +1038,6 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 			let votes = Self::try_undelegate(dao_id, who)?;
 			Ok(Some(T::WeightInfo::undelegate(votes)).into())
-		}
-
-		// TODO: no roots allowed
-		/// Clears all public proposals.
-		///
-		/// The dispatch origin of this call must be _Root_.
-		///
-		/// Weight: `O(1)`.
-		#[pallet::weight(T::WeightInfo::clear_public_proposals())]
-		#[pallet::call_index(13)]
-		pub fn clear_public_proposals(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
-			ensure_root(origin)?;
-			<PublicProps<T>>::remove(dao_id);
-			Ok(())
 		}
 
 		/// Unlock tokens that have an expired lock.

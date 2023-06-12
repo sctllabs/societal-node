@@ -15,7 +15,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Democracy pallet benchmarking.
+// Changes made comparing to the RuntimeOriginal tests of the FRAME pallet-collective:
+// - added DAO pallet configuration as DAO provider
+// - using DAO as a parameter for pallet functions
+
+//! DAO Democracy pallet benchmarking.
 
 use super::*;
 
@@ -23,27 +27,78 @@ use dao_primitives::{DaoOrigin, DaoPolicyProportion};
 use frame_benchmarking::{account, benchmarks, whitelist_account, BenchmarkError};
 use frame_support::{
 	assert_noop, assert_ok,
-	traits::{
-		Currency, EnsureOrigin, EnsureOriginWithArg, Get, OnInitialize, UnfilteredDispatchable,
-	},
+	traits::{fungibles::Transfer, Currency, EnsureOrigin, EnsureOriginWithArg, Get},
 };
 use frame_system::RawOrigin;
+use serde_json::json;
 use sp_core::H256;
 use sp_runtime::{traits::Bounded, BoundedVec};
 
 use crate::Pallet as Democracy;
 
-const REFERENDUM_COUNT_HINT: u32 = 10;
 const SEED: u32 = 0;
 
-// TODO: use mock dao settings instead
+// Create the pre-requisite information needed to create a dao.
+fn setup_dao_payload<T: Config>() -> Vec<u8> {
+	let dao_json = json!({
+		"name": "name",
+		"purpose": "purpose",
+		"metadata": "metadata",
+		"policy": {
+			"proposal_period": 100,
+			"governance": {
+				"GovernanceV1": {
+					"enactment_period": 2,
+					"launch_period": 2,
+					"voting_period": 2,
+					"vote_locking_period": 3,
+					"fast_track_voting_period": 3,
+					"cooloff_period": 2,
+					"minimum_deposit": 1,
+					"instant_allowed": true
+				}
+			}
+		},
+		"token": {
+			"token_id": 0,
+			"initial_balance": "100000000",
+			"metadata": {
+				"name": "token",
+				"symbol": "symbol",
+				"decimals": 2
+			}
+		}
+	});
 
-fn funded_account<T: Config>(name: &'static str, index: u32) -> T::AccountId {
+	serde_json::to_vec(&dao_json).ok().unwrap()
+}
+
+fn create_dao<T: Config>() -> Result<T::AccountId, DispatchError> {
+	let caller: T::AccountId = account("caller", 0, SEED);
+	let data = setup_dao_payload::<T>();
+
+	T::DaoProvider::create_dao(caller.clone(), vec![caller.clone()], vec![caller.clone()], data)?;
+
+	let dao_account_id = T::DaoProvider::dao_account_id(0);
+	let _ = T::Currency::make_free_balance_be(&dao_account_id, 1_000_000_000u32.into());
+
+	Ok(caller)
+}
+
+fn funded_account<T: Config>(
+	name: &'static str,
+	index: u32,
+) -> Result<T::AccountId, DispatchError> {
 	let caller: T::AccountId = account(name, index, SEED);
 	// Give the account half of the maximum value of the `Balance` type.
 	// Otherwise some transfers will fail with an overflow error.
 	T::Currency::make_free_balance_be(&caller, BalanceOf::<T>::max_value() / 2u32.into());
-	caller
+
+	// Transferring some DAO tokens to the caller
+	let dao_account_id = T::DaoProvider::dao_account_id(0);
+	T::Assets::transfer(0, &dao_account_id, &caller, 10_000_u32.into(), true)?;
+
+	Ok(caller)
 }
 
 fn make_proposal<T: Config>(n: u32) -> BoundedCallOf<T> {
@@ -52,8 +107,8 @@ fn make_proposal<T: Config>(n: u32) -> BoundedCallOf<T> {
 }
 
 fn add_proposal<T: Config>(n: u32) -> Result<H256, &'static str> {
-	let other = funded_account::<T>("proposer", n);
-	let value = BalanceOf::<T>::min_value();
+	let other = funded_account::<T>("proposer", n)?;
+	let value = 10_u32.into();
 	let proposal = make_proposal::<T>(n);
 	Democracy::<T>::propose(RawOrigin::Signed(other).into(), 0, proposal.clone(), value)?;
 	Ok(proposal.hash())
@@ -83,30 +138,46 @@ fn account_vote<T: Config>(b: BalanceOf<T>) -> AccountVote<BalanceOf<T>> {
 }
 
 benchmarks! {
-	propose {
+	propose_with_meta {
 		let p = T::MaxProposals::get();
+
+		create_dao::<T>()?;
 
 		for i in 0 .. (p - 1) {
 			add_proposal::<T>(i)?;
 		}
 
-		let caller = funded_account::<T>("caller", 0);
+		let caller = funded_account::<T>("caller", 0)?;
+
 		let proposal = make_proposal::<T>(0);
-		let value = BalanceOf::<T>::min_value();
+		let value = 10_u32.into();
 		whitelist_account!(caller);
-	}: _(RawOrigin::Signed(caller), 0, proposal, value)
+
+		let meta: Option<Vec<u8>> = Some(
+			"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor \
+			incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud \
+			exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure \
+			dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. \
+			Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt \
+			mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit, \
+			sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim \
+			veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo \
+			consequat. Duis aute irure dolor in reprehenderit".into()
+		);
+	}: _(RawOrigin::Signed(caller), 0, proposal, value, meta)
 	verify {
 		assert_eq!(Democracy::<T>::public_props(0).len(), p as usize, "Proposals not created.");
 	}
 
 	second {
-		let caller = funded_account::<T>("caller", 0);
+		create_dao::<T>()?;
+		let caller = funded_account::<T>("caller", 0)?;
 		add_proposal::<T>(0)?;
 
 		// Create s existing "seconds"
 		// we must reserve one deposit for the `proposal` and one for our benchmarked `second` call.
 		for i in 0 .. T::MaxDeposits::get() - 2 {
-			let seconder = funded_account::<T>("seconder", i);
+			let seconder = funded_account::<T>("seconder", i)?;
 			Democracy::<T>::second(RawOrigin::Signed(seconder).into(), 0, 0)?;
 		}
 
@@ -120,13 +191,15 @@ benchmarks! {
 	}
 
 	vote_new {
-		let caller = funded_account::<T>("caller", 0);
+		create_dao::<T>()?;
+		let caller = funded_account::<T>("caller", 0)?;
 		let account_vote = account_vote::<T>(100u32.into());
 
 		// We need to create existing direct votes
 		for i in 0 .. T::MaxVotes::get() - 1 {
 			let ref_index = add_referendum::<T>(i).0;
-			Democracy::<T>::vote(RawOrigin::Signed(caller.clone()).into(), 0, ref_index, account_vote)?;
+			Democracy::<T>::vote(
+				RawOrigin::Signed(caller.clone()).into(), 0, ref_index, account_vote)?;
 		}
 		let votes = match VotingOf::<T>::get(0, &caller) {
 			Voting::Direct { votes, .. } => votes,
@@ -146,13 +219,15 @@ benchmarks! {
 	}
 
 	vote_existing {
-		let caller = funded_account::<T>("caller", 0);
+		create_dao::<T>()?;
+		let caller = funded_account::<T>("caller", 0)?;
 		let account_vote = account_vote::<T>(100u32.into());
 
 		// We need to create existing direct votes
 		for i in 0..T::MaxVotes::get() {
 			let ref_index = add_referendum::<T>(i).0;
-			Democracy::<T>::vote(RawOrigin::Signed(caller.clone()).into(), 0, ref_index, account_vote)?;
+			Democracy::<T>::vote(
+				RawOrigin::Signed(caller.clone()).into(), 0, ref_index, account_vote)?;
 		}
 		let votes = match VotingOf::<T>::get(0, &caller) {
 			Voting::Direct { votes, .. } => votes,
@@ -184,8 +259,13 @@ benchmarks! {
 	}
 
 	emergency_cancel {
-		let dao_account_id: T::AccountId = funded_account::<T>("dao_account", 0);
-		let origin = T::CancellationOrigin::try_successful_origin(&DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) }).map_err(|_| BenchmarkError::Weightless)?;
+		let caller = create_dao::<T>()?;
+		let dao_account_id: T::AccountId = T::DaoProvider::dao_account_id(0);
+		let origin = T::CancellationOrigin::try_successful_origin(
+			&DaoOrigin {
+				dao_account_id,
+				proportion: DaoPolicyProportion::AtLeast((0, 1))
+			}).map_err(|_| BenchmarkError::Weightless)?;
 		let ref_index = add_referendum::<T>(0).0;
 		assert_ok!(Democracy::<T>::referendum_status(0, ref_index));
 	}: _<T::RuntimeOrigin>(origin, 0, ref_index)
@@ -198,6 +278,8 @@ benchmarks! {
 	}
 
 	blacklist {
+		create_dao::<T>()?;
+
 		// Place our proposal at the end to make sure it's worst case.
 		for i in 0 .. T::MaxProposals::get() - 1 {
 			add_proposal::<T>(i)?;
@@ -208,13 +290,25 @@ benchmarks! {
 		let (ref_index, hash) = add_referendum::<T>(0);
 		assert_ok!(Democracy::<T>::referendum_status(0, ref_index));
 
-		let dao_account_id: T::AccountId = funded_account::<T>("dao_account", 0);
+		let dao_account_id: T::AccountId = T::DaoProvider::dao_account_id(0);
 
 		// Place our proposal in the external queue, too.
 		assert_ok!(
-			Democracy::<T>::external_propose(T::ExternalOrigin::try_successful_origin(&DaoOrigin { dao_account_id: dao_account_id.clone(), proportion: DaoPolicyProportion::AtLeast((0, 1)) }).map_err(|_| BenchmarkError::Weightless)?, 0, make_proposal::<T>(0))
+			Democracy::<T>::external_propose(
+				T::ExternalOrigin::try_successful_origin(
+					&DaoOrigin {
+						dao_account_id: dao_account_id.clone(),
+						proportion: DaoPolicyProportion::AtLeast((0, 1))
+					}
+				)
+				.map_err(|_| BenchmarkError::Weightless)?, 0, make_proposal::<T>(0))
 		);
-		let origin = T::BlacklistOrigin::try_successful_origin(&DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) }).map_err(|_| BenchmarkError::Weightless)?;
+		let origin = T::BlacklistOrigin::try_successful_origin(
+			&DaoOrigin {
+				dao_account_id,
+				proportion: DaoPolicyProportion::AtLeast((0, 1))
+			}
+		).map_err(|_| BenchmarkError::Weightless)?;
 	}: _<T::RuntimeOrigin>(origin, 0, hash, Some(ref_index))
 	verify {
 		// Referendum has been canceled
@@ -226,8 +320,14 @@ benchmarks! {
 
 	// Worst case scenario, we external propose a previously blacklisted proposal
 	external_propose {
-		let dao_account_id: T::AccountId = funded_account::<T>("dao_account", 0);
-		let origin = T::ExternalOrigin::try_successful_origin(&DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) }).map_err(|_| BenchmarkError::Weightless)?;
+		create_dao::<T>()?;
+		let dao_account_id: T::AccountId = T::DaoProvider::dao_account_id(0);
+		let origin = T::ExternalOrigin::try_successful_origin(
+			&DaoOrigin {
+				dao_account_id,
+				proportion: DaoPolicyProportion::AtLeast((0, 1))
+			}
+		).map_err(|_| BenchmarkError::Weightless)?;
 		let proposal = make_proposal::<T>(0);
 		// Add proposal to blacklist with block number 0
 
@@ -245,9 +345,11 @@ benchmarks! {
 	}
 
 	external_propose_majority {
-		let dao_account_id: T::AccountId = funded_account::<T>("dao_account", 0);
+		create_dao::<T>()?;
+		let dao_account_id: T::AccountId = T::DaoProvider::dao_account_id(0);
 		let dao_origin = DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) };
-		let origin = T::ExternalMajorityOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)?;
+		let origin = T::ExternalMajorityOrigin::try_successful_origin(&dao_origin)
+			.map_err(|_| BenchmarkError::Weightless)?;
 		let proposal = make_proposal::<T>(0);
 	}: _<T::RuntimeOrigin>(origin, 0, proposal)
 	verify {
@@ -256,9 +358,11 @@ benchmarks! {
 	}
 
 	external_propose_default {
-		let dao_account_id: T::AccountId = funded_account::<T>("dao_account", 0);
+		create_dao::<T>()?;
+		let dao_account_id: T::AccountId = T::DaoProvider::dao_account_id(0);
 		let dao_origin = DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) };
-		let origin = T::ExternalDefaultOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)?;
+		let origin = T::ExternalDefaultOrigin::try_successful_origin(&dao_origin)
+			.map_err(|_| BenchmarkError::Weightless)?;
 		let proposal = make_proposal::<T>(0);
 	}: _<T::RuntimeOrigin>(origin, 0, proposal)
 	verify {
@@ -267,16 +371,19 @@ benchmarks! {
 	}
 
 	fast_track {
-		let dao_account_id: T::AccountId = funded_account::<T>("dao_account", 0);
+		create_dao::<T>()?;
+		let dao_account_id: T::AccountId = T::DaoProvider::dao_account_id(0);
 		let dao_origin = DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) };
-		let origin_propose = T::ExternalDefaultOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)?;
+		let origin_propose = T::ExternalDefaultOrigin::try_successful_origin(&dao_origin)
+			.map_err(|_| BenchmarkError::Weightless)?;
 		let proposal = make_proposal::<T>(0);
 		let proposal_hash = proposal.hash();
 		Democracy::<T>::external_propose_default(origin_propose, 0, proposal)?;
 
 		// NOTE: Instant origin may invoke a little bit more logic, but may not always succeed.
-		let origin_fast_track = T::FastTrackOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)?;
-		let voting_period = T::BlockNumber::min_value();
+		let origin_fast_track = T::FastTrackOrigin::try_successful_origin(&dao_origin)
+			.map_err(|_| BenchmarkError::Weightless)?;
+		let voting_period = T::BlockNumber::min_value() + T::BlockNumber::try_from(1_u64).ok().unwrap();
 		let delay = 0u32;
 	}: _<T::RuntimeOrigin>(origin_fast_track, 0, proposal_hash, voting_period, delay.into())
 	verify {
@@ -284,13 +391,15 @@ benchmarks! {
 	}
 
 	veto_external {
-		let dao_account_id: T::AccountId = funded_account::<T>("dao_account", 0);
+		let caller = create_dao::<T>()?;
+		let dao_account_id: T::AccountId = T::DaoProvider::dao_account_id(0);
 		let dao_origin = DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) };
 
 		let proposal = make_proposal::<T>(0);
 		let proposal_hash = proposal.hash();
 
-		let origin_propose = T::ExternalDefaultOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)?;
+		let origin_propose = T::ExternalDefaultOrigin::try_successful_origin(&dao_origin)
+			.map_err(|_| BenchmarkError::Weightless)?;
 		Democracy::<T>::external_propose_default(origin_propose, 0, proposal)?;
 
 		let mut vetoers: BoundedVec<T::AccountId, _> = Default::default();
@@ -310,166 +419,40 @@ benchmarks! {
 	}
 
 	cancel_proposal {
-		let dao_account_id: T::AccountId = funded_account::<T>("dao_account", 0);
+		create_dao::<T>()?;
+		let dao_account_id: T::AccountId = T::DaoProvider::dao_account_id(0);
 		let dao_origin = DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) };
 
 		// Place our proposal at the end to make sure it's worst case.
 		for i in 0 .. T::MaxProposals::get() {
 			add_proposal::<T>(i)?;
 		}
-		let cancel_origin = T::CancelProposalOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)?;
+		let cancel_origin = T::CancelProposalOrigin::try_successful_origin(&dao_origin)
+			.map_err(|_| BenchmarkError::Weightless)?;
 	}: _<T::RuntimeOrigin>(cancel_origin, 0, 0)
 
 	cancel_referendum {
-		let ref_index = add_referendum::<T>(0).0;
-	}: _(RawOrigin::Root, 0, ref_index)
-
-	#[extra]
-	on_initialize_external {
-		let r in 0 .. REFERENDUM_COUNT_HINT;
-
-		for i in 0..r {
-			add_referendum::<T>(i);
-		}
-
-		assert_eq!(Democracy::<T>::referendum_count(0), r, "referenda not created");
-
-		// Launch external
-		LastTabledWasExternal::<T>::insert(0, false);
-
-		let dao_account_id: T::AccountId = funded_account::<T>("dao_account", 0);
+		create_dao::<T>()?;
+		let dao_account_id: T::AccountId = T::DaoProvider::dao_account_id(0);
 		let dao_origin = DaoOrigin { dao_account_id, proportion: DaoPolicyProportion::AtLeast((0, 1)) };
 
-		let origin = T::ExternalMajorityOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)?;
-		let proposal = make_proposal::<T>(r);
-		let call = Call::<T>::external_propose_majority { dao_id: 0, proposal };
-		call.dispatch_bypass_filter(origin)?;
-		// External proposal created
-		ensure!(<NextExternal<T>>::contains_key(0), "External proposal didn't work");
+		let ref_index = add_referendum::<T>(0).0;
 
-		let block_number = T::BlockNumber::min_value();
-
-	}: { Democracy::<T>::on_initialize(block_number) }
-	verify {
-		// One extra because of next external
-		assert_eq!(Democracy::<T>::referendum_count(0), r + 1, "referenda not created");
-		ensure!(!<NextExternal<T>>::contains_key(0), "External wasn't taken");
-
-		// All but the new next external should be finished
-		for i in 0 .. r {
-			if let Some(value) = ReferendumInfoOf::<T>::get(0, i) {
-				match value {
-					ReferendumInfo::Finished { .. } => (),
-					ReferendumInfo::Ongoing(_) => return Err("Referendum was not finished".into()),
-				}
-			}
-		}
-	}
-
-	#[extra]
-	on_initialize_public {
-		let r in 0 .. (T::MaxVotes::get() - 1);
-
-		for i in 0..r {
-			add_referendum::<T>(i);
-		}
-
-		assert_eq!(Democracy::<T>::referendum_count(0), r, "referenda not created");
-
-		// Launch public
-		assert!(add_proposal::<T>(r).is_ok(), "proposal not created");
-		LastTabledWasExternal::<T>::insert(0, true);
-
-		let block_number = T::BlockNumber::min_value();
-
-	}: { Democracy::<T>::on_initialize(block_number) }
-	verify {
-		// One extra because of next public
-		assert_eq!(Democracy::<T>::referendum_count(0), r + 1, "proposal not accepted");
-
-		// All should be finished
-		for i in 0 .. r {
-			if let Some(value) = ReferendumInfoOf::<T>::get(0, i) {
-				match value {
-					ReferendumInfo::Finished { .. } => (),
-					ReferendumInfo::Ongoing(_) => return Err("Referendum was not finished".into()),
-				}
-			}
-		}
-	}
-
-	// No launch no maturing referenda.
-	on_initialize_base {
-		let r in 0 .. (T::MaxVotes::get() - 1);
-
-		for i in 0..r {
-			add_referendum::<T>(i);
-		}
-
-		for (dao_id, key, mut info) in ReferendumInfoOf::<T>::iter() {
-			if let ReferendumInfo::Ongoing(ref mut status) = info {
-				status.end += 100u32.into();
-			}
-			ReferendumInfoOf::<T>::insert(dao_id, key, info);
-		}
-
-		assert_eq!(Democracy::<T>::referendum_count(0), r, "referenda not created");
-		assert_eq!(Democracy::<T>::lowest_unbaked(0), 0, "invalid referenda init");
-
-	}: { Democracy::<T>::on_initialize(1u32.into()) }
-	verify {
-		// All should be on going
-		for i in 0 .. r {
-			if let Some(value) = ReferendumInfoOf::<T>::get(0, i) {
-				match value {
-					ReferendumInfo::Finished { .. } => return Err("Referendum has been finished".into()),
-					ReferendumInfo::Ongoing(_) => (),
-				}
-			}
-		}
-	}
-
-	on_initialize_base_with_launch_period {
-		let r in 0 .. (T::MaxVotes::get() - 1);
-
-		for i in 0..r {
-			add_referendum::<T>(i);
-		}
-
-		for (dao_id, key, mut info) in ReferendumInfoOf::<T>::iter() {
-			if let ReferendumInfo::Ongoing(ref mut status) = info {
-				status.end += 100u32.into();
-			}
-			ReferendumInfoOf::<T>::insert(dao_id, key, info);
-		}
-
-		assert_eq!(Democracy::<T>::referendum_count(0), r, "referenda not created");
-		assert_eq!(Democracy::<T>::lowest_unbaked(0), 0, "invalid referenda init");
-
-		let block_number = T::BlockNumber::min_value();
-
-	}: { Democracy::<T>::on_initialize(block_number) }
-	verify {
-		// All should be on going
-		for i in 0 .. r {
-			if let Some(value) = ReferendumInfoOf::<T>::get(0, i) {
-				match value {
-					ReferendumInfo::Finished { .. } => return Err("Referendum has been finished".into()),
-					ReferendumInfo::Ongoing(_) => (),
-				}
-			}
-		}
-	}
+		let cancel_origin = T::CancelProposalOrigin::try_successful_origin(&dao_origin)
+			.map_err(|_| BenchmarkError::Weightless)?;
+	}: _<T::RuntimeOrigin>(cancel_origin, 0, ref_index)
 
 	delegate {
 		let r in 0 .. (T::MaxVotes::get() - 1);
 
+		create_dao::<T>()?;
+
 		let initial_balance: BalanceOf<T> = 100u32.into();
 		let delegated_balance: BalanceOf<T> = 1000u32.into();
 
-		let caller = funded_account::<T>("caller", 0);
+		let caller = funded_account::<T>("caller", 0)?;
 		// Caller will initially delegate to `old_delegate`
-		let old_delegate: T::AccountId = funded_account::<T>("old_delegate", r);
+		let old_delegate: T::AccountId = funded_account::<T>("old_delegate", r)?;
 		let old_delegate_lookup = T::Lookup::unlookup(old_delegate.clone());
 		Democracy::<T>::delegate(
 			RawOrigin::Signed(caller.clone()).into(),
@@ -485,13 +468,14 @@ benchmarks! {
 		assert_eq!(target, old_delegate, "delegation target didn't work");
 		assert_eq!(balance, delegated_balance, "delegation balance didn't work");
 		// Caller will now switch to `new_delegate`
-		let new_delegate: T::AccountId = funded_account::<T>("new_delegate", r);
+		let new_delegate: T::AccountId = funded_account::<T>("new_delegate", r)?;
 		let new_delegate_lookup = T::Lookup::unlookup(new_delegate.clone());
 		let account_vote = account_vote::<T>(initial_balance);
 		// We need to create existing direct votes for the `new_delegate`
 		for i in 0..r {
 			let ref_index = add_referendum::<T>(i).0;
-			Democracy::<T>::vote(RawOrigin::Signed(new_delegate.clone()).into(), 0, ref_index, account_vote)?;
+			Democracy::<T>::vote(
+				RawOrigin::Signed(new_delegate.clone()).into(), 0, ref_index, account_vote)?;
 		}
 		let votes = match VotingOf::<T>::get(0, &new_delegate) {
 			Voting::Direct { votes, .. } => votes,
@@ -517,12 +501,14 @@ benchmarks! {
 	undelegate {
 		let r in 0 .. (T::MaxVotes::get() - 1);
 
+		create_dao::<T>()?;
+
 		let initial_balance: BalanceOf<T> = 100u32.into();
 		let delegated_balance: BalanceOf<T> = 1000u32.into();
 
-		let caller = funded_account::<T>("caller", 0);
+		let caller = funded_account::<T>("caller", 0)?;
 		// Caller will delegate
-		let the_delegate: T::AccountId = funded_account::<T>("delegate", r);
+		let the_delegate: T::AccountId = funded_account::<T>("delegate", r)?;
 		let the_delegate_lookup = T::Lookup::unlookup(the_delegate.clone());
 		Democracy::<T>::delegate(
 			RawOrigin::Signed(caller.clone()).into(),
@@ -563,16 +549,13 @@ benchmarks! {
 		}
 	}
 
-	clear_public_proposals {
-		add_proposal::<T>(0)?;
-
-	}: _(RawOrigin::Root, 0)
-
 	// Test when unlock will remove locks
 	unlock_remove {
 		let r in 0 .. (T::MaxVotes::get() - 1);
 
-		let locker = funded_account::<T>("locker", 0);
+		create_dao::<T>()?;
+
+		let locker = funded_account::<T>("locker", 0)?;
 		let locker_lookup = T::Lookup::unlookup(locker.clone());
 		// Populate votes so things are locked
 		let base_balance: BalanceOf<T> = 100u32.into();
@@ -584,7 +567,7 @@ benchmarks! {
 			Democracy::<T>::remove_vote(RawOrigin::Signed(locker.clone()).into(), 0, ref_index)?;
 		}
 
-		let caller = funded_account::<T>("caller", 0);
+		let caller = funded_account::<T>("caller", 0)?;
 		whitelist_account!(caller);
 	}: unlock(RawOrigin::Signed(caller), 0, locker_lookup)
 	verify {
@@ -597,7 +580,9 @@ benchmarks! {
 	unlock_set {
 		let r in 0 .. (T::MaxVotes::get() - 1);
 
-		let locker = funded_account::<T>("locker", 0);
+		create_dao::<T>()?;
+
+		let locker = funded_account::<T>("locker", 0)?;
 		let locker_lookup = T::Lookup::unlookup(locker.clone());
 		// Populate votes so things are locked
 		let base_balance: BalanceOf<T> = 100u32.into();
@@ -623,7 +608,7 @@ benchmarks! {
 
 		Democracy::<T>::remove_vote(RawOrigin::Signed(locker.clone()).into(), 0, ref_index)?;
 
-		let caller = funded_account::<T>("caller", 0);
+		let caller = funded_account::<T>("caller", 0)?;
 		whitelist_account!(caller);
 	}: unlock(RawOrigin::Signed(caller), 0, locker_lookup)
 	verify {
@@ -641,12 +626,15 @@ benchmarks! {
 	remove_vote {
 		let r in 1 .. T::MaxVotes::get();
 
-		let caller = funded_account::<T>("caller", 0);
+		create_dao::<T>()?;
+
+		let caller = funded_account::<T>("caller", 0)?;
 		let account_vote = account_vote::<T>(100u32.into());
 
 		for i in 0 .. r {
 			let ref_index = add_referendum::<T>(i).0;
-			Democracy::<T>::vote(RawOrigin::Signed(caller.clone()).into(), 0, ref_index, account_vote)?;
+			Democracy::<T>::vote(
+				RawOrigin::Signed(caller.clone()).into(), 0, ref_index, account_vote)?;
 		}
 
 		let votes = match VotingOf::<T>::get(0, &caller) {
@@ -670,13 +658,16 @@ benchmarks! {
 	remove_other_vote {
 		let r in 1 .. T::MaxVotes::get();
 
-		let caller = funded_account::<T>("caller", r);
+		create_dao::<T>()?;
+
+		let caller = funded_account::<T>("caller", r)?;
 		let caller_lookup = T::Lookup::unlookup(caller.clone());
 		let account_vote = account_vote::<T>(100u32.into());
 
 		for i in 0 .. r {
 			let ref_index = add_referendum::<T>(i).0;
-			Democracy::<T>::vote(RawOrigin::Signed(caller.clone()).into(), 0, ref_index, account_vote)?;
+			Democracy::<T>::vote(
+				RawOrigin::Signed(caller.clone()).into(), 0, ref_index, account_vote)?;
 		}
 
 		let votes = match VotingOf::<T>::get(0, &caller) {

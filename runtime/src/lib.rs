@@ -1185,30 +1185,46 @@ impl pallet_dao_democracy::Config for Runtime {
 	type Proposal = RuntimeCall;
 
 	/// A straight majority of the council can decide what their next motion is.
-	type ExternalOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>;
+	type ExternalOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	/// A super-majority can have the next scheduled referendum be a straight majority-carries vote.
-	type ExternalMajorityOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>;
+	type ExternalMajorityOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	/// A unanimous council can have the next scheduled referendum be a straight default-carries
 	/// (NTB) vote.
-	type ExternalDefaultOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>;
+	type ExternalDefaultOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	/// Two thirds of the technical committee can have an ExternalMajority/ExternalDefault vote
 	/// be tabled immediately and with a shorter voting/enactment period.
-	type FastTrackOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoTechnicalCommitteeCollective>;
-	type InstantOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoTechnicalCommitteeCollective>;
+	type FastTrackOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
+	type InstantOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	// To cancel a proposal which has been passed, 2/3 of the council must agree to it.
-	type CancellationOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>;
+	type CancellationOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	// To cancel a proposal before it has been passed, the technical committee must be unanimous or
 	// Root must agree.
-	type CancelProposalOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoTechnicalCommitteeCollective>;
-	type BlacklistOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoTechnicalCommitteeCollective>;
+	type CancelProposalOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
+	type BlacklistOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	// Any single technical committee member may veto a coming council proposal, however they can
 	// only do it once and it lasts only for the cool-off period.
 	type VetoOrigin =
@@ -2027,6 +2043,7 @@ mod benches {
 		[pallet_dao, Dao]
 		[pallet_dao_bounties, DaoBounties]
 		[pallet_dao_collective, DaoCouncil]
+		[pallet_dao_democracy, DaoDemocracy]
 		[pallet_dao_membership, DaoCouncilMembers]
 		[pallet_dao_treasury, DaoTreasury]
 	);
