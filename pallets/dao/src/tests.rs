@@ -5,10 +5,7 @@ use dao_primitives::{
 };
 use frame_support::{
 	assert_noop, assert_ok,
-	traits::{
-		tokens::fungibles::{metadata::Inspect as MetadataInspect, Inspect},
-		Currency,
-	},
+	traits::tokens::fungibles::{metadata::Inspect as MetadataInspect, Inspect},
 };
 use serde_json::{json, Value};
 use sp_core::{crypto::Ss58Codec, sr25519::Public};

@@ -6290,6 +6290,8 @@ dependencies = [
  "log",
  "pallet-balances",
  "pallet-dao-assets 4.0.0-dev (git+https://github.com/sctllabs/societal-node?branch=polkadot-v0.9.41-assets)",
+ "pallet-dao-democracy",
+ "pallet-preimage",
  "pallet-scheduler",
  "parity-scale-codec",
  "scale-info",

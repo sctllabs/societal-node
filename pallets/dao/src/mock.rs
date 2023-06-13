@@ -2,25 +2,28 @@ use crate as pallet_dao;
 use dao_primitives::{ContainsDaoMember, InitializeDaoMembers, RawOrigin};
 use frame_support::{
 	dispatch::DispatchError,
-	ord_parameter_types, parameter_types,
+	parameter_types,
 	traits::{ConstU16, ConstU32, ConstU64},
 	PalletId,
 };
 use frame_system as system;
-use sp_core::H256;
+use sp_core::{ConstU128, H256};
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, Extrinsic as ExtrinsicT, IdentityLookup},
 };
 
-use crate::{crypto, EnsureDao};
+use crate::crypto;
 use frame_support::{
 	instances::Instance1,
-	traits::{AsEnsureOriginWithArg, EqualPrivilegeOnly},
+	traits::{AsEnsureOriginWithArg, EqualPrivilegeOnly, SortedMembers},
 };
-use frame_system::{EnsureNone, EnsureRoot, EnsureSigned};
+use frame_system::{EnsureRoot, EnsureSigned, EnsureSignedBy};
 use serde_json::{json, Value};
-use sp_core::sr25519::{Public, Signature};
+use sp_core::{
+	crypto::Ss58Codec,
+	sr25519::{Public, Signature},
+};
 use sp_runtime::{
 	testing::TestXt,
 	traits::{IdentifyAccount, Verify},
@@ -41,8 +44,10 @@ frame_support::construct_runtime!(
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Storage, Event<T>},
 		DaoFactory: pallet_dao::{Pallet, Call, Storage, Event<T>},
+		Preimage: pallet_preimage,
 		Scheduler: pallet_scheduler::{Pallet, Call, Storage, Event<T>},
 		Assets: pallet_dao_assets::<Instance1>::{Pallet, Call, Storage, Event<T>},
+		Democracy: pallet_dao_democracy::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
@@ -99,7 +104,7 @@ impl frame_system::Config for Test {
 	type BlockHashCount = ConstU64<250>;
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = pallet_balances::AccountData<u64>;
+	type AccountData = pallet_balances::AccountData<u128>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -112,10 +117,10 @@ impl pallet_balances::Config for Test {
 	type MaxLocks = ();
 	type MaxReserves = ();
 	type ReserveIdentifier = [u8; 8];
-	type Balance = u64;
+	type Balance = u128;
 	type RuntimeEvent = RuntimeEvent;
 	type DustRemoval = ();
-	type ExistentialDeposit = ConstU64<1>;
+	type ExistentialDeposit = ConstU128<1>;
 	type AccountStore = System;
 	type WeightInfo = ();
 }
@@ -191,11 +196,6 @@ impl pallet_scheduler::Config for Test {
 	type Preimages = ();
 }
 
-ord_parameter_types! {
-	pub const One: u64 = 1;
-	pub const Two: u64 = 2;
-}
-
 impl pallet_dao::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type PalletId = DaoPalletId;
@@ -219,8 +219,11 @@ impl pallet_dao::Config for Test {
 	type PalletsOrigin = OriginCaller;
 	type Preimages = ();
 	type SpendDaoFunds = ();
-	type DaoReferendumScheduler = ();
+	type DaoReferendumScheduler = Democracy;
 	type WeightInfo = ();
+
+	#[cfg(feature = "runtime-benchmarks")]
+	type DaoReferendumBenchmarkHelper = Democracy;
 }
 
 impl pallet_dao_assets::Config<Instance1> for Test {
@@ -232,17 +235,73 @@ impl pallet_dao_assets::Config<Instance1> for Test {
 	type Currency = Balances;
 	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
 	type ForceOrigin = EnsureRoot<AccountId>;
-	type AssetDeposit = ConstU64<0>;
-	type AssetAccountDeposit = ConstU64<10>;
-	type MetadataDepositBase = ConstU64<0>;
-	type MetadataDepositPerByte = ConstU64<0>;
-	type ApprovalDeposit = ConstU64<0>;
+	type AssetDeposit = ConstU128<0>;
+	type AssetAccountDeposit = ConstU128<10>;
+	type MetadataDepositBase = ConstU128<0>;
+	type MetadataDepositPerByte = ConstU128<0>;
+	type ApprovalDeposit = ConstU128<0>;
 	type StringLimit = ConstU32<50>;
 	type Freezer = Assets;
 	type Extra = ();
 	type CallbackHandle = ();
 	type WeightInfo = pallet_dao_assets::weights::SubstrateWeight<Test>;
 	type MaxLocks = ConstU32<10>;
+}
+
+impl pallet_preimage::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = ();
+	type Currency = Balances;
+	type ManagerOrigin = EnsureRoot<AccountId>;
+	type BaseDeposit = ConstU128<0>;
+	type ByteDeposit = ConstU128<0>;
+}
+
+pub struct AliceToFerdie;
+impl SortedMembers<Public> for AliceToFerdie {
+	fn sorted_members() -> Vec<Public> {
+		vec![
+			Public::from_string("/Alice").ok().unwrap(),
+			Public::from_string("/Bob").ok().unwrap(),
+			Public::from_string("/Charlie").ok().unwrap(),
+			Public::from_string("/Dave").ok().unwrap(),
+			Public::from_string("/Eve").ok().unwrap(),
+		]
+	}
+
+	fn contains(_t: &Public) -> bool {
+		true
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn add(_m: &Public) {}
+}
+
+impl pallet_dao_democracy::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = pallet_balances::Pallet<Self>;
+	type MaxDeposits = ConstU32<1000>;
+	type MaxBlacklisted = ConstU32<5>;
+	type ExternalOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type ExternalMajorityOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type ExternalDefaultOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type FastTrackOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type CancellationOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type BlacklistOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type CancelProposalOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type VetoOrigin = EnsureSignedBy<AliceToFerdie, AccountId>;
+	type Slash = ();
+	type InstantOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type Scheduler = Scheduler;
+	type MaxVotes = ConstU32<100>;
+	type PalletsOrigin = OriginCaller;
+	type WeightInfo = ();
+	type MaxProposals = ConstU32<100>;
+	type Preimages = Preimage;
+	type Assets = Assets;
+	type Proposal = RuntimeCall;
+	type ProposalMetadataLimit = ConstU32<750>;
+	type DaoProvider = DaoFactory;
 }
 
 // Build genesis storage according to the mock runtime.

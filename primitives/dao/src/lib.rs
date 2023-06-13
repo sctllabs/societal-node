@@ -443,6 +443,27 @@ impl<DaoId> DaoReferendumScheduler<DaoId> for () {
 	}
 }
 
+#[cfg(feature = "runtime-benchmarks")]
+pub trait DaoReferendumBenchmarkHelper<DaoId, AccountId, Proposal, Balance> {
+	fn propose(who: AccountId, dao_id: DaoId, proposal: Proposal, value: Balance)
+		-> DispatchResult;
+}
+
+/// Empty implementation.
+#[cfg(feature = "runtime-benchmarks")]
+impl<DaoId, AccountId, Proposal, Balance>
+	DaoReferendumBenchmarkHelper<DaoId, AccountId, Proposal, Balance> for ()
+{
+	fn propose(
+		_who: AccountId,
+		_dao_id: DaoId,
+		_proposal: Proposal,
+		_value: Balance,
+	) -> DispatchResult {
+		Ok(())
+	}
+}
+
 /// Origin for the collective module.
 #[derive(PartialEq, Eq, Clone, RuntimeDebug, Encode, Decode, TypeInfo, MaxEncodedLen)]
 #[codec(mel_bound(AccountId: MaxEncodedLen))]

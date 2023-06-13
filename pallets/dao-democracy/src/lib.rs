@@ -155,6 +155,8 @@
 use codec::Decode;
 #[cfg(feature = "runtime-benchmarks")]
 use codec::Encode;
+#[cfg(feature = "runtime-benchmarks")]
+use dao_primitives::DaoReferendumBenchmarkHelper;
 use dao_primitives::{
 	DaoGovernance, DaoOrigin, DaoPolicy, DaoProvider, DaoReferendumScheduler, DaoToken, EncodeInto,
 	GovernanceV1Policy, RawOrigin,
@@ -167,6 +169,7 @@ use frame_support::{
 		schedule::{v3::Named as ScheduleNamed, DispatchTime},
 		Bounded, Currency, Get, LockIdentifier, OnUnbalanced, QueryPreimage, StorePreimage,
 	},
+	BoundedVec,
 };
 use frame_system::pallet_prelude::OriginFor;
 use sp_runtime::{
@@ -595,57 +598,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			let GovernanceV1Policy { minimum_deposit, .. } =
-				Self::ensure_democracy_supported(dao_id)?;
-
-			if let Some(metadata) = meta.clone() {
-				ensure!(
-					BoundedVec::<u8, T::ProposalMetadataLimit>::try_from(metadata).is_ok(),
-					Error::<T>::MetadataTooLong
-				)
-			}
-
-			ensure!(value >= Self::u128_to_balance_of(minimum_deposit), Error::<T>::ValueLow);
-
-			let index = Self::public_prop_count(dao_id);
-			let real_prop_count = PublicProps::<T>::decode_len(dao_id).unwrap_or(0) as u32;
-			let max_proposals = T::MaxProposals::get();
-			ensure!(real_prop_count < max_proposals, Error::<T>::TooMany);
-			let proposal_hash = proposal.hash();
-
-			if let Some((until, _)) = <Blacklist<T>>::get(dao_id, proposal_hash) {
-				ensure!(
-					<frame_system::Pallet<T>>::block_number() >= until,
-					Error::<T>::ProposalBlacklisted,
-				);
-			}
-
-			let dao_token = T::DaoProvider::dao_token(dao_id)?;
-			match dao_token {
-				DaoToken::FungibleToken(token_id) => T::Assets::hold(token_id, &who, value)?,
-				DaoToken::EthTokenAddress(_) => {},
-			}
-
-			// Make sure using Inline type of Bounded
-			let (proposal_dispatch_data, _) = T::Preimages::peek(&proposal)?;
-
-			let depositors = BoundedVec::<_, T::MaxDeposits>::truncate_from(vec![who.clone()]);
-			DepositOf::<T>::insert(dao_id, index, (depositors, value));
-
-			PublicPropCount::<T>::insert(dao_id, index + 1);
-
-			PublicProps::<T>::try_append(dao_id, (index, proposal.clone(), who.clone()))
-				.map_err(|_| Error::<T>::TooMany)?;
-
-			Self::deposit_event(Event::<T>::Proposed {
-				dao_id,
-				account: who,
-				proposal_index: index,
-				proposal: proposal_dispatch_data.into(),
-				deposit: value,
-				meta,
-			});
-			Ok(())
+			Self::do_propose(who, dao_id, proposal, value, meta)
 		}
 
 		/// Signals agreement with a particular proposal.
@@ -1268,6 +1221,66 @@ impl<T: Config> Pallet<T> {
 		}
 	}
 
+	pub fn do_propose(
+		who: T::AccountId,
+		dao_id: DaoId,
+		proposal: BoundedCallOf<T>,
+		value: BalanceOf<T>,
+		meta: Option<Vec<u8>>,
+	) -> DispatchResult {
+		let GovernanceV1Policy { minimum_deposit, .. } = Self::ensure_democracy_supported(dao_id)?;
+
+		if let Some(metadata) = meta.clone() {
+			ensure!(
+				BoundedVec::<u8, T::ProposalMetadataLimit>::try_from(metadata).is_ok(),
+				Error::<T>::MetadataTooLong
+			)
+		}
+
+		ensure!(value >= Self::u128_to_balance_of(minimum_deposit), Error::<T>::ValueLow);
+
+		let index = Self::public_prop_count(dao_id);
+		let real_prop_count = PublicProps::<T>::decode_len(dao_id).unwrap_or(0) as u32;
+		let max_proposals = T::MaxProposals::get();
+		ensure!(real_prop_count < max_proposals, Error::<T>::TooMany);
+		let proposal_hash = proposal.hash();
+
+		if let Some((until, _)) = <Blacklist<T>>::get(dao_id, proposal_hash) {
+			ensure!(
+				<frame_system::Pallet<T>>::block_number() >= until,
+				Error::<T>::ProposalBlacklisted,
+			);
+		}
+
+		let dao_token = T::DaoProvider::dao_token(dao_id)?;
+		match dao_token {
+			DaoToken::FungibleToken(token_id) => T::Assets::hold(token_id, &who, value)?,
+			DaoToken::EthTokenAddress(_) => {},
+		}
+
+		// Make sure using Inline type of Bounded
+		let (proposal_dispatch_data, _) = T::Preimages::peek(&proposal)?;
+
+		let depositors = BoundedVec::<_, T::MaxDeposits>::truncate_from(vec![who.clone()]);
+		DepositOf::<T>::insert(dao_id, index, (depositors, value));
+
+		PublicPropCount::<T>::insert(dao_id, index + 1);
+
+		PublicProps::<T>::try_append(dao_id, (index, proposal.clone(), who.clone()))
+			.map_err(|_| Error::<T>::TooMany)?;
+
+		Self::deposit_event(Event::<T>::Proposed {
+			dao_id,
+			account: who,
+			proposal_index: index,
+			proposal: proposal_dispatch_data.into(),
+			deposit: value,
+			meta,
+		});
+
+		Ok(())
+	}
+
 	/// Get the amount locked in support of `proposal`; `None` if proposal isn't a valid proposal
 	/// index.
 	pub fn backing_for(dao_id: DaoId, proposal: PropIndex) -> Option<BalanceOf<T>> {
@@ -1860,6 +1873,26 @@ impl<T: Config> DaoReferendumScheduler<DaoId> for Pallet<T> {
 		});
 
 		Ok(())
+	}
+}
+
+#[cfg(feature = "runtime-benchmarks")]
+impl<T: Config> DaoReferendumBenchmarkHelper<DaoId, T::AccountId, CallOf<T>, BalanceOf<T>>
+	for Pallet<T>
+{
+	fn propose(
+		who: T::AccountId,
+		dao_id: DaoId,
+		proposal: CallOf<T>,
+		value: BalanceOf<T>,
+	) -> DispatchResult {
+		Self::do_propose(
+			who,
+			dao_id,
+			T::Preimages::bound(proposal)?.transmute(),
+			value,
+			Some(vec![]),
+		)
 	}
 }
 

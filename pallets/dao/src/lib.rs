@@ -254,12 +254,20 @@ pub mod pallet {
 		type Preimages: QueryPreimage + StorePreimage;
 
 		/// Runtime hooks to external pallet using treasury to compute spend funds.
-		type SpendDaoFunds: SpendDaoFunds<u32>;
+		type SpendDaoFunds: SpendDaoFunds<DaoId>;
 
-		type DaoReferendumScheduler: DaoReferendumScheduler<u32>;
+		type DaoReferendumScheduler: DaoReferendumScheduler<DaoId>;
 
 		/// Weight information for extrinsics in this pallet.
 		type WeightInfo: WeightInfo;
+
+		#[cfg(feature = "runtime-benchmarks")]
+		type DaoReferendumBenchmarkHelper: DaoReferendumBenchmarkHelper<
+			DaoId,
+			Self::AccountId,
+			CallOf<Self>,
+			Self::Balance,
+		>;
 	}
 
 	/// Origin for the dao pallet.

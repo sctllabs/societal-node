@@ -1665,6 +1665,9 @@ impl pallet_dao::Config for Runtime {
 	type SpendDaoFunds = DaoTreasury;
 	type DaoReferendumScheduler = DaoDemocracy;
 	type WeightInfo = pallet_dao::weights::SubstrateWeight<Runtime>;
+
+	#[cfg(feature = "runtime-benchmarks")]
+	type DaoReferendumBenchmarkHelper = DaoDemocracy;
 }
 
 parameter_types! {
