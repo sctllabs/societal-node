@@ -5,12 +5,14 @@
 
 #![cfg(feature = "runtime-benchmarks")]
 
-use super::{Pallet as Treasury, *};
+use super::*;
+
+#[allow(unused)]
+use crate::Pallet as Treasury;
 
 use dao_primitives::DaoPolicyProportion;
 use frame_benchmarking::{account, benchmarks_instance_pallet, BenchmarkError};
-use frame_support::{dispatch::UnfilteredDispatchable, ensure};
-use frame_system::RawOrigin;
+use frame_support::dispatch::UnfilteredDispatchable;
 use serde_json::json;
 
 const SEED: u32 = 0;
@@ -68,16 +70,6 @@ fn setup_proposal<T: Config<I>, I: 'static>(
 	let beneficiary = account("beneficiary", u, SEED);
 	let beneficiary_lookup = T::Lookup::unlookup(beneficiary);
 	(caller, value, beneficiary_lookup)
-}
-
-// Create proposals that are approved for use in `on_initialize`.
-fn create_approved_proposals<T: Config<I>, I: 'static>(n: u32) -> Result<(), &'static str> {
-	for i in 0..n {
-		let (_caller, value, lookup) = setup_proposal::<T, I>(i);
-		Treasury::<T, I>::spend(RawOrigin::Root.into(), 0, value, lookup)?;
-	}
-	ensure!(<Approvals<T, I>>::get(0).len() == n as usize, "Not all approved");
-	Ok(())
 }
 
 fn assert_last_event<T: Config<I>, I: 'static>(generic_event: <T as Config<I>>::RuntimeEvent) {

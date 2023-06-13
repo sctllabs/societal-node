@@ -36,6 +36,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 #[cfg(test)]
 mod tests;
@@ -44,8 +45,6 @@ pub mod weights;
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 
-#[cfg(test)]
-use sp_runtime::traits::AccountIdConversion;
 use sp_runtime::{
 	traits::{Saturating, StaticLookup, Zero},
 	Permill, RuntimeDebug,
@@ -57,7 +56,7 @@ use frame_support::{
 	print,
 	traits::{
 		fungibles::{metadata::Mutate as MetadataMutate, Inspect, Mutate, Transfer},
-		Currency, EnsureOriginWithArg,
+		Currency,
 		ExistenceRequirement::KeepAlive,
 		Get, Imbalance, OnUnbalanced, ReservableCurrency, WithdrawReasons,
 	},
@@ -391,7 +390,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 
 		let mut missed_any = false;
 		let mut imbalance = <PositiveImbalanceOf<T, I>>::zero();
-		let proposals_len = Approvals::<T, I>::mutate(dao_id, |v| {
+		let _proposals_len = Approvals::<T, I>::mutate(dao_id, |v| {
 			let proposals_approvals_len = v.len() as u32;
 			v.retain(|&index| {
 				// Should always be true, but shouldn't panic if false or we're screwed.

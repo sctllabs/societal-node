@@ -26,7 +26,7 @@ use frame_support::{
 			},
 			DepositConsequence, WithdrawConsequence,
 		},
-		AsEnsureOriginWithArg, ConstU128, ConstU32, ConstU64, OnInitialize,
+		AsEnsureOriginWithArg, ConstU128, ConstU32, ConstU64, EnsureOriginWithArg, OnInitialize,
 	},
 	PalletId,
 };

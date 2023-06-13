@@ -493,7 +493,7 @@ pub mod pallet {
 					.max(T::WeightInfo::close_early_disapproved(m, p2))
 					.max(T::WeightInfo::close_approved(b, m, p2))
 					.max(T::WeightInfo::close_disapproved(m, p2))
-					.saturating_add(p1.into())
+					.saturating_add(p1)
 			},
 			DispatchClass::Operational
 		))]
@@ -534,7 +534,7 @@ pub mod pallet {
 					.max(T::WeightInfo::close_early_disapproved(m, p2))
 					.max(T::WeightInfo::close_approved(b, m, p2))
 					.max(T::WeightInfo::close_disapproved(m, p2))
-					.saturating_add(p1.into())
+					.saturating_add(p1)
 			},
 			DispatchClass::Operational
 		))]
@@ -636,7 +636,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 				.max(T::WeightInfo::close_early_disapproved(m, p2))
 				.max(T::WeightInfo::close_approved(b, m, p2))
 				.max(T::WeightInfo::close_disapproved(m, p2))
-				.saturating_add(p1.into())
+				.saturating_add(p1)
 		};
 
 		let call = CallOf::<T, I>::from(Call::close_scheduled_proposal {

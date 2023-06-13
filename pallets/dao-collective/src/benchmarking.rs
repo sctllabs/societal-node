@@ -28,7 +28,7 @@ use serde_json::json;
 use sp_runtime::traits::Bounded;
 use sp_std::mem::size_of;
 
-use frame_benchmarking::{account, benchmarks_instance_pallet, whitelisted_caller, BenchmarkError};
+use frame_benchmarking::{account, benchmarks_instance_pallet, whitelisted_caller};
 use frame_system::{Call as SystemCall, Pallet as System, RawOrigin as SystemOrigin};
 
 const SEED: u32 = 0;

@@ -1266,7 +1266,7 @@ impl<T: Config> Pallet<T> {
 
 		PublicPropCount::<T>::insert(dao_id, index + 1);
 
-		PublicProps::<T>::try_append(dao_id, (index, proposal.clone(), who.clone()))
+		PublicProps::<T>::try_append(dao_id, (index, proposal, who.clone()))
 			.map_err(|_| Error::<T>::TooMany)?;
 
 		Self::deposit_event(Event::<T>::Proposed {
