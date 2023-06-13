@@ -5,7 +5,10 @@ use super::*;
 #[allow(unused)]
 use crate::Pallet as Dao;
 use frame_benchmarking::{account, benchmarks, BenchmarkError};
+use frame_support::traits::fungibles::Transfer;
 use frame_system::RawOrigin;
+
+use sp_runtime::traits::Bounded;
 
 use crate::Pallet as DaoFactory;
 use serde_json::{json, Value};
@@ -62,11 +65,12 @@ fn setup_dao_payload<T: Config>(is_eth: bool) -> Vec<u8> {
 	} else {
 		dao_json["token"] = json!({
 			"token_id": 0,
-				"metadata": {
-					"name": "token",
-					"symbol": "symbol",
-					"decimals": 2
-				}
+			"initial_balance": "100000000",
+			"metadata": {
+				"name": "token",
+				"symbol": "symbol",
+				"decimals": 2
+			}
 		});
 	}
 
@@ -88,6 +92,22 @@ fn get_dao_origin<T: Config>(dao_id: DaoId) -> Result<T::RuntimeOrigin, Benchmar
 	};
 
 	T::ApproveOrigin::try_successful_origin(&dao_origin).map_err(|_| BenchmarkError::Weightless)
+}
+
+fn funded_account<T: Config>(
+	name: &'static str,
+	index: u32,
+) -> Result<T::AccountId, DispatchError> {
+	let caller: T::AccountId = account(name, index, SEED);
+	// Give the account half of the maximum value of the `Balance` type.
+	// Otherwise some transfers will fail with an overflow error.
+	T::Currency::make_free_balance_be(&caller, BalanceOf::<T>::max_value() / 2u32.into());
+
+	// Transferring some DAO tokens to the caller
+	let dao_account_id = DaoFactory::<T>::dao_account_id(0);
+	T::AssetProvider::transfer(0.into(), &dao_account_id, &caller, 10_000_u32.into(), true)?;
+
+	Ok(caller)
 }
 
 benchmarks! {
@@ -183,12 +203,35 @@ benchmarks! {
 	}: _<T::RuntimeOrigin>(origin, 0, 100_u32.into())
 	verify {
 		let dao_token_supply = T::AssetProvider::total_issuance(0.into());
-		assert_eq!(dao_token_supply, 101_u32.into());
+		assert_eq!(dao_token_supply, 100000100_u32.into());
 	}
 
 	spend_dao_funds {
 		setup_dao::<T>(false)?;
 		let origin = get_dao_origin::<T>(0)?;
+	}: _<T::RuntimeOrigin>(origin, 0)
+	verify { }
+
+	launch_dao_referendum {
+		setup_dao::<T>(false)?;
+
+		let proposer = funded_account::<T>("proposer", 0)?;
+		let proposal = CallOf::<T>::from(Call::spend_dao_funds { dao_id: 0 });
+		T::DaoReferendumBenchmarkHelper::propose(proposer, 0, proposal, 1_u32.into())?;
+
+		let origin = get_dao_origin::<T>(0)?;
+	}: _<T::RuntimeOrigin>(origin, 0)
+	verify { }
+
+	bake_dao_referendum {
+		setup_dao::<T>(false)?;
+
+		let proposer = funded_account::<T>("proposer", 0)?;
+		let proposal = CallOf::<T>::from(Call::spend_dao_funds { dao_id: 0 });
+		T::DaoReferendumBenchmarkHelper::propose(proposer, 0, proposal, 1_u32.into())?;
+
+		let origin = get_dao_origin::<T>(0)?;
+		DaoFactory::<T>::launch_dao_referendum(origin.clone(), 0)?;
 	}: _<T::RuntimeOrigin>(origin, 0)
 	verify { }
 

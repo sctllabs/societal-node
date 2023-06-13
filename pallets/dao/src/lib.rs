@@ -138,6 +138,7 @@ pub mod pallet {
 	use crate::weights::WeightInfo;
 	use eth_primitives::EthRpcService;
 	use frame_support::traits::{
+		fungibles::Transfer,
 		schedule::{
 			v3::{Named as ScheduleNamed, TaskName},
 			DispatchTime,
@@ -237,7 +238,7 @@ pub mod pallet {
 				Self::AccountId,
 				AssetId = <Self as pallet::Config>::AssetId,
 				Balance = <Self as pallet::Config>::Balance,
-			>;
+			> + Transfer<Self::AccountId>;
 
 		/// The identifier type for an offchain worker.
 		type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
@@ -580,8 +581,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		// TODO: weights for referendum extrinsics
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::launch_dao_referendum())]
 		#[pallet::call_index(7)]
 		pub fn launch_dao_referendum(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
 			Self::ensure_approved(origin, dao_id)?;
@@ -589,7 +589,7 @@ pub mod pallet {
 			T::DaoReferendumScheduler::launch_referendum(dao_id)
 		}
 
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::bake_dao_referendum())]
 		#[pallet::call_index(8)]
 		pub fn bake_dao_referendum(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
 			Self::ensure_approved(origin, dao_id)?;
