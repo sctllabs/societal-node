@@ -214,6 +214,9 @@ pub mod pallet {
 		type DaoMaxTechnicalCommitteeMembers: Get<u32>;
 
 		#[pallet::constant]
+		type DaoMaxPendingItems: Get<u32>;
+
+		#[pallet::constant]
 		type DaoMinTreasurySpendPeriod: Get<u32>;
 
 		type CouncilProvider: InitializeDaoMembers<u32, Self::AccountId>
@@ -287,6 +290,11 @@ pub mod pallet {
 	#[pallet::getter(fn pending_daos)]
 	pub(super) type PendingDaos<T: Config> =
 		StorageMap<_, Blake2_128Concat, T::Hash, PendingDaoOf<T>, OptionQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn pending_dao_hashes)]
+	pub(super) type PendingDaoHashes<T: Config> =
+		StorageValue<_, BoundedVec<T::Hash, T::DaoMaxPendingItems>, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn policies)]
@@ -462,6 +470,7 @@ pub mod pallet {
 		PolicyNotExist,
 		OffchainUnsignedTxError,
 		NotSupported,
+		TooManyPendingDaos,
 	}
 
 	#[pallet::call]
@@ -751,6 +760,22 @@ pub mod pallet {
 
 					let dao_hash = T::Hashing::hash_of(&dao);
 
+					<PendingDaoHashes<T>>::try_mutate(|hashes| -> Result<usize, DispatchError> {
+						hashes.try_push(dao_hash).map_err(|_| Error::<T>::TooManyPendingDaos)?;
+						Ok(hashes.len())
+					})?;
+
+					PendingDaos::<T>::insert(
+						dao_hash,
+						PendingDao {
+							dao: dao.clone(),
+							policy: policy.clone(),
+							council,
+							technical_committee,
+							block_number: frame_system::Pallet::<T>::block_number(),
+						},
+					);
+
 					let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
 					let data: IndexingData<T::Hash> = IndexingData(
 						b"approve_dao".to_vec(),
@@ -760,17 +785,6 @@ pub mod pallet {
 					offchain_index::set(&key, &data.encode());
 
 					let dao_event_source = dao.clone();
-
-					PendingDaos::<T>::insert(
-						dao_hash,
-						PendingDao {
-							dao,
-							policy: policy.clone(),
-							council,
-							technical_committee,
-							block_number: frame_system::Pallet::<T>::block_number(),
-						},
-					);
 
 					Self::deposit_event(Event::DaoPendingApproval {
 						dao_id,
@@ -804,6 +818,11 @@ pub mod pallet {
 					None => return Err(Error::<T>::DaoNotExist.into()),
 					Some(dao) => dao,
 				};
+
+			PendingDaoHashes::<T>::mutate(|hashes| {
+				hashes.retain(|h| h != &dao_hash);
+				hashes.len() + 1
+			});
 
 			if approve {
 				return Self::do_register_dao(dao, policy, council, technical_committee)

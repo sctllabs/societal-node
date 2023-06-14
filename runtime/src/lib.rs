@@ -1634,6 +1634,7 @@ parameter_types! {
 	pub const DaoMetadataLimit: u32 = 750;
 	pub const DaoMaxCouncilMembers: u32 = 100; // TODO
 	pub const DaoMaxTechnicalCommitteeMembers: u32 = 100; // TODO
+	pub const DaoMaxPendingItems: u32 = 100; // TODO
 	pub const DaoMinTreasurySpendPeriod: u32 = 10; // TODO
 }
 
@@ -1647,6 +1648,7 @@ impl pallet_dao::Config for Runtime {
 	type DaoMetadataLimit = DaoMetadataLimit;
 	type DaoMaxCouncilMembers = DaoMaxCouncilMembers;
 	type DaoMaxTechnicalCommitteeMembers = DaoMaxTechnicalCommitteeMembers;
+	type DaoMaxPendingItems = DaoMaxPendingItems;
 	type DaoMinTreasurySpendPeriod = DaoMinTreasurySpendPeriod;
 	type AssetId = AssetId;
 	type Balance = Balance;

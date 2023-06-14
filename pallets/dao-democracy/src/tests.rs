@@ -274,7 +274,6 @@ where
 	type Extrinsic = Extrinsic;
 }
 
-// #[cfg(feature = "runtime-benchmarks")]
 impl From<RawOrigin<Public>> for OriginCaller {
 	fn from(_value: RawOrigin<Public>) -> Self {
 		OriginCaller::system(frame_system::RawOrigin::Root)
@@ -300,11 +299,11 @@ impl pallet_dao::Config for Test {
 	type AuthorityId = pallet_dao::crypto::TestAuthId;
 	type DaoMaxCouncilMembers = ConstU32<100>;
 	type DaoMaxTechnicalCommitteeMembers = ConstU32<100>;
+	type DaoMaxPendingItems = ConstU32<100>;
 	type TechnicalCommitteeProvider = TestCouncilProvider;
 	type OffchainEthService = ();
 	type RuntimeCall = RuntimeCall;
 	type DaoMinTreasurySpendPeriod = ConstU32<20>;
-	// type ApproveOrigin = TestApproveOrigin;
 	type ApproveOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
 	type Scheduler = Scheduler;
 	type PalletsOrigin = OriginCaller;
@@ -315,22 +314,6 @@ impl pallet_dao::Config for Test {
 
 	#[cfg(feature = "runtime-benchmarks")]
 	type DaoReferendumBenchmarkHelper = ();
-}
-
-pub struct TestApproveOrigin;
-impl EnsureOriginWithArg<RuntimeOrigin, DaoOrigin<AccountId>> for TestApproveOrigin {
-	type Success = u64;
-	fn try_origin(
-		_o: RuntimeOrigin,
-		_dao_origin: &DaoOrigin<AccountId>,
-	) -> Result<Self::Success, RuntimeOrigin> {
-		Ok(0)
-	}
-
-	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin(_dao_origin: &DaoOrigin<AccountId>) -> Result<RuntimeOrigin, ()> {
-		Ok(RuntimeOrigin::root())
-	}
 }
 
 impl pallet_dao_assets::Config for Test {

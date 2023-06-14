@@ -229,6 +229,7 @@ impl pallet_dao::Config for Test {
 	type AuthorityId = crypto::TestAuthId;
 	type DaoMaxCouncilMembers = ConstU32<100>;
 	type DaoMaxTechnicalCommitteeMembers = ConstU32<100>;
+	type DaoMaxPendingItems = ConstU32<100>;
 	type TechnicalCommitteeProvider = TestTechnicalCommitteeProvider;
 	type OffchainEthService = ();
 	type RuntimeCall = RuntimeCall;
