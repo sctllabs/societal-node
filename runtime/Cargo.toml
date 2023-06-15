@@ -293,6 +293,7 @@ runtime-benchmarks = [
 	"pallet-dao-bounties/runtime-benchmarks",
 	"pallet-dao-collective/runtime-benchmarks",
 	"pallet-dao-democracy/runtime-benchmarks",
+	"pallet-dao-eth-governance/runtime-benchmarks",
 	"pallet-dao-membership/runtime-benchmarks",
 	"pallet-dao-treasury/runtime-benchmarks",
 	"pallet-election-provider-multi-phase/runtime-benchmarks",

@@ -1695,6 +1695,7 @@ impl pallet_dao_eth_governance::Config for Runtime {
 	type OffchainEthService = EthService<DaoEthGovernance>;
 	type Scheduler = Scheduler;
 	type PalletsOrigin = OriginCaller;
+	type WeightInfo = pallet_dao_eth_governance::weights::SubstrateWeight<Runtime>;
 }
 
 parameter_types! {
@@ -2050,6 +2051,7 @@ mod benches {
 		[pallet_dao, Dao]
 		[pallet_dao_bounties, DaoBounties]
 		[pallet_dao_collective, DaoCouncil]
+		[pallet_dao_eth_governance, DaoEthGovernance]
 		[pallet_dao_democracy, DaoDemocracy]
 		[pallet_dao_membership, DaoCouncilMembers]
 		[pallet_dao_treasury, DaoTreasury]
