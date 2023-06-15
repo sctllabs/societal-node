@@ -195,25 +195,8 @@ benchmarks_instance_pallet! {
 		let bounty_id = BountyCount::<T, I>::get(dao_id) - 1;
 		let DaoPolicy { spend_period, .. } = T::DaoProvider::policy(0)?;
 		let current_block_number = frame_system::Pallet::<T>::block_number();
-
-		// let bounty = Bounties::<T, I>::bounties(dao_id, bounty_id).unwrap();
-		// match bounty.status {
-		// 	BountyStatus::Active { ref curator, ref update_due } => {
-		// 		log::info!("{:?}", curator);
-		// 		log::info!("{:?}", update_due);
-		// 	}
-		// 	_ => todo!()
-		// }
-
 	}: _(RawOrigin::Signed(curator), dao_id, bounty_id, Vec::new())
-	verify {
-		// assert_last_event::<T, I>(
-		// 	Event::BountyExtended {
-		// 		dao_id,
-		// 		index: bounty_id,
-		// 		update_due: 14400_u32.into()
-		// 	}.into())
-	}
+	verify {}
 
 	spend_funds {
 		let b in 0 .. 100;
