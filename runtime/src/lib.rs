@@ -1671,8 +1671,10 @@ impl pallet_dao::Config for Runtime {
 }
 
 parameter_types! {
-	pub const EthGovernanceMaxProposals: u32 = 100;
+	pub const EthGovernanceMaxProposals: u32 = 50;
+	pub const EthGovernanceMaxPendingProposals: u32 = 50;
 	pub const EthGovernanceMaxVotes: u32 = 50;
+	pub const EthGovernanceMaxPendingVotes: u32 = 50;
 }
 
 impl pallet_dao_eth_governance::Config for Runtime {
@@ -1684,6 +1686,8 @@ impl pallet_dao_eth_governance::Config for Runtime {
 	type ProposalMetadataLimit = DaoMetadataLimit;
 	type EthRpcUrlLimit = DaoStringLimit;
 	type MaxProposals = EthGovernanceMaxProposals;
+	type MaxPendingProposals = EthGovernanceMaxPendingProposals;
+	type MaxPendingVotes = EthGovernanceMaxPendingVotes;
 	type MaxVotes = EthGovernanceMaxVotes;
 	type DaoProvider = Dao;
 	type Preimages = Preimage;

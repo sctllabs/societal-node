@@ -162,9 +162,17 @@ pub mod pallet {
 		/// Maximum number of proposals allowed to be active in parallel.
 		type MaxProposals: Get<ProposalIndex>;
 
+		/// Maximum number of pending proposals allowed to be active in parallel.
+		#[pallet::constant]
+		type MaxPendingProposals: Get<u32>;
+
 		/// The maximum number of votes(ayes/nays) for a proposal.
 		#[pallet::constant]
 		type MaxVotes: Get<u32>;
+
+		/// The maximum number of pending votes(ayes/nays) for a proposal.
+		#[pallet::constant]
+		type MaxPendingVotes: Get<u32>;
 
 		type DaoProvider: DaoProvider<
 			<Self as frame_system::Config>::Hash,
@@ -223,6 +231,11 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn pending_proposals)]
+	pub(super) type PendingProposals<T: Config> =
+		StorageMap<_, Twox64Concat, DaoId, BoundedVec<T::Hash, T::MaxPendingProposals>, ValueQuery>;
+
 	/// Votes on a given proposal, if it is ongoing.
 	#[pallet::storage]
 	#[pallet::getter(fn voting)]
@@ -236,7 +249,17 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
-	/// Actual pending proposal for a given hash.
+	#[pallet::storage]
+	#[pallet::getter(fn pending_votes)]
+	pub(super) type PendingVotes<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		(DaoId, ProposalIndex),
+		BoundedVec<T::Hash, T::MaxPendingVotes>,
+		ValueQuery,
+	>;
+
+	/// Actual pending voting for a given dao id and hash.
 	#[pallet::storage]
 	#[pallet::getter(fn pending_voting)]
 	pub type PendingVoting<T: Config> = StorageDoubleMap<
@@ -545,6 +568,8 @@ pub mod pallet {
 		NotSupported,
 		/// Voting is disabled for expired proposals
 		Expired,
+		TooManyPendingProposals,
+		TooManyPendingVotes,
 	}
 
 	#[pallet::call]
@@ -592,6 +617,17 @@ pub mod pallet {
 
 			match account_token_balance {
 				AccountTokenBalance::Offchain { .. } => {
+					<PendingProposals<T>>::try_mutate(
+						dao_id,
+						|hashes| -> Result<usize, DispatchError> {
+							hashes
+								.try_push(proposal_hash)
+								.map_err(|_| Error::<T>::TooManyPendingProposals)?;
+
+							Ok(hashes.len())
+						},
+					)?;
+
 					let pending_proposal = PendingProposal {
 						who: who.clone(),
 						length_bound,
@@ -660,7 +696,15 @@ pub mod pallet {
 
 			match account_token_balance {
 				AccountTokenBalance::Offchain { .. } => {
-					// TODO: add checks for vec size limits
+					<PendingVotes<T>>::try_mutate(
+						(dao_id, index),
+						|hashes| -> Result<usize, DispatchError> {
+							hashes
+								.try_push(pending_vote_hash)
+								.map_err(|_| Error::<T>::TooManyPendingVotes)?;
+							Ok(hashes.len())
+						},
+					)?;
 
 					<PendingVoting<T>>::insert(dao_id, pending_vote_hash, pending_vote);
 
@@ -1099,6 +1143,11 @@ impl<T: Config> Pallet<T> {
 
 		let PendingProposal { who, length_bound, meta, .. } = pending_proposal;
 
+		PendingProposals::<T>::mutate(dao_id, |hashes| {
+			hashes.retain(|h| h != &hash);
+			hashes.len() + 1
+		});
+
 		if approve {
 			Self::do_propose_proposed(
 				who,
@@ -1117,6 +1166,11 @@ impl<T: Config> Pallet<T> {
 	fn do_approve_vote(dao_id: DaoId, hash: T::Hash, approve: bool) -> Result<(), DispatchError> {
 		let PendingVote { who, proposal_hash, proposal_index, aye, balance, .. } =
 			<PendingVoting<T>>::take(dao_id, hash).expect("Pending Vote not found");
+
+		PendingVotes::<T>::mutate((dao_id, proposal_index), |hashes| {
+			hashes.retain(|h| h != &hash);
+			hashes.len() + 1
+		});
 
 		if approve {
 			Self::do_vote(who, dao_id, proposal_hash, proposal_index, Vote { aye, balance })?;
