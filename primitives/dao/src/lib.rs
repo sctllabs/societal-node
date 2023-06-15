@@ -336,6 +336,10 @@ pub trait DaoProvider<Hash> {
 
 	/// Note: Should only be used for benchmarking.
 	#[cfg(feature = "runtime-benchmarks")]
+	fn approve_dao(dao_hash: Hash, approve: bool) -> Result<(), DispatchError>;
+
+	/// Note: Should only be used for benchmarking.
+	#[cfg(feature = "runtime-benchmarks")]
 	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()>;
 }
 

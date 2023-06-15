@@ -192,6 +192,11 @@ impl DaoProvider<H256> for TestDaoProvider {
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
+	fn approve_dao(_dao_hash: H256, _approve: bool) -> Result<(), DispatchError> {
+		Ok(())
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
 	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()> {
 		Self::ApproveOrigin::try_successful_origin(dao_origin)
 	}

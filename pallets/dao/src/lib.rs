@@ -488,17 +488,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			ensure_none(origin)?;
 
-			let PendingDao { dao, policy, council, technical_committee, .. } =
-				match <PendingDaos<T>>::take(dao_hash) {
-					None => return Err(Error::<T>::DaoNotExist.into()),
-					Some(dao) => dao,
-				};
-
-			if approve {
-				return Self::do_register_dao(dao, policy, council, technical_committee)
-			}
-
-			Ok(())
+			Self::do_approve_dao(dao_hash, approve)
 		}
 
 		#[pallet::weight(T::WeightInfo::update_dao_metadata())]
@@ -808,6 +798,20 @@ pub mod pallet {
 			Self::do_register_dao(dao, policy, council, technical_committee)
 		}
 
+		pub fn do_approve_dao(dao_hash: T::Hash, approve: bool) -> DispatchResult {
+			let PendingDao { dao, policy, council, technical_committee, .. } =
+				match <PendingDaos<T>>::take(dao_hash) {
+					None => return Err(Error::<T>::DaoNotExist.into()),
+					Some(dao) => dao,
+				};
+
+			if approve {
+				return Self::do_register_dao(dao, policy, council, technical_committee)
+			}
+
+			Ok(())
+		}
+
 		pub fn do_register_dao(
 			mut dao: DaoOf<T>,
 			policy: PolicyOf,
@@ -1008,6 +1012,11 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 		data: Vec<u8>,
 	) -> Result<(), DispatchError> {
 		Self::do_create_dao(who, council, technical_committee, data)
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn approve_dao(dao_hash: T::Hash, approve: bool) -> Result<(), DispatchError> {
+		Self::do_approve_dao(dao_hash, approve)
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
