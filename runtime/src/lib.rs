@@ -222,8 +222,8 @@ parameter_types! {
 
 /// <HB SBP M1 Review
 /// 
-/// Same as deposit fn, this impl might be extracted from here.
-/// Example: https://github.com/paritytech/cumulus/blob/master/parachains/runtimes/assets/asset-hub-kusama/src/constants.rs
+/// I would move this to constants.rs as well.
+/// Example: https://github.com/paritytech/cumulus/blob/master/parachains/runtimes/assets/asset-hub-kusama/src/constants.rs#L57
 /// 
 /// >
 
@@ -1804,6 +1804,12 @@ impl parachain_info::Config for Runtime {}
 
 impl cumulus_pallet_aura_ext::Config for Runtime {}
 
+
+/// <HB SBP M1 Review
+/// 
+/// Why don't move the xcmp pallets to the xcm_config.rs?
+/// 
+/// >
 #[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 impl cumulus_pallet_xcmp_queue::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
