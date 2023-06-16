@@ -1,5 +1,6 @@
 use crate::{
-	DaoCouncilCollective, DaoCouncilMembership, DaoTechnicalCommitteeCollective, LocalAssetInstance,
+	dao_config::{DaoCouncilCollective, DaoCouncilMembership, DaoTechnicalCommitteeCollective},
+	LocalAssetInstance,
 };
 use frame_support::parameter_types;
 use pallet_dao_bounties_precompile::DaoBountiesPrecompile;
