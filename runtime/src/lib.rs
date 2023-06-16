@@ -161,6 +161,11 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	state_version: 1,
 };
 
+/// <HB SBP M1 Review
+/// 
+/// This code might be removed and replace it by the constants definition in constants.rs
+/// 
+/// >
 const fn deposit(items: u32, bytes: u32) -> Balance {
 	items as Balance * 15 * CENTS + (bytes as Balance) * 6 * CENTS
 }
@@ -212,6 +217,15 @@ parameter_types! {
 	// Retry a scheduled item every 10 blocks (1 minute) until the preimage exists.
 	pub const NoPreimagePostponement: Option<u32> = Some(10);
 }
+
+
+
+/// <HB SBP M1 Review
+/// 
+/// Same as deposit fn, this impl might be extracted from here.
+/// Example: https://github.com/paritytech/cumulus/blob/master/parachains/runtimes/assets/asset-hub-kusama/src/constants.rs
+/// 
+/// >
 
 /// Handles converting a weight scalar to a fee value, based on the scale and granularity of the
 /// node's balance type.
@@ -341,6 +355,17 @@ impl pallet_balances::Config for Runtime {
 	type AccountStore = System;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 }
+
+
+/// <HB SBP M1 Review
+/// 
+/// Are you using the pallet_nicks for any specific reason? This pallet is used for demonstration pusposes 
+/// and should not be used in a production chain.
+/// 
+/// If you need on chain identity, you might want to use the pallet_identity instead.
+/// 
+/// 
+/// >
 
 impl pallet_nicks::Config for Runtime {
 	// The Balances pallet implements the ReservableCurrency trait.
