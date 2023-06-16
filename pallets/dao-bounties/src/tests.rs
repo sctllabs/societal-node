@@ -140,7 +140,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 	}
 
 	fn dao_token(_id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
-		Ok(DaoToken::FungibleToken(1))
+		Ok(DaoToken::FungibleToken(0))
 	}
 
 	fn policy(_id: Self::Id) -> Result<Self::Policy, DispatchError> {
@@ -180,6 +180,26 @@ impl DaoProvider<H256> for TestDaoProvider {
 
 		Ok(dao_origin)
 	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn create_dao(
+		_founder: Self::AccountId,
+		_council: Vec<Self::AccountId>,
+		_technical_committee: Vec<Self::AccountId>,
+		_data: Vec<u8>,
+	) -> Result<(), DispatchError> {
+		Ok(())
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn approve_dao(_dao_hash: H256, _approve: bool) -> Result<(), DispatchError> {
+		Ok(())
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()> {
+		Self::ApproveOrigin::try_successful_origin(dao_origin)
+	}
 }
 
 parameter_types! {
@@ -191,7 +211,6 @@ parameter_types! {
 impl pallet_dao_treasury::Config for Test {
 	type PalletId = TreasuryPalletId;
 	type Currency = pallet_balances::Pallet<Test>;
-	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
 	type Burn = Burn;
@@ -207,7 +226,6 @@ impl pallet_dao_treasury::Config for Test {
 impl pallet_dao_treasury::Config<Instance1> for Test {
 	type PalletId = TreasuryPalletId2;
 	type Currency = pallet_balances::Pallet<Test>;
-	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
 	type Burn = Burn;

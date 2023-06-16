@@ -22,20 +22,27 @@ use super::*;
 #[test]
 fn fast_track_referendum_works() {
 	new_test_ext().execute_with(|| {
+		let alice = Public::from_string("/Alice").ok().unwrap();
+
 		System::set_block_number(0);
+
+		assert_ok!(create_dao(alice));
+		assert_ok!(init_dao_token_accounts(0));
+
 		let h = set_balance_proposal(2).hash();
 		assert_noop!(
-			Democracy::fast_track(RuntimeOrigin::signed(5), h, 3, 2),
+			Democracy::fast_track(RuntimeOrigin::root(), 0, h, 3, 2),
 			Error::<Test>::ProposalMissing
 		);
 		assert_ok!(Democracy::external_propose_majority(
-			RuntimeOrigin::signed(3),
+			RuntimeOrigin::root(),
+			0,
 			set_balance_proposal(2)
 		));
-		assert_noop!(Democracy::fast_track(RuntimeOrigin::signed(1), h, 3, 2), BadOrigin);
-		assert_ok!(Democracy::fast_track(RuntimeOrigin::signed(5), h, 2, 0));
+		assert_noop!(Democracy::fast_track(RuntimeOrigin::signed(alice), 0, h, 3, 2), BadOrigin);
+		assert_ok!(Democracy::fast_track(RuntimeOrigin::root(), 0, h, 2, 0));
 		assert_eq!(
-			Democracy::referendum_status(0),
+			Democracy::referendum_status(0, 0),
 			Ok(ReferendumStatus {
 				end: 2,
 				proposal: set_balance_proposal(2),
@@ -50,30 +57,34 @@ fn fast_track_referendum_works() {
 #[test]
 fn instant_referendum_works() {
 	new_test_ext().execute_with(|| {
+		let alice = Public::from_string("/Alice").ok().unwrap();
+		let eve = Public::from_string("/Eve").ok().unwrap();
+
 		System::set_block_number(0);
+
+		assert_ok!(create_dao(alice));
+		assert_ok!(init_dao_token_accounts(0));
+
 		let h = set_balance_proposal(2).hash();
 		assert_noop!(
-			Democracy::fast_track(RuntimeOrigin::signed(5), h, 3, 2),
+			Democracy::fast_track(RuntimeOrigin::root(), 0, h, 3, 2),
 			Error::<Test>::ProposalMissing
 		);
 		assert_ok!(Democracy::external_propose_majority(
-			RuntimeOrigin::signed(3),
+			RuntimeOrigin::root(),
+			0,
 			set_balance_proposal(2)
 		));
-		assert_noop!(Democracy::fast_track(RuntimeOrigin::signed(1), h, 3, 2), BadOrigin);
-		assert_noop!(Democracy::fast_track(RuntimeOrigin::signed(5), h, 1, 0), BadOrigin);
-		assert_noop!(
-			Democracy::fast_track(RuntimeOrigin::signed(6), h, 1, 0),
-			Error::<Test>::InstantNotAllowed
-		);
+		assert_noop!(Democracy::fast_track(RuntimeOrigin::signed(alice), 0, h, 3, 2), BadOrigin);
+		assert_noop!(Democracy::fast_track(RuntimeOrigin::signed(eve), 0, h, 1, 0), BadOrigin);
 		INSTANT_ALLOWED.with(|v| *v.borrow_mut() = true);
 		assert_noop!(
-			Democracy::fast_track(RuntimeOrigin::signed(6), h, 0, 0),
+			Democracy::fast_track(RuntimeOrigin::root(), 0, h, 0, 0),
 			Error::<Test>::VotingPeriodLow
 		);
-		assert_ok!(Democracy::fast_track(RuntimeOrigin::signed(6), h, 1, 0));
+		assert_ok!(Democracy::fast_track(RuntimeOrigin::root(), 0, h, 1, 0));
 		assert_eq!(
-			Democracy::referendum_status(0),
+			Democracy::referendum_status(0, 0),
 			Ok(ReferendumStatus {
 				end: 1,
 				proposal: set_balance_proposal(2),
@@ -90,25 +101,31 @@ fn instant_next_block_referendum_backed() {
 	new_test_ext().execute_with(|| {
 		// arrange
 		let start_block_number = 10;
-		let majority_origin_id = 3;
-		let instant_origin_id = 6;
-		let voting_period = 1;
+		let voting_period = 2;
 		let proposal = set_balance_proposal(2);
 		let delay = 2; // has no effect on test
 
+		let alice = Public::from_string("/Alice").ok().unwrap();
+
 		// init
 		System::set_block_number(start_block_number);
+
+		assert_ok!(create_dao(alice));
+		assert_ok!(init_dao_token_accounts(0));
+
 		InstantAllowed::set(true);
 
 		// propose with majority origin
 		assert_ok!(Democracy::external_propose_majority(
-			RuntimeOrigin::signed(majority_origin_id),
+			RuntimeOrigin::root(),
+			0,
 			proposal.clone()
 		));
 
 		// fast track with instant origin and voting period pointing to the next block
 		assert_ok!(Democracy::fast_track(
-			RuntimeOrigin::signed(instant_origin_id),
+			RuntimeOrigin::root(),
+			0,
 			proposal.hash(),
 			voting_period,
 			delay
@@ -116,7 +133,7 @@ fn instant_next_block_referendum_backed() {
 
 		// fetch the status of the only referendum at index 0
 		assert_eq!(
-			Democracy::referendum_status(0),
+			Democracy::referendum_status(0, 0),
 			Ok(ReferendumStatus {
 				end: start_block_number + voting_period,
 				proposal,
@@ -128,12 +145,13 @@ fn instant_next_block_referendum_backed() {
 
 		// referendum expected to be baked with the start of the next block
 		next_block();
+		next_block();
 
 		// assert no active referendums
-		assert_noop!(Democracy::referendum_status(0), Error::<Test>::ReferendumInvalid);
+		assert_noop!(Democracy::referendum_status(0, 0), Error::<Test>::ReferendumInvalid);
 		// the only referendum in the storage is finished and not approved
 		assert_eq!(
-			ReferendumInfoOf::<Test>::get(0).unwrap(),
+			ReferendumInfoOf::<Test>::get(0, 0).unwrap(),
 			ReferendumInfo::Finished { approved: false, end: start_block_number + voting_period }
 		);
 	});
@@ -142,11 +160,17 @@ fn instant_next_block_referendum_backed() {
 #[test]
 fn fast_track_referendum_fails_when_no_simple_majority() {
 	new_test_ext().execute_with(|| {
+		let alice = Public::from_string("/Alice").ok().unwrap();
+
 		System::set_block_number(0);
+
+		assert_ok!(create_dao(alice));
+		assert_ok!(init_dao_token_accounts(0));
+
 		let h = set_balance_proposal(2).hash();
-		assert_ok!(Democracy::external_propose(RuntimeOrigin::signed(2), set_balance_proposal(2)));
+		assert_ok!(Democracy::external_propose(RuntimeOrigin::root(), 0, set_balance_proposal(2)));
 		assert_noop!(
-			Democracy::fast_track(RuntimeOrigin::signed(5), h, 3, 2),
+			Democracy::fast_track(RuntimeOrigin::root(), 0, h, 3, 2),
 			Error::<Test>::NotSimpleMajority
 		);
 	});

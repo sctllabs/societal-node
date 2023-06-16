@@ -2,8 +2,10 @@
 #![recursion_limit = "128"]
 
 use scale_info::{prelude::*, TypeInfo};
-use sp_core::{bounded::BoundedVec, Hasher, H160};
-use sp_io::storage;
+#[cfg(not(feature = "runtime-benchmarks"))]
+use sp_core::Hasher;
+use sp_core::{bounded::BoundedVec, H160};
+use sp_io::{offchain_index, storage};
 use sp_runtime::{
 	traits::{BlockNumberProvider, Hash, IntegerSquareRoot, Zero},
 	Saturating,
@@ -14,8 +16,6 @@ use dao_primitives::{
 	AccountTokenBalance, DaoPolicy, DaoProvider, DaoToken, EncodeInto, PendingProposal,
 	PendingVote, RawOrigin,
 };
-
-use sp_io::offchain_index;
 
 // TODO
 use pallet_dao_democracy::vote_threshold::compare_rationals;
@@ -47,6 +47,16 @@ use serde::Deserialize;
 use crate::vote::{AccountVote, Vote};
 pub use pallet::*;
 
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
+
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+pub mod weights;
+
 pub mod vote;
 
 type BalanceOf<T> = <T as Config>::Balance;
@@ -65,6 +75,7 @@ pub type BlockNumber = u32;
 pub type BoundedProposal<T> = Bounded<<T as Config>::Proposal>;
 
 pub type CallOf<T> = <T as Config>::RuntimeCall;
+pub type BoundedCallOf<T> = Bounded<CallOf<T>>;
 
 const UNSIGNED_TXS_PRIORITY: u64 = 100;
 
@@ -115,7 +126,7 @@ struct IndexingData<Hash>(Vec<u8>, OffchainData<Hash, BlockNumber>);
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use crate::vote::Vote;
+	use crate::{vote::Vote, weights::WeightInfo};
 	use eth_primitives::EthRpcService;
 	use frame_system::offchain::{CreateSignedTransaction, SubmitTransaction};
 	use serde_json::json;
@@ -162,9 +173,17 @@ pub mod pallet {
 		/// Maximum number of proposals allowed to be active in parallel.
 		type MaxProposals: Get<ProposalIndex>;
 
+		/// Maximum number of pending proposals allowed to be active in parallel.
+		#[pallet::constant]
+		type MaxPendingProposals: Get<u32>;
+
 		/// The maximum number of votes(ayes/nays) for a proposal.
 		#[pallet::constant]
 		type MaxVotes: Get<u32>;
+
+		/// The maximum number of pending votes(ayes/nays) for a proposal.
+		#[pallet::constant]
+		type MaxPendingVotes: Get<u32>;
 
 		type DaoProvider: DaoProvider<
 			<Self as frame_system::Config>::Hash,
@@ -186,6 +205,9 @@ pub mod pallet {
 
 		/// Overarching type of all pallets origins.
 		type PalletsOrigin: From<RawOrigin<Self::AccountId>>;
+
+		/// Weight information for extrinsics in this pallet.
+		type WeightInfo: WeightInfo;
 	}
 
 	/// The hashes of the active proposals by Dao.
@@ -223,6 +245,11 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn pending_proposals)]
+	pub(super) type PendingProposals<T: Config> =
+		StorageMap<_, Twox64Concat, DaoId, BoundedVec<T::Hash, T::MaxPendingProposals>, ValueQuery>;
+
 	/// Votes on a given proposal, if it is ongoing.
 	#[pallet::storage]
 	#[pallet::getter(fn voting)]
@@ -236,7 +263,17 @@ pub mod pallet {
 		OptionQuery,
 	>;
 
-	/// Actual pending proposal for a given hash.
+	#[pallet::storage]
+	#[pallet::getter(fn pending_votes)]
+	pub(super) type PendingVotes<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		(DaoId, ProposalIndex),
+		BoundedVec<T::Hash, T::MaxPendingVotes>,
+		ValueQuery,
+	>;
+
+	/// Actual pending voting for a given dao id and hash.
 	#[pallet::storage]
 	#[pallet::getter(fn pending_voting)]
 	pub type PendingVoting<T: Config> = StorageDoubleMap<
@@ -545,6 +582,8 @@ pub mod pallet {
 		NotSupported,
 		/// Voting is disabled for expired proposals
 		Expired,
+		TooManyPendingProposals,
+		TooManyPendingVotes,
 	}
 
 	#[pallet::call]
@@ -552,7 +591,7 @@ pub mod pallet {
 		/// Add a new proposal to either be voted on or executed directly.
 		///
 		/// Requires the sender to be member.
-		#[pallet::weight(10_1000)]
+		#[pallet::weight(T::WeightInfo::propose_with_meta())]
 		#[pallet::call_index(0)]
 		pub fn propose(
 			origin: OriginFor<T>,
@@ -565,7 +604,7 @@ pub mod pallet {
 		}
 
 		/// Adds a new proposal with temporary meta field for arbitrary data indexed by node indexer
-		#[pallet::weight(10_1000)]
+		#[pallet::weight(T::WeightInfo::propose_with_meta())]
 		#[pallet::call_index(1)]
 		pub fn propose_with_meta(
 			origin: OriginFor<T>,
@@ -592,6 +631,17 @@ pub mod pallet {
 
 			match account_token_balance {
 				AccountTokenBalance::Offchain { .. } => {
+					<PendingProposals<T>>::try_mutate(
+						dao_id,
+						|hashes| -> Result<usize, DispatchError> {
+							hashes
+								.try_push(proposal_hash)
+								.map_err(|_| Error::<T>::TooManyPendingProposals)?;
+
+							Ok(hashes.len())
+						},
+					)?;
+
 					let pending_proposal = PendingProposal {
 						who: who.clone(),
 						length_bound,
@@ -619,7 +669,7 @@ pub mod pallet {
 		}
 
 		/// Add an aye or nay vote for the sender to the given proposal.
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::vote())]
 		#[pallet::call_index(2)]
 		pub fn vote(
 			origin: OriginFor<T>,
@@ -660,7 +710,15 @@ pub mod pallet {
 
 			match account_token_balance {
 				AccountTokenBalance::Offchain { .. } => {
-					// TODO: add checks for vec size limits
+					<PendingVotes<T>>::try_mutate(
+						(dao_id, index),
+						|hashes| -> Result<usize, DispatchError> {
+							hashes
+								.try_push(pending_vote_hash)
+								.map_err(|_| Error::<T>::TooManyPendingVotes)?;
+							Ok(hashes.len())
+						},
+					)?;
 
 					<PendingVoting<T>>::insert(dao_id, pending_vote_hash, pending_vote);
 
@@ -692,7 +750,7 @@ pub mod pallet {
 		/// proposal.
 		/// + `length_bound`: The upper bound for the length of the proposal in storage. Checked via
 		/// `storage::read` so it is `size_of::<u32>() == 4` larger than the pure length.
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::close())]
 		#[pallet::call_index(3)]
 		pub fn close(
 			origin: OriginFor<T>,
@@ -720,7 +778,7 @@ pub mod pallet {
 			}
 		}
 
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::approve_propose())]
 		#[pallet::call_index(4)]
 		pub fn approve_propose(
 			origin: OriginFor<T>,
@@ -737,7 +795,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::approve_vote())]
 		#[pallet::call_index(5)]
 		pub fn approve_vote(
 			origin: OriginFor<T>,
@@ -752,7 +810,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::close())]
 		#[pallet::call_index(6)]
 		pub fn close_scheduled_proposal(
 			origin: OriginFor<T>,
@@ -1064,7 +1122,7 @@ impl<T: Config> Pallet<T> {
 
 	/// Validating account_id provided as an argument against call signer
 	fn validate_account(
-		signer: T::AccountId,
+		_signer: T::AccountId,
 		account_id: Vec<u8>,
 	) -> Result<Vec<u8>, DispatchError> {
 		let account_id = Result::unwrap_or(str::from_utf8(&account_id), "");
@@ -1079,10 +1137,13 @@ impl<T: Config> Pallet<T> {
 		data[0..4].copy_from_slice(b"evm:");
 		data[4..24].copy_from_slice(&H160::from_slice(&hex_account[..])[..]);
 
-		let hash = <T::Hashing as Hasher>::hash(&data);
-		let acc = T::AccountId::decode(&mut hash.as_ref()).map_err(|_| Error::<T>::InvalidInput)?;
-
-		ensure!(signer == acc, Error::<T>::WrongAccountId);
+		#[cfg(not(feature = "runtime-benchmarks"))]
+		{
+			let hash = <T::Hashing as Hasher>::hash(&data);
+			let acc =
+				T::AccountId::decode(&mut hash.as_ref()).map_err(|_| Error::<T>::InvalidInput)?;
+			ensure!(_signer == acc, Error::<T>::WrongAccountId);
+		}
 
 		Ok(account_id_stripped.as_bytes().to_vec())
 	}
@@ -1098,6 +1159,11 @@ impl<T: Config> Pallet<T> {
 			<PendingProposalOf<T>>::take(dao_id, hash).expect("Pending Proposal not found");
 
 		let PendingProposal { who, length_bound, meta, .. } = pending_proposal;
+
+		PendingProposals::<T>::mutate(dao_id, |hashes| {
+			hashes.retain(|h| h != &hash);
+			hashes.len() + 1
+		});
 
 		if approve {
 			Self::do_propose_proposed(
@@ -1117,6 +1183,11 @@ impl<T: Config> Pallet<T> {
 	fn do_approve_vote(dao_id: DaoId, hash: T::Hash, approve: bool) -> Result<(), DispatchError> {
 		let PendingVote { who, proposal_hash, proposal_index, aye, balance, .. } =
 			<PendingVoting<T>>::take(dao_id, hash).expect("Pending Vote not found");
+
+		PendingVotes::<T>::mutate((dao_id, proposal_index), |hashes| {
+			hashes.retain(|h| h != &hash);
+			hashes.len() + 1
+		});
 
 		if approve {
 			Self::do_vote(who, dao_id, proposal_hash, proposal_index, Vote { aye, balance })?;

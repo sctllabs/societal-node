@@ -15,7 +15,7 @@ use dao_primitives::{
 };
 use frame_support::{
 	ord_parameter_types, parameter_types,
-	traits::{AsEnsureOriginWithArg, ConstU32, ConstU64},
+	traits::{AsEnsureOriginWithArg, ConstU32, ConstU64, EnsureOriginWithArg},
 	weights::Weight,
 	PalletId,
 };
@@ -163,11 +163,30 @@ impl DaoProvider<H256> for TestDaoProvider {
 	) -> Result<Option<Self::NFTCollectionId>, DispatchError> {
 		Err(Error::<Test>::NotMember.into())
 	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn create_dao(
+		_founder: Self::AccountId,
+		_council: Vec<Self::AccountId>,
+		_technical_committee: Vec<Self::AccountId>,
+		_data: Vec<u8>,
+	) -> Result<(), DispatchError> {
+		Ok(())
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn approve_dao(_dao_hash: H256, _approve: bool) -> Result<(), DispatchError> {
+		Ok(())
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()> {
+		Self::ApproveOrigin::try_successful_origin(dao_origin)
+	}
 }
 
 impl Config for Test {
 	type RuntimeEvent = RuntimeEvent;
-	type ApproveOrigin = AsEnsureOriginWithArg<EnsureSignedBy<One, u64>>;
 	type MembershipInitialized = TestChangeMembers;
 	type MembershipChanged = TestChangeMembers;
 	type MaxMembers = ConstU32<10>;

@@ -154,7 +154,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	//   `spec_version`, and `authoring_version` are the same between Wasm and native.
 	// This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
 	//   the compatible custom types.
-	spec_version: 100,
+	spec_version: 101,
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
@@ -563,9 +563,9 @@ impl pallet_aura::Config for Runtime {
 
 parameter_types! {
 	pub const CouncilMotionDuration: BlockNumber = 5 * DAYS;
-	pub const CouncilMaxProposals: u32 = 100;
+	pub const CouncilMaxProposals: u32 = 50;
 	pub const CouncilMaxMembers: u32 = 100;
-	pub const CollectiveMaxVotes: u32 = 50;
+	pub const CollectiveMaxVotes: u32 = 100;
 }
 
 // TODO - Update settings
@@ -697,10 +697,6 @@ impl pallet_dao_treasury::Config for Runtime {
 	type PalletId = DaoTreasuryPalletId;
 	type Currency = Balances;
 	type AssetId = AssetId;
-	type ApproveOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
-	>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
 	type Burn = Burn;
@@ -904,17 +900,10 @@ impl pallet_membership::Config<pallet_membership::Instance1> for Runtime {
 type DaoCouncilMembership = pallet_dao_membership::Instance1;
 impl pallet_dao_membership::Config<DaoCouncilMembership> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-
-	// TODO: dynamic properties - move to dao-primitives for generic types
-	type ApproveOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
-	>;
 	type MembershipInitialized = DaoCouncil;
 	type MembershipChanged = DaoCouncil;
 	type MaxMembers = TechnicalMaxMembers;
 	type WeightInfo = pallet_dao_membership::weights::SubstrateWeight<Runtime>;
-
 	type DaoProvider = Dao;
 }
 
@@ -922,17 +911,10 @@ impl pallet_dao_membership::Config<DaoCouncilMembership> for Runtime {
 type DaoTechnicalCommitteeMembership = pallet_dao_membership::Instance2;
 impl pallet_dao_membership::Config<DaoTechnicalCommitteeMembership> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-
-	// TODO: dynamic properties - move to dao-primitives for generic types
-	type ApproveOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoTechnicalCommitteeCollective>,
-	>;
 	type MembershipInitialized = DaoTechnicalCommittee;
 	type MembershipChanged = DaoTechnicalCommittee;
 	type MaxMembers = TechnicalMaxMembers;
 	type WeightInfo = pallet_dao_membership::weights::SubstrateWeight<Runtime>;
-
 	type DaoProvider = Dao;
 }
 
@@ -1131,7 +1113,7 @@ parameter_types! {
 	pub const MinimumDeposit: Balance = 100 * DOLLARS;
 	pub const EnactmentPeriod: BlockNumber = 30 * 24 * 60 * MINUTES;
 	pub const CooloffPeriod: BlockNumber = 28 * 24 * 60 * MINUTES;
-	pub const MaxProposals: u32 = 100;
+	pub const MaxProposals: u32 = 50;
 }
 
 // TODO - Update settings
@@ -1203,30 +1185,46 @@ impl pallet_dao_democracy::Config for Runtime {
 	type Proposal = RuntimeCall;
 
 	/// A straight majority of the council can decide what their next motion is.
-	type ExternalOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>;
+	type ExternalOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	/// A super-majority can have the next scheduled referendum be a straight majority-carries vote.
-	type ExternalMajorityOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>;
+	type ExternalMajorityOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	/// A unanimous council can have the next scheduled referendum be a straight default-carries
 	/// (NTB) vote.
-	type ExternalDefaultOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>;
+	type ExternalDefaultOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	/// Two thirds of the technical committee can have an ExternalMajority/ExternalDefault vote
 	/// be tabled immediately and with a shorter voting/enactment period.
-	type FastTrackOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoTechnicalCommitteeCollective>;
-	type InstantOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoTechnicalCommitteeCollective>;
+	type FastTrackOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
+	type InstantOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	// To cancel a proposal which has been passed, 2/3 of the council must agree to it.
-	type CancellationOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>;
+	type CancellationOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	// To cancel a proposal before it has been passed, the technical committee must be unanimous or
 	// Root must agree.
-	type CancelProposalOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoTechnicalCommitteeCollective>;
-	type BlacklistOrigin =
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoTechnicalCommitteeCollective>;
+	type CancelProposalOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
+	type BlacklistOrigin = EitherOfDiverseWithArg<
+		EnsureDao<AccountId>,
+		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
+	>;
 	// Any single technical committee member may veto a coming council proposal, however they can
 	// only do it once and it lasts only for the cool-off period.
 	type VetoOrigin =
@@ -1631,10 +1629,12 @@ impl pallet_hotfix_sufficients::Config for Runtime {
 
 parameter_types! {
 	pub const DaoPalletId: PalletId = PalletId(*b"py/sctld");
+	pub const DaoNameLimit: u32 = 20;
 	pub const DaoStringLimit: u32 = 100;
 	pub const DaoMetadataLimit: u32 = 750;
 	pub const DaoMaxCouncilMembers: u32 = 100; // TODO
 	pub const DaoMaxTechnicalCommitteeMembers: u32 = 100; // TODO
+	pub const DaoMaxPendingItems: u32 = 100; // TODO
 	pub const DaoMinTreasurySpendPeriod: u32 = 10; // TODO
 }
 
@@ -1643,10 +1643,12 @@ impl pallet_dao::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
 	type PalletId = DaoPalletId;
+	type DaoNameLimit = DaoNameLimit;
 	type DaoStringLimit = DaoStringLimit;
 	type DaoMetadataLimit = DaoMetadataLimit;
 	type DaoMaxCouncilMembers = DaoMaxCouncilMembers;
 	type DaoMaxTechnicalCommitteeMembers = DaoMaxTechnicalCommitteeMembers;
+	type DaoMaxPendingItems = DaoMaxPendingItems;
 	type DaoMinTreasurySpendPeriod = DaoMinTreasurySpendPeriod;
 	type AssetId = AssetId;
 	type Balance = Balance;
@@ -1664,11 +1666,17 @@ impl pallet_dao::Config for Runtime {
 	type Preimages = Preimage;
 	type SpendDaoFunds = DaoTreasury;
 	type DaoReferendumScheduler = DaoDemocracy;
+	type WeightInfo = pallet_dao::weights::SubstrateWeight<Runtime>;
+
+	#[cfg(feature = "runtime-benchmarks")]
+	type DaoReferendumBenchmarkHelper = DaoDemocracy;
 }
 
 parameter_types! {
-	pub const EthGovernanceMaxProposals: u32 = 100;
+	pub const EthGovernanceMaxProposals: u32 = 50;
+	pub const EthGovernanceMaxPendingProposals: u32 = 50;
 	pub const EthGovernanceMaxVotes: u32 = 50;
+	pub const EthGovernanceMaxPendingVotes: u32 = 50;
 }
 
 impl pallet_dao_eth_governance::Config for Runtime {
@@ -1680,6 +1688,8 @@ impl pallet_dao_eth_governance::Config for Runtime {
 	type ProposalMetadataLimit = DaoMetadataLimit;
 	type EthRpcUrlLimit = DaoStringLimit;
 	type MaxProposals = EthGovernanceMaxProposals;
+	type MaxPendingProposals = EthGovernanceMaxPendingProposals;
+	type MaxPendingVotes = EthGovernanceMaxPendingVotes;
 	type MaxVotes = EthGovernanceMaxVotes;
 	type DaoProvider = Dao;
 	type Preimages = Preimage;
@@ -1687,6 +1697,7 @@ impl pallet_dao_eth_governance::Config for Runtime {
 	type OffchainEthService = EthService<DaoEthGovernance>;
 	type Scheduler = Scheduler;
 	type PalletsOrigin = OriginCaller;
+	type WeightInfo = pallet_dao_eth_governance::weights::SubstrateWeight<Runtime>;
 }
 
 parameter_types! {
@@ -2040,6 +2051,12 @@ mod benches {
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
 		[pallet_dao, Dao]
+		[pallet_dao_bounties, DaoBounties]
+		[pallet_dao_collective, DaoCouncil]
+		[pallet_dao_eth_governance, DaoEthGovernance]
+		[pallet_dao_democracy, DaoDemocracy]
+		[pallet_dao_membership, DaoCouncilMembers]
+		[pallet_dao_treasury, DaoTreasury]
 	);
 }
 

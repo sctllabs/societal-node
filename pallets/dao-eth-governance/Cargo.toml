@@ -34,9 +34,16 @@ frame-support = { workspace = true }
 frame-system = { workspace = true }
 
 # Local dependencies
-eth-primitives = { default-features = false, path = "../../primitives/eth" }
-dao-primitives = { default-features = false, path = "../../primitives/dao" }
-pallet-dao-democracy = { default-features = false, path = "../dao-democracy" }
+eth-primitives = { workspace = true }
+dao-primitives = { workspace = true }
+pallet-dao = { workspace = true }
+pallet-dao-democracy = { workspace = true }
+
+[dev-dependencies]
+pallet-balances = { workspace = true }
+pallet-dao-assets = { workspace = true }
+pallet-preimage = { workspace = true }
+pallet-scheduler = { workspace = true }
 
 [features]
 default = ["std"]
@@ -46,6 +53,10 @@ std = [
 	"frame-support/std",
 	"frame-system/std",
 	"log/std",
+	"eth-primitives/std",
+	"dao-primitives/std",
+	"pallet-dao/std",
+	"pallet-dao-democracy/std",
 	"scale-info/std",
 	"sp-core/std",
 	"sp-io/std",
@@ -56,6 +67,7 @@ runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-support/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",
+	"pallet-dao/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 ]
 try-runtime = ["frame-support/try-runtime"]

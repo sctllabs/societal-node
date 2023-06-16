@@ -34,8 +34,8 @@ frame-support = { workspace = true }
 frame-system = { workspace = true }
 
 # Local dependencies
-dao-primitives = { default-features = false, path = "../../primitives/dao" }
-pallet-dao-democracy = { default-features = false, path = "../dao-democracy" }
+dao-primitives = { workspace = true }
+pallet-dao-democracy = { workspace = true }
 
 [features]
 default = ["std"]

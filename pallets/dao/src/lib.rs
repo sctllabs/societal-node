@@ -35,6 +35,7 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+pub mod weights;
 
 #[cfg(feature = "runtime-benchmarks")]
 type BalanceOf<T> =
@@ -43,6 +44,7 @@ type BalanceOf<T> =
 type DaoOf<T> = Dao<
 	<T as frame_system::Config>::AccountId,
 	<T as Config>::AssetId,
+	BoundedVec<u8, <T as Config>::DaoNameLimit>,
 	BoundedVec<u8, <T as Config>::DaoStringLimit>,
 	BoundedVec<u8, <T as Config>::DaoMetadataLimit>,
 >;
@@ -51,6 +53,7 @@ type PolicyOf = DaoPolicy;
 type PendingDaoOf<T> = PendingDao<
 	<T as frame_system::Config>::AccountId,
 	<T as Config>::AssetId,
+	BoundedVec<u8, <T as Config>::DaoNameLimit>,
 	BoundedVec<u8, <T as Config>::DaoStringLimit>,
 	BoundedVec<u8, <T as Config>::DaoMetadataLimit>,
 	BoundedVec<<T as frame_system::Config>::AccountId, <T as Config>::DaoMaxCouncilMembers>,
@@ -132,8 +135,10 @@ struct IndexingData<Hash>(Vec<u8>, OffchainData<Hash>);
 #[frame_support::pallet]
 pub mod pallet {
 	pub use super::*;
+	use crate::weights::WeightInfo;
 	use eth_primitives::EthRpcService;
 	use frame_support::traits::{
+		fungibles::Transfer,
 		schedule::{
 			v3::{Named as ScheduleNamed, TaskName},
 			DispatchTime,
@@ -194,6 +199,9 @@ pub mod pallet {
 		type PalletId: Get<PalletId>;
 
 		#[pallet::constant]
+		type DaoNameLimit: Get<u32>;
+
+		#[pallet::constant]
 		type DaoStringLimit: Get<u32>;
 
 		#[pallet::constant]
@@ -204,6 +212,9 @@ pub mod pallet {
 
 		#[pallet::constant]
 		type DaoMaxTechnicalCommitteeMembers: Get<u32>;
+
+		#[pallet::constant]
+		type DaoMaxPendingItems: Get<u32>;
 
 		#[pallet::constant]
 		type DaoMinTreasurySpendPeriod: Get<u32>;
@@ -230,7 +241,7 @@ pub mod pallet {
 				Self::AccountId,
 				AssetId = <Self as pallet::Config>::AssetId,
 				Balance = <Self as pallet::Config>::Balance,
-			>;
+			> + Transfer<Self::AccountId>;
 
 		/// The identifier type for an offchain worker.
 		type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
@@ -247,9 +258,20 @@ pub mod pallet {
 		type Preimages: QueryPreimage + StorePreimage;
 
 		/// Runtime hooks to external pallet using treasury to compute spend funds.
-		type SpendDaoFunds: SpendDaoFunds<u32>;
+		type SpendDaoFunds: SpendDaoFunds<DaoId>;
 
-		type DaoReferendumScheduler: DaoReferendumScheduler<u32>;
+		type DaoReferendumScheduler: DaoReferendumScheduler<DaoId>;
+
+		/// Weight information for extrinsics in this pallet.
+		type WeightInfo: WeightInfo;
+
+		#[cfg(feature = "runtime-benchmarks")]
+		type DaoReferendumBenchmarkHelper: DaoReferendumBenchmarkHelper<
+			DaoId,
+			Self::AccountId,
+			CallOf<Self>,
+			Self::Balance,
+		>;
 	}
 
 	/// Origin for the dao pallet.
@@ -268,6 +290,11 @@ pub mod pallet {
 	#[pallet::getter(fn pending_daos)]
 	pub(super) type PendingDaos<T: Config> =
 		StorageMap<_, Blake2_128Concat, T::Hash, PendingDaoOf<T>, OptionQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn pending_dao_hashes)]
+	pub(super) type PendingDaoHashes<T: Config> =
+		StorageValue<_, BoundedVec<T::Hash, T::DaoMaxPendingItems>, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn policies)]
@@ -385,8 +412,11 @@ pub mod pallet {
 			council: BoundedVec<T::AccountId, T::DaoMaxCouncilMembers>,
 			technical_committee: BoundedVec<T::AccountId, T::DaoMaxTechnicalCommitteeMembers>,
 			token: DaoToken<T::AssetId, BoundedVec<u8, T::DaoStringLimit>>,
-			config:
-				DaoConfig<BoundedVec<u8, T::DaoStringLimit>, BoundedVec<u8, T::DaoMetadataLimit>>,
+			config: DaoConfig<
+				BoundedVec<u8, T::DaoNameLimit>,
+				BoundedVec<u8, T::DaoStringLimit>,
+				BoundedVec<u8, T::DaoMetadataLimit>,
+			>,
 			policy: DaoPolicy,
 		},
 		DaoPendingApproval {
@@ -394,8 +424,11 @@ pub mod pallet {
 			founder: T::AccountId,
 			account_id: T::AccountId,
 			token: DaoToken<T::AssetId, BoundedVec<u8, T::DaoStringLimit>>,
-			config:
-				DaoConfig<BoundedVec<u8, T::DaoStringLimit>, BoundedVec<u8, T::DaoMetadataLimit>>,
+			config: DaoConfig<
+				BoundedVec<u8, T::DaoNameLimit>,
+				BoundedVec<u8, T::DaoStringLimit>,
+				BoundedVec<u8, T::DaoMetadataLimit>,
+			>,
 			policy: DaoPolicy,
 		},
 		DaoTokenTransferred {
@@ -437,12 +470,12 @@ pub mod pallet {
 		PolicyNotExist,
 		OffchainUnsignedTxError,
 		NotSupported,
+		TooManyPendingDaos,
 	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		// TODO: calculate dynamic weight
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(4).ref_time())]
+		#[pallet::weight(T::WeightInfo::create_dao())]
 		#[pallet::call_index(0)]
 		pub fn create_dao(
 			origin: OriginFor<T>,
@@ -452,6 +485,149 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin.clone())?;
 
+			Self::do_create_dao(who, council, technical_committee, data)
+		}
+
+		#[pallet::weight(T::WeightInfo::approve_dao())]
+		#[pallet::call_index(2)]
+		pub fn approve_dao(
+			origin: OriginFor<T>,
+			dao_hash: T::Hash,
+			approve: bool,
+		) -> DispatchResult {
+			ensure_none(origin)?;
+
+			Self::do_approve_dao(dao_hash, approve)
+		}
+
+		#[pallet::weight(T::WeightInfo::update_dao_metadata())]
+		#[pallet::call_index(3)]
+		pub fn update_dao_metadata(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			metadata: Vec<u8>,
+		) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			let dao_metadata = BoundedVec::<u8, T::DaoMetadataLimit>::try_from(metadata.clone())
+				.map_err(|_| Error::<T>::MetadataTooLong)?;
+
+			Daos::<T>::mutate(dao_id, |maybe_dao| {
+				if let Some(dao) = maybe_dao {
+					dao.config.metadata = dao_metadata.clone();
+				}
+			});
+
+			Self::deposit_event(Event::DaoMetadataUpdated { dao_id, metadata });
+
+			Ok(())
+		}
+
+		#[pallet::weight(T::WeightInfo::update_dao_policy())]
+		#[pallet::call_index(4)]
+		pub fn update_dao_policy(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			policy: Vec<u8>,
+		) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			let policy = serde_json::from_slice::<DaoPolicy>(&policy)
+				.map_err(|_| Error::<T>::InvalidInput)?;
+
+			let old_policy = Self::policy(dao_id)?;
+			Policies::<T>::insert(dao_id, policy.clone());
+
+			if old_policy.spend_period != policy.spend_period {
+				Self::schedule_dao_events(dao_id, policy.clone(), true)?;
+			}
+
+			Self::deposit_event(Event::DaoPolicyUpdated { dao_id, policy });
+
+			Ok(())
+		}
+
+		#[pallet::weight(T::WeightInfo::mint_dao_token())]
+		#[pallet::call_index(5)]
+		pub fn mint_dao_token(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			amount: T::Balance,
+		) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			let dao_account_id = Self::dao_account_id(dao_id);
+			let dao_token = Self::dao_token(dao_id)?;
+
+			match dao_token {
+				DaoToken::FungibleToken(token_id) => {
+					T::AssetProvider::mint_into(token_id, &dao_account_id, amount)
+						.map_err(|_| Error::<T>::TokenMintFailed)?;
+
+					Ok(())
+				},
+				DaoToken::EthTokenAddress(_) => Err(Error::<T>::NotSupported.into()),
+			}
+		}
+
+		#[pallet::weight(T::WeightInfo::spend_dao_funds())]
+		#[pallet::call_index(6)]
+		pub fn spend_dao_funds(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			T::SpendDaoFunds::spend_dao_funds(dao_id);
+
+			Ok(())
+		}
+
+		#[pallet::weight(T::WeightInfo::launch_dao_referendum())]
+		#[pallet::call_index(7)]
+		pub fn launch_dao_referendum(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			T::DaoReferendumScheduler::launch_referendum(dao_id)
+		}
+
+		#[pallet::weight(T::WeightInfo::bake_dao_referendum())]
+		#[pallet::call_index(8)]
+		pub fn bake_dao_referendum(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			T::DaoReferendumScheduler::bake_referendum(dao_id)
+		}
+	}
+
+	impl<T: Config> Pallet<T> {
+		pub fn account_id(dao_id: u32) -> T::AccountId {
+			T::PalletId::get().into_sub_account_truncating(dao_id)
+		}
+
+		fn u128_to_asset_id(asset_id: u128) -> AssetId<T> {
+			asset_id.try_into().ok().unwrap()
+		}
+
+		pub fn u128_to_balance(cost: u128) -> Balance<T> {
+			TryInto::<Balance<T>>::try_into(cost).ok().unwrap()
+		}
+
+		fn spend_dao_funds_task_id(dao_id: DaoId) -> TaskName {
+			(DAO_FACTORY_ID, DAO_SPEND_ID, dao_id).encode_into()
+		}
+
+		fn launch_dao_referendum_task_id(dao_id: DaoId) -> TaskName {
+			(DAO_FACTORY_ID, DAO_REFERENDUM_LAUNCH_ID, dao_id).encode_into()
+		}
+
+		fn bake_dao_referendum_task_id(dao_id: DaoId) -> TaskName {
+			(DAO_FACTORY_ID, DAO_REFERENDUM_BAKE_ID, dao_id).encode_into()
+		}
+
+		pub fn do_create_dao(
+			founder: T::AccountId,
+			council: Vec<T::AccountId>,
+			technical_committee: Vec<T::AccountId>,
+			data: Vec<u8>,
+		) -> DispatchResult {
 			let DaoPayload { name, purpose, metadata, token, token_id, token_address, policy } =
 				serde_json::from_slice::<DaoPayload>(&data)
 					.map_err(|_| Error::<T>::InvalidInput)?;
@@ -459,7 +635,7 @@ pub mod pallet {
 			let dao_id = <NextDaoId<T>>::get();
 			let dao_account_id = Self::account_id(dao_id);
 
-			let dao_name = BoundedVec::<u8, T::DaoStringLimit>::try_from(name)
+			let dao_name = BoundedVec::<u8, T::DaoNameLimit>::try_from(name)
 				.map_err(|_| Error::<T>::NameTooLong)?;
 
 			let dao_purpose = BoundedVec::<u8, T::DaoStringLimit>::try_from(purpose)
@@ -472,7 +648,7 @@ pub mod pallet {
 			let _ = <T as Config>::Currency::make_free_balance_be(&dao_account_id, min);
 
 			// setting submitter as a Dao council by default
-			let mut council_members: Vec<T::AccountId> = vec![who.clone()];
+			let mut council_members: Vec<T::AccountId> = vec![founder.clone()];
 			for account in council {
 				if council_members.contains(&account) {
 					continue
@@ -501,7 +677,6 @@ pub mod pallet {
 				)
 				.map_err(|_| Error::<T>::CouncilMembersOverflow)?;
 
-			let founder = who;
 			let config = DaoConfig { name: dao_name, purpose: dao_purpose, metadata: dao_metadata };
 
 			ensure!(policy.spend_period.0 >= T::DaoMinTreasurySpendPeriod::get(), "Value too low");
@@ -585,6 +760,22 @@ pub mod pallet {
 
 					let dao_hash = T::Hashing::hash_of(&dao);
 
+					<PendingDaoHashes<T>>::try_mutate(|hashes| -> Result<usize, DispatchError> {
+						hashes.try_push(dao_hash).map_err(|_| Error::<T>::TooManyPendingDaos)?;
+						Ok(hashes.len())
+					})?;
+
+					PendingDaos::<T>::insert(
+						dao_hash,
+						PendingDao {
+							dao: dao.clone(),
+							policy: policy.clone(),
+							council,
+							technical_committee,
+							block_number: frame_system::Pallet::<T>::block_number(),
+						},
+					);
+
 					let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
 					let data: IndexingData<T::Hash> = IndexingData(
 						b"approve_dao".to_vec(),
@@ -594,17 +785,6 @@ pub mod pallet {
 					offchain_index::set(&key, &data.encode());
 
 					let dao_event_source = dao.clone();
-
-					PendingDaos::<T>::insert(
-						dao_hash,
-						PendingDao {
-							dao,
-							policy: policy.clone(),
-							council,
-							technical_committee,
-							block_number: frame_system::Pallet::<T>::block_number(),
-						},
-					);
 
 					Self::deposit_event(Event::DaoPendingApproval {
 						dao_id,
@@ -632,148 +812,23 @@ pub mod pallet {
 			Self::do_register_dao(dao, policy, council, technical_committee)
 		}
 
-		#[pallet::weight(10_000)]
-		#[pallet::call_index(2)]
-		pub fn approve_dao(
-			origin: OriginFor<T>,
-			dao_hash: T::Hash,
-			approve: bool,
-		) -> DispatchResult {
-			ensure_none(origin)?;
-
+		pub fn do_approve_dao(dao_hash: T::Hash, approve: bool) -> DispatchResult {
 			let PendingDao { dao, policy, council, technical_committee, .. } =
 				match <PendingDaos<T>>::take(dao_hash) {
 					None => return Err(Error::<T>::DaoNotExist.into()),
 					Some(dao) => dao,
 				};
 
+			PendingDaoHashes::<T>::mutate(|hashes| {
+				hashes.retain(|h| h != &dao_hash);
+				hashes.len() + 1
+			});
+
 			if approve {
 				return Self::do_register_dao(dao, policy, council, technical_committee)
 			}
 
 			Ok(())
-		}
-
-		#[pallet::weight(10_000)]
-		#[pallet::call_index(3)]
-		pub fn update_dao_metadata(
-			origin: OriginFor<T>,
-			dao_id: DaoId,
-			metadata: Vec<u8>,
-		) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
-
-			let dao_metadata = BoundedVec::<u8, T::DaoMetadataLimit>::try_from(metadata.clone())
-				.map_err(|_| Error::<T>::MetadataTooLong)?;
-
-			Daos::<T>::mutate(dao_id, |maybe_dao| {
-				if let Some(dao) = maybe_dao {
-					dao.config.metadata = dao_metadata.clone();
-				}
-			});
-
-			Self::deposit_event(Event::DaoMetadataUpdated { dao_id, metadata });
-
-			Ok(())
-		}
-
-		#[pallet::weight(10_000)]
-		#[pallet::call_index(4)]
-		pub fn update_dao_policy(
-			origin: OriginFor<T>,
-			dao_id: DaoId,
-			policy: Vec<u8>,
-		) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
-
-			let policy = serde_json::from_slice::<DaoPolicy>(&policy)
-				.map_err(|_| Error::<T>::InvalidInput)?;
-
-			let old_policy = Self::policy(dao_id)?;
-			Policies::<T>::insert(dao_id, policy.clone());
-
-			if old_policy.spend_period != policy.spend_period {
-				Self::schedule_dao_events(dao_id, policy.clone(), true)?;
-			}
-
-			Self::deposit_event(Event::DaoPolicyUpdated { dao_id, policy });
-
-			Ok(())
-		}
-
-		#[pallet::weight(10_000)]
-		#[pallet::call_index(5)]
-		pub fn mint_dao_token(
-			origin: OriginFor<T>,
-			dao_id: DaoId,
-			amount: T::Balance,
-		) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
-
-			let dao_account_id = Self::dao_account_id(dao_id);
-			let dao_token = Self::dao_token(dao_id)?;
-
-			match dao_token {
-				DaoToken::FungibleToken(token_id) => {
-					T::AssetProvider::mint_into(token_id, &dao_account_id, amount)
-						.map_err(|_| Error::<T>::TokenMintFailed)?;
-
-					Ok(())
-				},
-				DaoToken::EthTokenAddress(_) => Err(Error::<T>::NotSupported.into()),
-			}
-		}
-
-		#[pallet::weight(10_000)]
-		#[pallet::call_index(6)]
-		pub fn spend_dao_funds(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
-
-			T::SpendDaoFunds::spend_dao_funds(dao_id);
-
-			Ok(())
-		}
-
-		#[pallet::weight(10_000)]
-		#[pallet::call_index(7)]
-		pub fn launch_dao_referendum(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
-
-			T::DaoReferendumScheduler::launch_referendum(dao_id)
-		}
-
-		#[pallet::weight(10_000)]
-		#[pallet::call_index(8)]
-		pub fn bake_dao_referendum(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
-			Self::ensure_approved(origin, dao_id)?;
-
-			T::DaoReferendumScheduler::bake_referendum(dao_id)
-		}
-	}
-
-	impl<T: Config> Pallet<T> {
-		pub fn account_id(dao_id: u32) -> T::AccountId {
-			T::PalletId::get().into_sub_account_truncating(dao_id)
-		}
-
-		fn u128_to_asset_id(asset_id: u128) -> AssetId<T> {
-			asset_id.try_into().ok().unwrap()
-		}
-
-		pub fn u128_to_balance(cost: u128) -> Balance<T> {
-			TryInto::<Balance<T>>::try_into(cost).ok().unwrap()
-		}
-
-		fn spend_dao_funds_task_id(dao_id: DaoId) -> TaskName {
-			(DAO_FACTORY_ID, DAO_SPEND_ID, dao_id).encode_into()
-		}
-
-		fn launch_dao_referendum_task_id(dao_id: DaoId) -> TaskName {
-			(DAO_FACTORY_ID, DAO_REFERENDUM_LAUNCH_ID, dao_id).encode_into()
-		}
-
-		fn bake_dao_referendum_task_id(dao_id: DaoId) -> TaskName {
-			(DAO_FACTORY_ID, DAO_REFERENDUM_BAKE_ID, dao_id).encode_into()
 		}
 
 		pub fn do_register_dao(
@@ -967,6 +1022,26 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 
 		Ok(dao_origin)
 	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn create_dao(
+		who: T::AccountId,
+		council: Vec<T::AccountId>,
+		technical_committee: Vec<T::AccountId>,
+		data: Vec<u8>,
+	) -> Result<(), DispatchError> {
+		Self::do_create_dao(who, council, technical_committee, data)
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn approve_dao(dao_hash: T::Hash, approve: bool) -> Result<(), DispatchError> {
+		Self::do_approve_dao(dao_hash, approve)
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()> {
+		Self::ApproveOrigin::try_successful_origin(dao_origin)
+	}
 }
 
 impl<T: Config> BlockNumberProvider for Pallet<T> {
@@ -985,7 +1060,7 @@ impl<T: Config> EthRpcProvider for Pallet<T> {
 pub struct EnsureDao<AccountId>(PhantomData<AccountId>);
 impl<
 		O: Into<Result<RawOrigin<AccountId>, O>> + From<RawOrigin<AccountId>>,
-		AccountId: PartialEq<AccountId> + Decode,
+		AccountId: PartialEq<AccountId> + Decode + Clone,
 	> EnsureOriginWithArg<O, DaoOrigin<AccountId>> for EnsureDao<AccountId>
 {
 	type Success = ();
@@ -1002,10 +1077,10 @@ impl<
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin(_dao_origin: &DaoOrigin<AccountId>) -> Result<O, ()> {
-		let zero_account_id =
-			AccountId::decode(&mut sp_runtime::traits::TrailingZeroInput::zeroes())
-				.expect("infinite length input; no invalid inputs for type; qed");
-		Ok(O::from(RawOrigin::Dao(zero_account_id)))
+	fn try_successful_origin(dao_origin: &DaoOrigin<AccountId>) -> Result<O, ()> {
+		let dao_account_id = match dao_origin {
+			ref origin => &origin.clone().dao_account_id,
+		};
+		Ok(O::from(RawOrigin::Dao(dao_account_id.clone())))
 	}
 }

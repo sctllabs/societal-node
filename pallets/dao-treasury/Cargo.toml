@@ -23,6 +23,7 @@ impl-trait-for-tuples = { workspace = true }
 log = { workspace = true }
 scale-info = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["derive"], optional = true }
+serde_json = { workspace = true, features = ["alloc"] }
 
 # Primitives
 sp-runtime = { workspace = true }
@@ -35,7 +36,7 @@ frame-system = { workspace = true }
 pallet-balances = { workspace = true }
 
 # Local Dependencies
-dao-primitives = { default-features = false, path = "../../primitives/dao" }
+dao-primitives = { workspace = true }
 
 [dev-dependencies]
 sp-core = { workspace = true }

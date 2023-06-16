@@ -48,7 +48,9 @@ fn create_dao_fails_on_string_limits() {
 		);
 
 		dao_json = get_dao_json();
-		dao_json["purpose"] = Value::String("very long purpose above the limits".to_string());
+		let new_purpose = "very long purpose above the limits very long purpose above the \
+			limits very long purpose above the limits";
+		dao_json["purpose"] = Value::String(new_purpose.to_string());
 		assert_noop!(
 			DaoFactory::create_dao(
 				RuntimeOrigin::signed(account.clone()),
@@ -60,7 +62,16 @@ fn create_dao_fails_on_string_limits() {
 		);
 
 		dao_json = get_dao_json();
-		dao_json["metadata"] = Value::String("very long metadata above the limits".to_string());
+		let new_metadata = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor \
+			incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud \
+			exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure \
+			dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. \
+			Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt \
+			mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit, \
+			sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim \
+			veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo \
+			consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.";
+		dao_json["metadata"] = Value::String(new_metadata.to_string());
 		assert_noop!(
 			DaoFactory::create_dao(
 				RuntimeOrigin::signed(account.clone()),
@@ -105,18 +116,6 @@ fn create_dao_token_failure() {
 			),
 			Error::<Test>::TokenNotExists
 		);
-
-		dao_json = get_dao_json();
-		dao_json["token"]["token_id"] = json!(2);
-		assert_noop!(
-			DaoFactory::create_dao(
-				RuntimeOrigin::signed(account.clone()),
-				vec![account, account1],
-				vec![],
-				serde_json::to_vec(&dao_json).ok().unwrap()
-			),
-			Error::<Test>::TokenAlreadyExists
-		);
 	})
 }
 
@@ -159,7 +158,7 @@ fn create_dao_works() {
 					.ok()
 					.unwrap(),
 				config: DaoConfig {
-					name: BoundedVec::<u8, <Test as Config>::DaoStringLimit>::try_from(
+					name: BoundedVec::<u8, <Test as Config>::DaoNameLimit>::try_from(
 						DaoName::get().as_bytes().to_vec()
 					)
 					.unwrap(),
@@ -167,7 +166,7 @@ fn create_dao_works() {
 						DaoPurpose::get().as_bytes().to_vec()
 					)
 					.unwrap(),
-					metadata: BoundedVec::<u8, <Test as Config>::DaoStringLimit>::try_from(
+					metadata: BoundedVec::<u8, <Test as Config>::DaoMetadataLimit>::try_from(
 						DaoMetadata::get().as_bytes().to_vec()
 					)
 					.unwrap(),

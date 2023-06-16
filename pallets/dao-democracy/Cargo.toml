@@ -17,6 +17,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 # Third-party dependencies
 log = { workspace = true }
 serde = { workspace = true, features = ["derive"], optional = true }
+serde_json = { workspace = true, features = ["alloc"] }
 
 # Primitives
 sp-io = { workspace = true }
@@ -34,11 +35,12 @@ frame-system = { workspace = true }
 scale-info = { workspace = true, features = ["derive"] }
 
 # Local Dependencies
-dao-primitives = { default-features = false, path = "../../primitives/dao" }
+dao-primitives = { workspace = true }
 pallet-dao-assets = { workspace = true }
 
 [dev-dependencies]
 pallet-balances = { workspace = true }
+pallet-dao = { workspace = true }
 pallet-scheduler = { workspace = true }
 pallet-preimage = { workspace = true }
 
@@ -49,6 +51,8 @@ std = [
 	"frame-benchmarking?/std",
 	"frame-support/std",
 	"frame-system/std",
+	"pallet-balances/std",
+	"pallet-dao/std",
 	"pallet-dao-assets/std",
 	"scale-info/std",
 	"serde",

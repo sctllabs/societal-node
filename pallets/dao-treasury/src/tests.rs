@@ -26,7 +26,7 @@ use frame_support::{
 			},
 			DepositConsequence, WithdrawConsequence,
 		},
-		AsEnsureOriginWithArg, ConstU128, ConstU32, ConstU64, OnInitialize,
+		AsEnsureOriginWithArg, ConstU128, ConstU32, ConstU64, EnsureOriginWithArg, OnInitialize,
 	},
 	PalletId,
 };
@@ -162,7 +162,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 	}
 
 	fn dao_token(_id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
-		todo!()
+		Ok(DaoToken::FungibleToken(0))
 	}
 
 	fn ensure_approved(
@@ -182,6 +182,26 @@ impl DaoProvider<H256> for TestDaoProvider {
 		_id: Self::Id,
 	) -> Result<Option<Self::NFTCollectionId>, DispatchError> {
 		Err(Error::<Test>::NotSupported.into())
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn create_dao(
+		_founder: Self::AccountId,
+		_council: Vec<Self::AccountId>,
+		_technical_committee: Vec<Self::AccountId>,
+		_data: Vec<u8>,
+	) -> Result<(), DispatchError> {
+		Ok(())
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn approve_dao(_dao_hash: H256, _approve: bool) -> Result<(), DispatchError> {
+		Ok(())
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()> {
+		Self::ApproveOrigin::try_successful_origin(dao_origin)
 	}
 }
 
@@ -319,7 +339,6 @@ impl Config for Test {
 	type PalletId = TreasuryPalletId;
 	type Currency = pallet_balances::Pallet<Test>;
 	type AssetId = u128;
-	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
 	type RuntimeEvent = RuntimeEvent;
 	type OnSlash = ();
 	type Burn = Burn;

@@ -1,33 +1,26 @@
-use crate as pallet_dao;
+use crate as pallet_dao_eth_governance;
 use dao_primitives::{ContainsDaoMember, InitializeDaoMembers, RawOrigin};
+use eth_primitives::EthService;
 use frame_support::{
 	dispatch::DispatchError,
 	parameter_types,
-	traits::{ConstU16, ConstU32, ConstU64},
+	traits::{AsEnsureOriginWithArg, ConstU16, ConstU32, ConstU64, EqualPrivilegeOnly},
 	PalletId,
 };
-use frame_system as system;
-use sp_core::{ConstU128, H256};
+use sp_core::{
+	sr25519::{Public, Signature},
+	ConstU128, H256,
+};
 use sp_runtime::{
-	testing::Header,
-	traits::{BlakeTwo256, Extrinsic as ExtrinsicT, IdentityLookup},
+	testing::{Header, TestXt},
+	traits::{BlakeTwo256, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup, Verify},
 };
 
-use crate::crypto;
-use frame_support::{
-	instances::Instance1,
-	traits::{AsEnsureOriginWithArg, EqualPrivilegeOnly, SortedMembers},
-};
-use frame_system::{EnsureRoot, EnsureSigned, EnsureSignedBy};
+use crate::Config;
+use frame_system::{EnsureRoot, EnsureSigned};
+use pallet_dao::crypto;
 use serde_json::{json, Value};
-use sp_core::{
-	crypto::Ss58Codec,
-	sr25519::{Public, Signature},
-};
-use sp_runtime::{
-	testing::TestXt,
-	traits::{IdentifyAccount, Verify},
-};
+
 use std::collections::HashMap;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
@@ -43,48 +36,13 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Storage, Event<T>},
-		DaoFactory: pallet_dao::{Pallet, Call, Storage, Event<T>},
+		DaoEthGovernance: pallet_dao_eth_governance::{Pallet, Call, Storage, Event<T>},
+		DaoFactory: pallet_dao::{Pallet, Call, Storage, Event<T>, Config<T>},
 		Preimage: pallet_preimage,
 		Scheduler: pallet_scheduler::{Pallet, Call, Storage, Event<T>},
-		Assets: pallet_dao_assets::<Instance1>::{Pallet, Call, Storage, Event<T>},
-		Democracy: pallet_dao_democracy::{Pallet, Call, Storage, Event<T>},
+		Assets: pallet_dao_assets::{Pallet, Call, Storage, Config<T>, Event<T>},
 	}
 );
-
-impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Test
-where
-	RuntimeCall: From<LocalCall>,
-{
-	fn create_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
-		call: RuntimeCall,
-		_public: <Signature as Verify>::Signer,
-		_account: AccountId,
-		nonce: u64,
-	) -> Option<(RuntimeCall, <Extrinsic as ExtrinsicT>::SignaturePayload)> {
-		Some((call, (nonce, ())))
-	}
-}
-
-impl frame_system::offchain::SigningTypes for Test {
-	type Public = <Signature as Verify>::Signer;
-	type Signature = Signature;
-}
-
-type Extrinsic = TestXt<RuntimeCall, ()>;
-
-impl<C> frame_system::offchain::SendTransactionTypes<C> for Test
-where
-	RuntimeCall: From<C>,
-{
-	type OverarchingCall = RuntimeCall;
-	type Extrinsic = Extrinsic;
-}
-
-impl From<RawOrigin<Public>> for OriginCaller {
-	fn from(_value: RawOrigin<Public>) -> Self {
-		OriginCaller::system(frame_system::RawOrigin::Root)
-	}
-}
 
 impl frame_system::Config for Test {
 	type BaseCallFilter = frame_support::traits::Everything;
@@ -126,19 +84,93 @@ impl pallet_balances::Config for Test {
 }
 
 parameter_types! {
-	pub const DaoPalletId: PalletId = PalletId(*b"py/sctld");
-	pub static Members: HashMap<u32, Vec<AccountId>> = HashMap::new();
-	pub static TechnicalCommittee: HashMap<u32, Vec<AccountId>> = HashMap::new();
+	pub const MaxProposals: u32 = 100;
+	pub const MaxPendingProposals: u32 = 100;
+	pub const MaxPendingVotes: u32 = 100;
+}
 
-	pub DaoName: String = "dao".into();
-	pub DaoPurpose: String = "dao purpose".into();
-	pub DaoMetadata: String = "dao metadata".into();
+impl Config for Test {
+	type RuntimeCall = RuntimeCall;
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeOrigin = RuntimeOrigin;
+	type Balance = u128;
+	type Proposal = RuntimeCall;
+	type ProposalMetadataLimit = ConstU32<750>;
+	type EthRpcUrlLimit = ();
+	type MaxProposals = MaxProposals;
+	type MaxPendingProposals = MaxPendingProposals;
+	type MaxPendingVotes = MaxPendingVotes;
+	type MaxVotes = ConstU32<100>;
+	type DaoProvider = DaoFactory;
+	type Preimages = Preimage;
+	type AuthorityId = crypto::TestAuthId;
+	type OffchainEthService = EthService<DaoEthGovernance>;
+	type Scheduler = Scheduler;
+	type PalletsOrigin = OriginCaller;
+	type WeightInfo = ();
+}
 
-	pub TokenId: u128 = 0;
-	pub TokenName: String = "dao_token".into();
-	pub TokenSymbol: String = "sctl".into();
-	pub TokenDecimals: u8 = 3;
-	pub TokenInitialBalance: String = "1000000000".into();
+impl pallet_preimage::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = ();
+	type Currency = ();
+	type ManagerOrigin = EnsureRoot<AccountId>;
+	type BaseDeposit = ConstU32<0>;
+	type ByteDeposit = ConstU32<0>;
+}
+
+impl pallet_scheduler::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeOrigin = RuntimeOrigin;
+	type PalletsOrigin = OriginCaller;
+	type RuntimeCall = RuntimeCall;
+	type MaximumWeight = ();
+	type ScheduleOrigin = EnsureRoot<AccountId>;
+	type MaxScheduledPerBlock = ConstU32<100>;
+	type WeightInfo = ();
+	type OriginPrivilegeCmp = EqualPrivilegeOnly;
+	type Preimages = ();
+}
+
+type Extrinsic = TestXt<RuntimeCall, ()>;
+
+impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Test
+where
+	RuntimeCall: From<LocalCall>,
+{
+	fn create_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
+		call: RuntimeCall,
+		_public: <Signature as Verify>::Signer,
+		_account: AccountId,
+		nonce: u64,
+	) -> Option<(RuntimeCall, <Extrinsic as ExtrinsicT>::SignaturePayload)> {
+		Some((call, (nonce, ())))
+	}
+}
+
+impl frame_system::offchain::SigningTypes for Test {
+	type Public = <Signature as Verify>::Signer;
+	type Signature = Signature;
+}
+
+impl<C> frame_system::offchain::SendTransactionTypes<C> for Test
+where
+	RuntimeCall: From<C>,
+{
+	type OverarchingCall = RuntimeCall;
+	type Extrinsic = Extrinsic;
+}
+
+impl From<RawOrigin<Public>> for OriginCaller {
+	fn from(_value: RawOrigin<Public>) -> Self {
+		OriginCaller::system(frame_system::RawOrigin::Root)
+	}
+}
+
+impl From<RawOrigin<Public>> for RuntimeOrigin {
+	fn from(_value: RawOrigin<Public>) -> Self {
+		RuntimeOrigin::from(frame_system::RawOrigin::Root)
+	}
 }
 
 pub struct TestCouncilProvider;
@@ -183,19 +215,6 @@ impl ContainsDaoMember<u32, AccountId> for TestTechnicalCommitteeProvider {
 	}
 }
 
-impl pallet_scheduler::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
-	type RuntimeOrigin = RuntimeOrigin;
-	type PalletsOrigin = OriginCaller;
-	type RuntimeCall = RuntimeCall;
-	type MaximumWeight = ();
-	type ScheduleOrigin = EnsureRoot<AccountId>;
-	type MaxScheduledPerBlock = ConstU32<100>;
-	type WeightInfo = ();
-	type OriginPrivilegeCmp = EqualPrivilegeOnly; // TODO : Simplest type, maybe there is better ?
-	type Preimages = ();
-}
-
 impl pallet_dao::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type PalletId = DaoPalletId;
@@ -220,14 +239,14 @@ impl pallet_dao::Config for Test {
 	type PalletsOrigin = OriginCaller;
 	type Preimages = ();
 	type SpendDaoFunds = ();
-	type DaoReferendumScheduler = Democracy;
+	type DaoReferendumScheduler = ();
 	type WeightInfo = ();
 
 	#[cfg(feature = "runtime-benchmarks")]
-	type DaoReferendumBenchmarkHelper = Democracy;
+	type DaoReferendumBenchmarkHelper = ();
 }
 
-impl pallet_dao_assets::Config<Instance1> for Test {
+impl pallet_dao_assets::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type Balance = u128;
 	type RemoveItemsLimit = ConstU32<1000>;
@@ -249,65 +268,21 @@ impl pallet_dao_assets::Config<Instance1> for Test {
 	type MaxLocks = ConstU32<10>;
 }
 
-impl pallet_preimage::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = ();
-	type Currency = Balances;
-	type ManagerOrigin = EnsureRoot<AccountId>;
-	type BaseDeposit = ConstU128<0>;
-	type ByteDeposit = ConstU128<0>;
-}
+parameter_types! {
+	pub const DaoPalletId: PalletId = PalletId(*b"py/sctld");
+	pub static Members: HashMap<u32, Vec<AccountId>> = HashMap::new();
+	pub static TechnicalCommittee: HashMap<u32, Vec<AccountId>> = HashMap::new();
 
-pub struct AliceToFerdie;
-impl SortedMembers<Public> for AliceToFerdie {
-	fn sorted_members() -> Vec<Public> {
-		vec![
-			Public::from_string("/Alice").ok().unwrap(),
-			Public::from_string("/Bob").ok().unwrap(),
-			Public::from_string("/Charlie").ok().unwrap(),
-			Public::from_string("/Dave").ok().unwrap(),
-			Public::from_string("/Eve").ok().unwrap(),
-		]
-	}
+	pub DaoName: String = "dao".into();
+	pub DaoPurpose: String = "dao purpose".into();
+	pub DaoMetadata: String = "dao metadata".into();
 
-	fn contains(_t: &Public) -> bool {
-		true
-	}
-
-	#[cfg(feature = "runtime-benchmarks")]
-	fn add(_m: &Public) {}
-}
-
-impl pallet_dao_democracy::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
-	type Currency = pallet_balances::Pallet<Self>;
-	type MaxDeposits = ConstU32<1000>;
-	type MaxBlacklisted = ConstU32<5>;
-	type ExternalOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
-	type ExternalMajorityOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
-	type ExternalDefaultOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
-	type FastTrackOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
-	type CancellationOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
-	type BlacklistOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
-	type CancelProposalOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
-	type VetoOrigin = EnsureSignedBy<AliceToFerdie, AccountId>;
-	type Slash = ();
-	type InstantOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
-	type Scheduler = Scheduler;
-	type MaxVotes = ConstU32<100>;
-	type PalletsOrigin = OriginCaller;
-	type WeightInfo = ();
-	type MaxProposals = ConstU32<100>;
-	type Preimages = Preimage;
-	type Assets = Assets;
-	type Proposal = RuntimeCall;
-	type ProposalMetadataLimit = ConstU32<750>;
-	type DaoProvider = DaoFactory;
+	pub TokenAddress: String = "0x439ACbC2FAE8E4b9115e702AeBeAa9977621017C".to_string();
 }
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-	system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
+	frame_system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
 }
 
 pub fn get_dao_json() -> Value {
@@ -318,14 +293,6 @@ pub fn get_dao_json() -> Value {
 		"policy": {
 			"proposal_period": 100
 		},
-		"token": {
-			"token_id": TokenId::get(),
-			"initial_balance": TokenInitialBalance::get(),
-			"metadata": {
-				"name": TokenName::get(),
-				"symbol": TokenSymbol::get(),
-				"decimals": TokenDecimals::get()
-			}
-		}
+		"token_address": TokenAddress::get()
 	})
 }

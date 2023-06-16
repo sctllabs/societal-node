@@ -63,6 +63,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 mod tests;
 pub mod weights;
@@ -771,8 +772,7 @@ pub mod pallet {
 		/// # <weight>
 		/// - O(1).
 		/// # </weight>
-		#[pallet::weight(<T as Config<I>>::WeightInfo::close_bounty_proposed()
-			.max(<T as Config<I>>::WeightInfo::close_bounty_active()))]
+		#[pallet::weight(<T as Config<I>>::WeightInfo::close_bounty_active())]
 		#[pallet::call_index(7)]
 		pub fn close_bounty(
 			origin: OriginFor<T>,

@@ -90,9 +90,9 @@ pub struct DaoPayload {
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
-pub struct DaoConfig<BoundedString, BoundedMetadata> {
+pub struct DaoConfig<BoundedName, BoundedString, BoundedMetadata> {
 	/// Name of the DAO.
-	pub name: BoundedString,
+	pub name: BoundedName,
 	/// Purpose of this DAO.
 	pub purpose: BoundedString,
 	/// Generic metadata. Can be used to store additional data.
@@ -215,25 +215,26 @@ pub enum DaoToken<TokenId, BoundedString> {
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
-pub struct Dao<AccountId, TokenId, BoundedString, BoundedMetadata> {
+pub struct Dao<AccountId, TokenId, BoundedName, BoundedString, BoundedMetadata> {
 	pub founder: AccountId,
 	pub account_id: AccountId,
 	pub token: DaoToken<TokenId, BoundedString>,
 	pub status: DaoStatus,
-	pub config: DaoConfig<BoundedString, BoundedMetadata>,
+	pub config: DaoConfig<BoundedName, BoundedString, BoundedMetadata>,
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct PendingDao<
 	AccountId,
 	TokenId,
+	BoundedName,
 	BoundedString,
 	BoundedMetadata,
 	BoundedCouncilMembers,
 	BoundedTechnicalCommittee,
 	BlockNumber,
 > {
-	pub dao: Dao<AccountId, TokenId, BoundedString, BoundedMetadata>,
+	pub dao: Dao<AccountId, TokenId, BoundedName, BoundedString, BoundedMetadata>,
 	pub policy: DaoPolicy,
 	pub council: BoundedCouncilMembers,
 	pub technical_committee: BoundedTechnicalCommittee,
@@ -323,6 +324,23 @@ pub trait DaoProvider<Hash> {
 		origin: Self::Origin,
 		dao_id: Self::Id,
 	) -> DispatchResultWithDaoOrigin<Self::AccountId>;
+
+	/// Note: Should only be used for benchmarking.
+	#[cfg(feature = "runtime-benchmarks")]
+	fn create_dao(
+		founder: Self::AccountId,
+		council: Vec<Self::AccountId>,
+		technical_committee: Vec<Self::AccountId>,
+		data: Vec<u8>,
+	) -> Result<(), DispatchError>;
+
+	/// Note: Should only be used for benchmarking.
+	#[cfg(feature = "runtime-benchmarks")]
+	fn approve_dao(dao_hash: Hash, approve: bool) -> Result<(), DispatchError>;
+
+	/// Note: Should only be used for benchmarking.
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()>;
 }
 
 pub trait InitializeDaoMembers<DaoId, AccountId> {
@@ -429,6 +447,27 @@ impl<DaoId> DaoReferendumScheduler<DaoId> for () {
 	}
 }
 
+#[cfg(feature = "runtime-benchmarks")]
+pub trait DaoReferendumBenchmarkHelper<DaoId, AccountId, Proposal, Balance> {
+	fn propose(who: AccountId, dao_id: DaoId, proposal: Proposal, value: Balance)
+		-> DispatchResult;
+}
+
+/// Empty implementation.
+#[cfg(feature = "runtime-benchmarks")]
+impl<DaoId, AccountId, Proposal, Balance>
+	DaoReferendumBenchmarkHelper<DaoId, AccountId, Proposal, Balance> for ()
+{
+	fn propose(
+		_who: AccountId,
+		_dao_id: DaoId,
+		_proposal: Proposal,
+		_value: Balance,
+	) -> DispatchResult {
+		Ok(())
+	}
+}
+
 /// Origin for the collective module.
 #[derive(PartialEq, Eq, Clone, RuntimeDebug, Encode, Decode, TypeInfo, MaxEncodedLen)]
 #[codec(mel_bound(AccountId: MaxEncodedLen))]
@@ -436,6 +475,7 @@ pub enum RawOrigin<AccountId> {
 	Dao(AccountId),
 }
 
+#[derive(Clone)]
 pub struct DaoOrigin<AccountId> {
 	pub dao_account_id: AccountId,
 	pub proportion: DaoPolicyProportion,

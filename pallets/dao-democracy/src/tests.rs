@@ -15,26 +15,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The crate's tests.
+// Changes made comparing to the RuntimeOriginal tests of the FRAME pallet-collective:
+// - added DAO pallet configuration as DAO provider
+// - using DAO as a parameter for pallet functions
+
+//! DAO Democracy pallet tests.
 
 use super::*;
 use crate as pallet_democracy;
+use dao_primitives::{ContainsDaoMember, InitializeDaoMembers};
 use frame_support::{
 	assert_noop, assert_ok, ord_parameter_types, parameter_types,
 	traits::{
-		ConstU32, ConstU64, Contains, EqualPrivilegeOnly, GenesisBuild, OnInitialize,
-		SortedMembers, StorePreimage,
+		AsEnsureOriginWithArg, ConstU32, ConstU64, Contains, EnsureOriginWithArg,
+		EqualPrivilegeOnly, OnInitialize, SortedMembers, StorePreimage,
 	},
-	weights::Weight,
+	weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight},
+	PalletId,
 };
-use frame_system::{EnsureRoot, EnsureSignedBy};
-use pallet_balances::{BalanceLock, Error as BalancesError};
-use sp_core::H256;
+use frame_system::{EnsureRoot, EnsureSigned, EnsureSignedBy};
+use pallet_dao_assets::Error as AssetsError;
+use serde_json::{json, Value};
+use sp_core::{
+	crypto::Ss58Codec,
+	sr25519::{Public, Signature},
+	ConstU128, H256,
+};
 use sp_runtime::{
-	testing::Header,
-	traits::{BadOrigin, BlakeTwo256, IdentityLookup},
+	testing::{Header, TestXt},
+	traits::{
+		BadOrigin, BlakeTwo256, Extrinsic as ExtrinsicT, IdentifyAccount, IdentityLookup, Verify,
+	},
 	Perbill,
 };
+use std::collections::HashMap;
+
 mod cancellation;
 mod decoders;
 mod delegation;
@@ -52,6 +67,7 @@ const BIG_NAY: Vote = Vote { aye: false, conviction: Conviction::Locked1x };
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
+type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 
 frame_support::construct_runtime!(
 	pub enum Test where
@@ -63,11 +79,13 @@ frame_support::construct_runtime!(
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Preimage: pallet_preimage,
 		Scheduler: pallet_scheduler::{Pallet, Call, Storage, Event<T>},
-		Democracy: pallet_democracy::{Pallet, Call, Storage, Config<T>, Event<T>},
+		Democracy: pallet_democracy::{Pallet, Call, Storage, Event<T>},
+		Assets: pallet_dao_assets::{Pallet, Call, Storage, Config<T>, Event<T>},
+		Dao: pallet_dao::{Pallet, Call, Storage, Event<T>, Config<T>},
 	}
 );
 
-// Test that a fitlered call can be dispatched.
+// Test that a filtered call can be dispatched.
 pub struct BaseFilter;
 impl Contains<RuntimeCall> for BaseFilter {
 	fn contains(call: &RuntimeCall) -> bool {
@@ -95,14 +113,14 @@ impl frame_system::Config for Test {
 	type RuntimeCall = RuntimeCall;
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
-	type AccountId = u64;
+	type AccountId = AccountId;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
 	type RuntimeEvent = RuntimeEvent;
 	type BlockHashCount = ConstU64<250>;
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = pallet_balances::AccountData<u64>;
+	type AccountData = pallet_balances::AccountData<u128>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -118,9 +136,9 @@ impl pallet_preimage::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Currency = Balances;
-	type ManagerOrigin = EnsureRoot<u64>;
-	type BaseDeposit = ConstU64<0>;
-	type ByteDeposit = ConstU64<0>;
+	type ManagerOrigin = EnsureRoot<AccountId>;
+	type BaseDeposit = ConstU128<0>;
+	type ByteDeposit = ConstU128<0>;
 }
 
 impl pallet_scheduler::Config for Test {
@@ -129,7 +147,7 @@ impl pallet_scheduler::Config for Test {
 	type PalletsOrigin = OriginCaller;
 	type RuntimeCall = RuntimeCall;
 	type MaximumWeight = MaximumSchedulerWeight;
-	type ScheduleOrigin = EnsureRoot<u64>;
+	type ScheduleOrigin = EnsureRoot<AccountId>;
 	type MaxScheduledPerBlock = ConstU32<100>;
 	type WeightInfo = ();
 	type OriginPrivilegeCmp = EqualPrivilegeOnly;
@@ -140,10 +158,10 @@ impl pallet_balances::Config for Test {
 	type MaxReserves = ();
 	type ReserveIdentifier = [u8; 8];
 	type MaxLocks = ConstU32<10>;
-	type Balance = u64;
+	type Balance = u128;
 	type RuntimeEvent = RuntimeEvent;
 	type DustRemoval = ();
-	type ExistentialDeposit = ConstU64<1>;
+	type ExistentialDeposit = ConstU128<1>;
 	type AccountStore = System;
 	type WeightInfo = ();
 }
@@ -152,63 +170,188 @@ parameter_types! {
 	pub static InstantAllowed: bool = false;
 }
 ord_parameter_types! {
-	pub const One: u64 = 1;
-	pub const Two: u64 = 2;
-	pub const Three: u64 = 3;
-	pub const Four: u64 = 4;
-	pub const Five: u64 = 5;
-	pub const Six: u64 = 6;
+	pub const Alice: Public = Public::from_string("/Alice").ok().unwrap();
+	pub const Bob: Public = Public::from_string("/Bob").ok().unwrap();
+	pub const Charlie: Public = Public::from_string("/Charlie").ok().unwrap();
+	pub const Dave: Public = Public::from_string("/Dave").ok().unwrap();
+	pub const Eve: Public = Public::from_string("/Eve").ok().unwrap();
+	pub const Ferdie: Public = Public::from_string("/Ferdie").ok().unwrap();
 }
-pub struct OneToFive;
-impl SortedMembers<u64> for OneToFive {
-	fn sorted_members() -> Vec<u64> {
-		vec![1, 2, 3, 4, 5]
+pub struct AliceToFerdie;
+impl SortedMembers<Public> for AliceToFerdie {
+	fn sorted_members() -> Vec<Public> {
+		vec![
+			Public::from_string("/Alice").ok().unwrap(),
+			Public::from_string("/Bob").ok().unwrap(),
+			Public::from_string("/Charlie").ok().unwrap(),
+			Public::from_string("/Dave").ok().unwrap(),
+			Public::from_string("/Eve").ok().unwrap(),
+		]
 	}
+
+	fn contains(_t: &Public) -> bool {
+		true
+	}
+
 	#[cfg(feature = "runtime-benchmarks")]
-	fn add(_m: &u64) {}
+	fn add(_m: &Public) {}
 }
 
 impl Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = pallet_balances::Pallet<Self>;
-	type EnactmentPeriod = ConstU64<2>;
-	type LaunchPeriod = ConstU64<2>;
-	type VotingPeriod = ConstU64<2>;
-	type VoteLockingPeriod = ConstU64<3>;
-	type FastTrackVotingPeriod = ConstU64<2>;
-	type MinimumDeposit = ConstU64<1>;
 	type MaxDeposits = ConstU32<1000>;
 	type MaxBlacklisted = ConstU32<5>;
-	type ExternalOrigin = EnsureSignedBy<Two, u64>;
-	type ExternalMajorityOrigin = EnsureSignedBy<Three, u64>;
-	type ExternalDefaultOrigin = EnsureSignedBy<One, u64>;
-	type FastTrackOrigin = EnsureSignedBy<Five, u64>;
-	type CancellationOrigin = EnsureSignedBy<Four, u64>;
-	type BlacklistOrigin = EnsureRoot<u64>;
-	type CancelProposalOrigin = EnsureRoot<u64>;
-	type VetoOrigin = EnsureSignedBy<OneToFive, u64>;
-	type CooloffPeriod = ConstU64<2>;
+	type ExternalOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type ExternalMajorityOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type ExternalDefaultOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type FastTrackOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type CancellationOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type BlacklistOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type CancelProposalOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type VetoOrigin = EnsureSignedBy<AliceToFerdie, AccountId>;
 	type Slash = ();
-	type InstantOrigin = EnsureSignedBy<Six, u64>;
-	type InstantAllowed = InstantAllowed;
+	type InstantOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
 	type Scheduler = Scheduler;
 	type MaxVotes = ConstU32<100>;
 	type PalletsOrigin = OriginCaller;
 	type WeightInfo = ();
 	type MaxProposals = ConstU32<100>;
 	type Preimages = Preimage;
+	type Assets = Assets;
+	type Proposal = RuntimeCall;
+	type ProposalMetadataLimit = ConstU32<750>;
+	type DaoProvider = Dao;
+}
+
+pub struct TestCouncilProvider;
+impl InitializeDaoMembers<u32, AccountId> for TestCouncilProvider {
+	fn initialize_members(
+		dao_id: u32,
+		source_members: Vec<AccountId>,
+	) -> Result<(), DispatchError> {
+		let mut members = HashMap::new();
+		members.insert(dao_id, source_members.clone());
+
+		Members::set(members);
+
+		Ok(())
+	}
+}
+
+impl ContainsDaoMember<u32, AccountId> for TestCouncilProvider {
+	fn contains(_dao_id: u32, _who: &AccountId) -> Result<bool, DispatchError> {
+		Ok(true)
+	}
+}
+
+type Extrinsic = TestXt<RuntimeCall, ()>;
+
+impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Test
+where
+	RuntimeCall: From<LocalCall>,
+{
+	fn create_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
+		call: RuntimeCall,
+		_public: <Signature as Verify>::Signer,
+		_account: AccountId,
+		nonce: u64,
+	) -> Option<(RuntimeCall, <Extrinsic as ExtrinsicT>::SignaturePayload)> {
+		Some((call, (nonce, ())))
+	}
+}
+
+impl frame_system::offchain::SigningTypes for Test {
+	type Public = <Signature as Verify>::Signer;
+	type Signature = Signature;
+}
+
+impl<C> frame_system::offchain::SendTransactionTypes<C> for Test
+where
+	RuntimeCall: From<C>,
+{
+	type OverarchingCall = RuntimeCall;
+	type Extrinsic = Extrinsic;
+}
+
+impl From<RawOrigin<Public>> for OriginCaller {
+	fn from(_value: RawOrigin<Public>) -> Self {
+		OriginCaller::system(frame_system::RawOrigin::Root)
+	}
+}
+
+parameter_types! {
+	pub const DaoPalletId: PalletId = PalletId(*b"py/sctld");
+	pub static Members: HashMap<u32, Vec<AccountId>> = HashMap::new();
+}
+
+impl pallet_dao::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type PalletId = DaoPalletId;
+	type Currency = pallet_balances::Pallet<Self>;
+	type DaoNameLimit = ConstU32<20>;
+	type DaoStringLimit = ConstU32<100>;
+	type DaoMetadataLimit = ConstU32<750>;
+	type AssetId = u128;
+	type Balance = u128;
+	type CouncilProvider = TestCouncilProvider;
+	type AssetProvider = Assets;
+	type AuthorityId = pallet_dao::crypto::TestAuthId;
+	type DaoMaxCouncilMembers = ConstU32<100>;
+	type DaoMaxTechnicalCommitteeMembers = ConstU32<100>;
+	type DaoMaxPendingItems = ConstU32<100>;
+	type TechnicalCommitteeProvider = TestCouncilProvider;
+	type OffchainEthService = ();
+	type RuntimeCall = RuntimeCall;
+	type DaoMinTreasurySpendPeriod = ConstU32<20>;
+	type ApproveOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
+	type Scheduler = Scheduler;
+	type PalletsOrigin = OriginCaller;
+	type Preimages = ();
+	type SpendDaoFunds = ();
+	type DaoReferendumScheduler = Democracy;
+	type WeightInfo = ();
+
+	#[cfg(feature = "runtime-benchmarks")]
+	type DaoReferendumBenchmarkHelper = ();
+}
+
+impl pallet_dao_assets::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type Balance = u128;
+	type RemoveItemsLimit = ConstU32<1000>;
+	type AssetId = u128;
+	type AssetIdParameter = codec::Compact<u128>;
+	type Currency = Balances;
+	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
+	type ForceOrigin = EnsureRoot<AccountId>;
+	type AssetDeposit = ConstU128<0>;
+	type AssetAccountDeposit = ConstU128<10>;
+	type MetadataDepositBase = ConstU128<0>;
+	type MetadataDepositPerByte = ConstU128<0>;
+	type ApprovalDeposit = ConstU128<0>;
+	type StringLimit = ConstU32<50>;
+	type Freezer = Assets;
+	type Extra = ();
+	type CallbackHandle = ();
+	type WeightInfo = pallet_dao_assets::weights::SubstrateWeight<Test>;
+	type MaxLocks = ConstU32<10>;
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
 	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 	pallet_balances::GenesisConfig::<Test> {
-		balances: vec![(1, 10), (2, 20), (3, 30), (4, 40), (5, 50), (6, 60)],
+		balances: vec![
+			(Public::from_string("/Alice").ok().unwrap(), 10),
+			(Public::from_string("/Bob").ok().unwrap(), 20),
+			(Public::from_string("/Charlie").ok().unwrap(), 30),
+			(Public::from_string("/Dave").ok().unwrap(), 40),
+			(Public::from_string("/Eve").ok().unwrap(), 50),
+			(Public::from_string("/Ferdie").ok().unwrap(), 60),
+		],
 	}
 	.assimilate_storage(&mut t)
 	.unwrap();
-	pallet_democracy::GenesisConfig::<Test>::default()
-		.assimilate_storage(&mut t)
-		.unwrap();
 	let mut ext = sp_io::TestExternalities::new(t);
 	ext.execute_with(|| System::set_block_number(1));
 	ext
@@ -217,14 +360,18 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 #[test]
 fn params_should_work() {
 	new_test_ext().execute_with(|| {
-		assert_eq!(Democracy::referendum_count(), 0);
-		assert_eq!(Balances::free_balance(42), 0);
+		assert_eq!(Democracy::referendum_count(0), 0);
+		assert_eq!(Balances::free_balance(Public::from_string("/Alice_stash").ok().unwrap()), 0);
 		assert_eq!(Balances::total_issuance(), 210);
 	});
 }
 
-fn set_balance_proposal(value: u64) -> BoundedCallOf<Test> {
-	let inner = pallet_balances::Call::set_balance { who: 42, new_free: value, new_reserved: 0 };
+fn set_balance_proposal(value: u128) -> BoundedCallOf<Test> {
+	let inner = pallet_balances::Call::set_balance {
+		who: Public::from_string("/Alice_stash").ok().unwrap(),
+		new_free: value,
+		new_reserved: 0,
+	};
 	let outer = RuntimeCall::Balances(inner);
 	Preimage::bound(outer).unwrap()
 }
@@ -237,14 +384,62 @@ fn set_balance_proposal_is_correctly_filtered_out() {
 	}
 }
 
-fn propose_set_balance(who: u64, value: u64, delay: u64) -> DispatchResult {
-	Democracy::propose(RuntimeOrigin::signed(who), set_balance_proposal(value), delay)
+fn create_dao(who: Public) -> DispatchResult {
+	let dao = serde_json::to_vec(&get_dao_json()).ok().unwrap();
+
+	Dao::create_dao(RuntimeOrigin::signed(who), vec![], vec![], dao)
+}
+
+fn init_dao_token_accounts(dao_id: DaoId) -> DispatchResult {
+	let dao_account_id = Dao::dao_account_id(dao_id);
+
+	Assets::transfer(
+		RuntimeOrigin::signed(dao_account_id),
+		codec::Compact(0),
+		Public::from_string("/Alice").ok().unwrap(),
+		10,
+	)?;
+	Assets::transfer(
+		RuntimeOrigin::signed(dao_account_id),
+		codec::Compact(0),
+		Public::from_string("/Bob").ok().unwrap(),
+		20,
+	)?;
+	Assets::transfer(
+		RuntimeOrigin::signed(dao_account_id),
+		codec::Compact(0),
+		Public::from_string("/Charlie").ok().unwrap(),
+		30,
+	)?;
+	Assets::transfer(
+		RuntimeOrigin::signed(dao_account_id),
+		codec::Compact(0),
+		Public::from_string("/Dave").ok().unwrap(),
+		40,
+	)?;
+	Assets::transfer(
+		RuntimeOrigin::signed(dao_account_id),
+		codec::Compact(0),
+		Public::from_string("/Eve").ok().unwrap(),
+		50,
+	)?;
+	Assets::transfer(
+		RuntimeOrigin::signed(dao_account_id),
+		codec::Compact(0),
+		Public::from_string("/Ferdie").ok().unwrap(),
+		60,
+	)?;
+
+	Ok(())
+}
+
+fn propose_set_balance(dao_id: DaoId, who: Public, value: u128, delay: u128) -> DispatchResult {
+	Democracy::propose(RuntimeOrigin::signed(who), dao_id, set_balance_proposal(value), delay)
 }
 
 fn next_block() {
 	System::set_block_number(System::block_number() + 1);
 	Scheduler::on_initialize(System::block_number());
-	Democracy::begin_block(System::block_number());
 }
 
 fn fast_forward_to(n: u64) {
@@ -254,28 +449,67 @@ fn fast_forward_to(n: u64) {
 }
 
 fn begin_referendum() -> ReferendumIndex {
+	let alice = Public::from_string("/Alice").ok().unwrap();
+
 	System::set_block_number(0);
-	assert_ok!(propose_set_balance(1, 2, 1));
-	fast_forward_to(2);
+
+	assert_ok!(create_dao(alice));
+	assert_ok!(init_dao_token_accounts(0));
+	assert_ok!(propose_set_balance(0, alice, 2, 1));
+
+	fast_forward_to(3);
+
 	0
 }
 
-fn aye(who: u64) -> AccountVote<u64> {
+fn aye(who: Public) -> AccountVote<u128> {
 	AccountVote::Standard { vote: AYE, balance: Balances::free_balance(&who) }
 }
 
-fn nay(who: u64) -> AccountVote<u64> {
+fn nay(who: Public) -> AccountVote<u128> {
 	AccountVote::Standard { vote: NAY, balance: Balances::free_balance(&who) }
 }
 
-fn big_aye(who: u64) -> AccountVote<u64> {
+fn big_aye(who: Public) -> AccountVote<u128> {
 	AccountVote::Standard { vote: BIG_AYE, balance: Balances::free_balance(&who) }
 }
 
-fn big_nay(who: u64) -> AccountVote<u64> {
+fn big_nay(who: Public) -> AccountVote<u128> {
 	AccountVote::Standard { vote: BIG_NAY, balance: Balances::free_balance(&who) }
 }
 
-fn tally(r: ReferendumIndex) -> Tally<u64> {
-	Democracy::referendum_status(r).unwrap().tally
+fn tally(dao_id: DaoId, r: ReferendumIndex) -> Tally<u128> {
+	Democracy::referendum_status(dao_id, r).unwrap().tally
+}
+
+pub fn get_dao_json() -> Value {
+	json!({
+		"name": "name",
+		"purpose": "purpose",
+		"metadata": "metadata",
+		"policy": {
+			"proposal_period": 100,
+			"governance": {
+				"GovernanceV1": {
+					"enactment_period": 2,
+					"launch_period": 2,
+					"voting_period": 2,
+					"vote_locking_period": 3,
+					"fast_track_voting_period": 3,
+					"cooloff_period": 2,
+					"minimum_deposit": 1,
+					"instant_allowed": true
+				}
+			}
+		},
+		"token": {
+			"token_id": 0,
+			"initial_balance": "210",
+			"metadata": {
+				"name": "name",
+				"symbol": "symbol",
+				"decimals": 3
+			}
+		}
+	})
 }

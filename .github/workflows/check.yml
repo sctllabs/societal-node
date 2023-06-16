@@ -31,9 +31,6 @@ jobs:
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           source ~/.cargo/env
-          rustup default nightly-2023-01-01
-          rustup target add wasm32-unknown-unknown --toolchain nightly-2023-01-01-x86_64-unknown-linux-gnu
-          rustup --version
 
       - name: Check Build
         run: |
@@ -41,5 +38,4 @@ jobs:
 
       - name: Check Build for Benchmarking
         run: >
-          pushd node &&
           cargo check --features=runtime-benchmarks --release

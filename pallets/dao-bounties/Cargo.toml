@@ -20,6 +20,8 @@ codec = { package = "parity-scale-codec", version = "3.0.0", default-features = 
 ] }
 log = { workspace = true }
 scale-info = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["alloc"] }
 
 # Primitives
 sp-core = { workspace = true }
@@ -33,9 +35,11 @@ frame-support = { workspace = true }
 frame-system = { workspace = true }
 
 # Local Dependencies
-dao-primitives = { default-features = false, path = "../../primitives/dao" }
+dao-primitives = { workspace = true }
+pallet-dao = { workspace = true }
 pallet-dao-assets = { workspace = true }
-pallet-dao-treasury = { default-features = false, path = "../dao-treasury" }
+pallet-dao-treasury = { workspace = true }
+pallet-timestamp = { workspace = true }
 
 [dev-dependencies]
 pallet-balances = { workspace = true }

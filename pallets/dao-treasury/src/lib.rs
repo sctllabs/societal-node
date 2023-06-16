@@ -36,6 +36,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 #[cfg(test)]
 mod tests;
@@ -44,8 +45,6 @@ pub mod weights;
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 
-#[cfg(test)]
-use sp_runtime::traits::AccountIdConversion;
 use sp_runtime::{
 	traits::{Saturating, StaticLookup, Zero},
 	Permill, RuntimeDebug,
@@ -57,7 +56,7 @@ use frame_support::{
 	print,
 	traits::{
 		fungibles::{metadata::Mutate as MetadataMutate, Inspect, Mutate, Transfer},
-		Currency, EnsureOriginWithArg,
+		Currency,
 		ExistenceRequirement::KeepAlive,
 		Get, Imbalance, OnUnbalanced, ReservableCurrency, WithdrawReasons,
 	},
@@ -148,9 +147,6 @@ pub mod pallet {
 			+ TypeInfo
 			+ From<u128>
 			+ Ord;
-
-		/// Origin from which approvals must come.
-		type ApproveOrigin: EnsureOriginWithArg<Self::RuntimeOrigin, DaoOrigin<Self::AccountId>>;
 
 		/// The overarching event type.
 		type RuntimeEvent: From<Event<Self, I>>
@@ -296,7 +292,8 @@ pub mod pallet {
 	impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		/// Propose and approve a spend of treasury funds.
 		///
-		/// - `origin`: Must be `ApproveOrigin` with the `Success` value being at least `amount`.
+		/// - `origin`: Must be Dao `ApproveOrigin` with the `Success` value being at least
+		///   `amount`.
 		/// - `dao_id`: DAO ID.
 		/// - `amount`: The amount to be transferred from the treasury to the `beneficiary`.
 		/// - `beneficiary`: The destination account for the transfer.
@@ -337,7 +334,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::transfer_token())]
 		#[pallet::call_index(1)]
 		pub fn transfer_token(
 			origin: OriginFor<T>,
@@ -360,7 +357,7 @@ pub mod pallet {
 			}
 		}
 
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::transfer_token())]
 		#[pallet::call_index(2)]
 		pub fn transfer_token_by_id(
 			origin: OriginFor<T>,
@@ -393,7 +390,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 
 		let mut missed_any = false;
 		let mut imbalance = <PositiveImbalanceOf<T, I>>::zero();
-		let proposals_len = Approvals::<T, I>::mutate(dao_id, |v| {
+		let _proposals_len = Approvals::<T, I>::mutate(dao_id, |v| {
 			let proposals_approvals_len = v.len() as u32;
 			v.retain(|&index| {
 				// Should always be true, but shouldn't panic if false or we're screwed.
@@ -426,8 +423,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			});
 			proposals_approvals_len
 		});
-
-		total_weight += T::WeightInfo::on_initialize_proposals(proposals_len);
 
 		// Call Runtime hooks to external pallet using treasury to compute spend funds.
 		T::SpendFunds::spend_funds(

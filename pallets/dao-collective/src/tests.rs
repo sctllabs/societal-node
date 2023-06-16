@@ -136,7 +136,7 @@ impl Config<Instance1> for Test {
 	type RuntimeOrigin = RuntimeOrigin;
 	type Proposal = RuntimeCall;
 	type RuntimeEvent = RuntimeEvent;
-	type ProposalMetadataLimit = ConstU32<100>;
+	type ProposalMetadataLimit = ConstU32<750>;
 	type MaxProposals = MaxProposals;
 	type MaxMembers = MaxMembers;
 	type MaxVotes = ConstU32<100>;
@@ -152,7 +152,7 @@ impl Config<Instance2> for Test {
 	type RuntimeOrigin = RuntimeOrigin;
 	type Proposal = RuntimeCall;
 	type RuntimeEvent = RuntimeEvent;
-	type ProposalMetadataLimit = ConstU32<100>;
+	type ProposalMetadataLimit = ConstU32<750>;
 	type MaxProposals = MaxProposals;
 	type MaxMembers = MaxMembers;
 	type MaxVotes = ConstU32<100>;
@@ -236,6 +236,26 @@ impl DaoProvider<H256> for TestDaoProvider {
 	) -> Result<Option<Self::NFTCollectionId>, DispatchError> {
 		Err(Error::<Test, Instance1>::NotMember.into())
 	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn create_dao(
+		_founder: Self::AccountId,
+		_council: Vec<Self::AccountId>,
+		_technical_committee: Vec<Self::AccountId>,
+		_data: Vec<u8>,
+	) -> Result<(), DispatchError> {
+		Ok(())
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn approve_dao(_dao_hash: H256, _approve: bool) -> Result<(), DispatchError> {
+		Ok(())
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()> {
+		Self::ApproveOrigin::try_successful_origin(dao_origin)
+	}
 }
 
 parameter_types! {
@@ -266,7 +286,7 @@ impl Config for Test {
 	type RuntimeOrigin = RuntimeOrigin;
 	type Proposal = RuntimeCall;
 	type RuntimeEvent = RuntimeEvent;
-	type ProposalMetadataLimit = ConstU32<100>;
+	type ProposalMetadataLimit = ConstU32<750>;
 	type MaxProposals = MaxProposals;
 	type MaxMembers = MaxMembers;
 	type MaxVotes = ConstU32<100>;
@@ -289,8 +309,8 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 }
 
 pub(crate) fn init_members() {
-	Collective::set_members(RuntimeOrigin::root(), 0, vec![1, 2, 3], 0).ok();
-	CollectiveMajority::set_members(RuntimeOrigin::root(), 0, vec![1, 2, 3, 4, 5], 0).ok();
+	Collective::initialize_members(0, vec![1, 2, 3]).ok();
+	CollectiveMajority::initialize_members(0, vec![1, 2, 3, 4, 5]).ok();
 }
 
 fn make_proposal(value: u64) -> RuntimeCall {
@@ -400,11 +420,7 @@ fn close_works() {
 #[test]
 fn proposal_weight_limit_works_on_approve() {
 	new_test_ext().execute_with(|| {
-		let proposal = RuntimeCall::Collective(crate::Call::set_members {
-			dao_id: 0,
-			new_members: vec![1, 2, 3],
-			old_count: MaxMembers::get(),
-		});
+		let proposal = RuntimeCall::Democracy(mock_democracy::Call::external_propose_majority {});
 		let proposal_len: u32 = proposal.using_encoded(|p| p.len() as u32);
 		let proposal_weight = proposal.get_dispatch_info().weight;
 
@@ -452,11 +468,7 @@ fn proposal_weight_limit_works_on_approve() {
 #[test]
 fn proposal_weight_limit_ignored_on_disapprove() {
 	new_test_ext().execute_with(|| {
-		let proposal = RuntimeCall::Collective(crate::Call::set_members {
-			dao_id: 0,
-			new_members: vec![1, 2, 3],
-			old_count: MaxMembers::get(),
-		});
+		let proposal = RuntimeCall::Democracy(mock_democracy::Call::external_propose_majority {});
 		let proposal_len: u32 = proposal.using_encoded(|p| p.len() as u32);
 		let proposal_weight = proposal.get_dispatch_info().weight;
 
@@ -501,12 +513,7 @@ fn close_with_no_prime_but_majority_works() {
 		};
 
 		let hash = BlakeTwo256::hash_of(&proposal_bounded.unwrap());
-		assert_ok!(CollectiveMajority::set_members(
-			RuntimeOrigin::root(),
-			0,
-			vec![1, 2, 3, 4, 5],
-			MaxMembers::get()
-		));
+		assert_ok!(CollectiveMajority::initialize_members(0, vec![1, 2, 3, 4, 5]));
 
 		assert_ok!(CollectiveMajority::propose(
 			RuntimeOrigin::signed(1),
@@ -710,18 +717,13 @@ fn removal_of_old_voters_votes_works_with_set_members() {
 				end
 			})
 		);
-		assert_ok!(Collective::set_members(
-			RuntimeOrigin::root(),
-			0,
-			vec![2, 3, 4],
-			MaxMembers::get()
-		));
+		assert_ok!(Collective::initialize_members(0, vec![2, 3, 4]));
 		assert_eq!(
 			Collective::voting(0, &hash),
 			Some(Votes {
 				index: 0,
 				threshold: 1,
-				ayes: bounded_vec![2],
+				ayes: bounded_vec![1, 2],
 				nays: bounded_vec![],
 				end
 			})
@@ -752,22 +754,6 @@ fn removal_of_old_voters_votes_works_with_set_members() {
 				threshold: 1,
 				ayes: bounded_vec![2],
 				nays: bounded_vec![3],
-				end
-			})
-		);
-		assert_ok!(Collective::set_members(
-			RuntimeOrigin::root(),
-			0,
-			vec![2, 4],
-			MaxMembers::get()
-		));
-		assert_eq!(
-			Collective::voting(0, &hash),
-			Some(Votes {
-				index: 1,
-				threshold: 1,
-				ayes: bounded_vec![2],
-				nays: bounded_vec![],
 				end
 			})
 		);
@@ -848,11 +834,7 @@ fn limit_active_proposals() {
 #[test]
 fn correct_validate_and_get_proposal() {
 	new_test_ext().execute_with(|| {
-		let proposal = RuntimeCall::Collective(crate::Call::set_members {
-			dao_id: 0,
-			new_members: vec![1, 2, 3],
-			old_count: MaxMembers::get(),
-		});
+		let proposal = RuntimeCall::Democracy(mock_democracy::Call::external_propose_majority {});
 		let length = proposal.encode().len() as u32;
 		assert_ok!(Collective::propose(
 			RuntimeOrigin::signed(1),
