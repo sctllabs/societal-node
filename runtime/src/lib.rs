@@ -45,8 +45,9 @@ pub use frame_system::{
 	limits::{BlockLength, BlockWeights},
 	Call as SystemCall, EnsureRoot, EnsureSigned,
 };
-use node_primitives::AccountIndex;
-pub use node_primitives::{AccountId, Balance, BlockNumber, Hash, Index, Moment, Signature};
+pub use node_primitives::{
+	AccountId, AccountIndex, Balance, BlockNumber, Hash, Index, Moment, Signature,
+};
 use pallet_contracts::DefaultAddressGenerator;
 use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
@@ -62,7 +63,8 @@ use sp_runtime::{
 	generic, impl_opaque_keys,
 	traits::{
 		AccountIdLookup, BlakeTwo256, Block as BlockT, Convert, ConvertInto, DispatchInfoOf,
-		Dispatchable, OpaqueKeys, PostDispatchInfoOf, SaturatedConversion, UniqueSaturatedInto,
+		Dispatchable, NumberFor, OpaqueKeys, PostDispatchInfoOf, SaturatedConversion,
+		UniqueSaturatedInto,
 	},
 	transaction_validity::{
 		TransactionPriority, TransactionSource, TransactionValidity, TransactionValidityError,
@@ -95,11 +97,7 @@ pub use pallet_staking::StakerStatus;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::CurrencyAdapter;
 
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
-use {
-	xcm_config::{XcmConfig, XcmOriginToTransactDispatchOrigin},
-	xcm_executor::XcmExecutor,
-};
+pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 
 /// Generated voter bag information.
 mod voter_bags;
@@ -524,9 +522,6 @@ parameter_types! {
 	pub const ReportLongevity: u64 =
 		BondingDuration::get() as u64 * SessionsPerEra::get() as u64 * EpochDuration::get();
 }
-
-pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
-use sp_runtime::traits::NumberFor;
 
 impl pallet_aura::Config for Runtime {
 	type AuthorityId = AuraId;
@@ -1198,6 +1193,11 @@ impl pallet_uniques::Config for Runtime {
 	type Locker = ();
 }
 
+parameter_types! {
+	pub Features: PalletFeatures = PalletFeatures::all_enabled();
+	pub const MaxAttributesPerCall: u32 = 10;
+}
+
 impl pallet_nfts::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type CollectionId = u32;
@@ -1420,48 +1420,9 @@ impl pallet_utility::Config for Runtime {
 	type WeightInfo = pallet_utility::weights::SubstrateWeight<Runtime>;
 }
 
-parameter_types! {
-	pub const ReservedXcmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT.saturating_div(4);
-	pub const ReservedDmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT.saturating_div(4);
-}
-
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
-impl cumulus_pallet_parachain_system::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type OnSystemEvent = ();
-	type SelfParaId = parachain_info::Pallet<Runtime>;
-	type OutboundXcmpMessageSource = XcmpQueue;
-	type DmpMessageHandler = DmpQueue;
-	type ReservedDmpWeight = ReservedDmpWeight;
-	type XcmpMessageHandler = XcmpQueue;
-	type ReservedXcmpWeight = ReservedXcmpWeight;
-	type CheckAssociatedRelayNumber = cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
-}
-
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 impl parachain_info::Config for Runtime {}
 
 impl cumulus_pallet_aura_ext::Config for Runtime {}
-
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
-impl cumulus_pallet_xcmp_queue::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type XcmExecutor = XcmExecutor<XcmConfig>;
-	type ChannelInfo = ParachainSystem;
-	type VersionWrapper = ();
-	type ExecuteOverweightOrigin = EnsureRoot<AccountId>;
-	type ControllerOrigin = EnsureRoot<AccountId>;
-	type ControllerOriginConverter = XcmOriginToTransactDispatchOrigin;
-	type PriceForSiblingDelivery = ();
-	type WeightInfo = ();
-}
-
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
-impl cumulus_pallet_dmp_queue::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type XcmExecutor = XcmExecutor<XcmConfig>;
-	type ExecuteOverweightOrigin = EnsureRoot<AccountId>;
-}
 
 // We allow root only to execute privileged collator selection operations.
 pub type CollatorSelectionUpdateOrigin = EnsureRoot<AccountId>;
@@ -1480,11 +1441,6 @@ impl pallet_collator_selection::Config for Runtime {
 	type ValidatorIdOf = pallet_collator_selection::IdentityCollator;
 	type ValidatorRegistration = Session;
 	type WeightInfo = ();
-}
-
-parameter_types! {
-	pub Features: PalletFeatures = PalletFeatures::all_enabled();
-	pub const MaxAttributesPerCall: u32 = 10;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -2060,11 +2016,4 @@ impl cumulus_pallet_parachain_system::CheckInherents<Block> for CheckInherents {
 
 		inherent_data.check_extrinsics(block)
 	}
-}
-
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
-cumulus_pallet_parachain_system::register_validate_block! {
-	Runtime = Runtime,
-	BlockExecutor = cumulus_pallet_aura_ext::BlockExecutor::<Runtime, Executive>,
-	CheckInherents = CheckInherents,
 }
