@@ -342,31 +342,6 @@ impl pallet_balances::Config for Runtime {
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 }
 
-impl pallet_nicks::Config for Runtime {
-	// The Balances pallet implements the ReservableCurrency trait.
-	// `Balances` is defined in `construct_runtime!` macro.
-	type Currency = Balances;
-
-	// Set ReservationFee to a value.
-	type ReservationFee = ConstU128<100>;
-
-	// No action is taken when deposits are forfeited.
-	type Slashed = ();
-
-	// Configure the FRAME System Root origin as the Nick pallet admin.
-	// https://paritytech.github.io/substrate/master/frame_system/enum.RawOrigin.html#variant.Root
-	type ForceOrigin = frame_system::EnsureRoot<AccountId>;
-
-	// Set MinLength of nick name to a desired value.
-	type MinLength = ConstU32<8>;
-
-	// Set MaxLength of nick name to a desired value.
-	type MaxLength = ConstU32<32>;
-
-	// The ubiquitous event type.
-	type RuntimeEvent = RuntimeEvent;
-}
-
 impl pallet_contracts::Config for Runtime {
 	type Time = Timestamp;
 	type Randomness = RandomnessCollectiveFlip;
@@ -1867,7 +1842,6 @@ construct_runtime!(
 		// FRAME Pallets
 		Sudo: pallet_sudo::{Pallet, Call, Event<T>, Config<T>} = 30,
 		Assets: pallet_dao_assets::<Instance1>::{Pallet, Call, Storage, Event<T>} = 31,
-		Nicks: pallet_nicks::{Pallet, Call, Event<T>} = 32,
 		Scheduler: pallet_scheduler::{Pallet, Call, Storage, Event<T>} = 33,
 		Contracts: pallet_contracts::{Pallet, Call, Storage, Event<T>} = 34,
 		Historical: pallet_session_historical::{Pallet, Storage} = 35,
