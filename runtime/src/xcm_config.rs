@@ -1,12 +1,13 @@
 use super::{
 	constants::{
 		currency::{deposit, DOLLARS},
+		fee::WeightToFee,
 		time::DAYS,
 		weight::MAXIMUM_BLOCK_WEIGHT,
 	},
 	AccountId, Balance, Balances, BlockNumber, CheckInherents, DmpQueue, EnsureRoot, Executive,
 	ParachainInfo, ParachainSystem, PolkadotXcm, Runtime, RuntimeCall, RuntimeEvent, RuntimeOrigin,
-	WeightToFee, XcmpQueue,
+	XcmpQueue,
 };
 
 use core::{marker::PhantomData, ops::ControlFlow};
