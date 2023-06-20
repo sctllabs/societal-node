@@ -175,7 +175,7 @@ where
 			client.clone(),
 			pool.clone(),
 			graph,
-			Some(societal_node_runtime::TransactionConverter),
+			Some(societal_node_runtime::evm_config::TransactionConverter),
 			sync.clone(),
 			signers,
 			overrides.clone(),

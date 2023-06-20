@@ -36,8 +36,7 @@ use frame_support::{
 	},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight},
-		IdentityFee, Weight, WeightToFeeCoefficient, WeightToFeeCoefficients,
-		WeightToFeePolynomial,
+		IdentityFee, Weight,
 	},
 	PalletId, RuntimeDebugNoBound,
 };
@@ -45,10 +44,10 @@ pub use frame_system::{
 	limits::{BlockLength, BlockWeights},
 	Call as SystemCall, EnsureRoot, EnsureSigned,
 };
-use node_primitives::AccountIndex;
-pub use node_primitives::{AccountId, Balance, BlockNumber, Hash, Index, Moment, Signature};
+pub use node_primitives::{
+	AccountId, AccountIndex, Balance, BlockNumber, Hash, Index, Moment, Signature,
+};
 use pallet_contracts::DefaultAddressGenerator;
-use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
 use sp_core::{
 	crypto::{ByteArray, KeyTypeId},
@@ -62,7 +61,8 @@ use sp_runtime::{
 	generic, impl_opaque_keys,
 	traits::{
 		AccountIdLookup, BlakeTwo256, Block as BlockT, Convert, ConvertInto, DispatchInfoOf,
-		Dispatchable, OpaqueKeys, PostDispatchInfoOf, SaturatedConversion, UniqueSaturatedInto,
+		Dispatchable, NumberFor, OpaqueKeys, PostDispatchInfoOf, SaturatedConversion,
+		UniqueSaturatedInto,
 	},
 	transaction_validity::{
 		TransactionPriority, TransactionSource, TransactionValidity, TransactionValidityError,
@@ -95,11 +95,7 @@ pub use pallet_staking::StakerStatus;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::CurrencyAdapter;
 
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
-use {
-	xcm_config::{XcmConfig, XcmOriginToTransactDispatchOrigin},
-	xcm_executor::XcmExecutor,
-};
+pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 
 /// Generated voter bag information.
 mod voter_bags;
@@ -108,22 +104,21 @@ mod voter_bags;
 #[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 pub mod xcm_config;
 
+mod dao_config;
+pub mod evm_config;
+
 /// Constant values used within the runtime.
 pub mod constants;
 pub use constants::{
-	currency::{CENTS, DOLLARS},
+	currency::{deposit, CENTS, DOLLARS, MILLIUNIT},
 	ratio::{AVERAGE_ON_INITIALIZE_RATIO, NORMAL_DISPATCH_RATIO},
 	time::*,
 	weight::MAXIMUM_BLOCK_WEIGHT,
 };
 use eth_primitives::EthService;
 
-use crate::{
-	constants::currency::MILLIUNIT,
-	precompiles::{FOREIGN_ASSET_PRECOMPILE_ADDRESS_PREFIX, LOCAL_ASSET_PRECOMPILE_ADDRESS_PREFIX},
-};
 mod precompiles;
-use precompiles::FrontierPrecompiles;
+use precompiles::{FOREIGN_ASSET_PRECOMPILE_ADDRESS_PREFIX, LOCAL_ASSET_PRECOMPILE_ADDRESS_PREFIX};
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
@@ -160,10 +155,6 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	transaction_version: 1,
 	state_version: 1,
 };
-
-const fn deposit(items: u32, bytes: u32) -> Balance {
-	items as Balance * 15 * CENTS + (bytes as Balance) * 6 * CENTS
-}
 
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
@@ -211,34 +202,6 @@ parameter_types! {
 
 	// Retry a scheduled item every 10 blocks (1 minute) until the preimage exists.
 	pub const NoPreimagePostponement: Option<u32> = Some(10);
-}
-
-/// Handles converting a weight scalar to a fee value, based on the scale and granularity of the
-/// node's balance type.
-///
-/// This should typically create a mapping between the following ranges:
-///   - `[0, MAXIMUM_BLOCK_WEIGHT]`
-///   - `[Balance::min, Balance::max]`
-///
-/// Yet, it can be used for any other sort of change to weight-fee. Some examples being:
-///   - Setting it to `0` will essentially disable the weight fee.
-///   - Setting it to `1` will cause the literal `#[weight = x]` values to be charged.
-pub struct WeightToFee;
-impl WeightToFeePolynomial for WeightToFee {
-	type Balance = Balance;
-	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
-		// TODO
-		// in Rococo, extrinsic base weight (smallest non-zero weight) is mapped to 1 MILLIUNIT:
-		// in our template, we map to 1/10 of that, or 1/10 MILLIUNIT
-		let p = MILLIUNIT / 10;
-		let q = 100 * Balance::from(ExtrinsicBaseWeight::get().ref_time());
-		smallvec![WeightToFeeCoefficient {
-			degree: 1,
-			negative: false,
-			coeff_frac: Perbill::from_rational(p % q, q),
-			coeff_integer: p / q,
-		}]
-	}
 }
 
 // Configure FRAME pallets to include in runtime.
@@ -340,31 +303,6 @@ impl pallet_balances::Config for Runtime {
 	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
 	type AccountStore = System;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
-}
-
-impl pallet_nicks::Config for Runtime {
-	// The Balances pallet implements the ReservableCurrency trait.
-	// `Balances` is defined in `construct_runtime!` macro.
-	type Currency = Balances;
-
-	// Set ReservationFee to a value.
-	type ReservationFee = ConstU128<100>;
-
-	// No action is taken when deposits are forfeited.
-	type Slashed = ();
-
-	// Configure the FRAME System Root origin as the Nick pallet admin.
-	// https://paritytech.github.io/substrate/master/frame_system/enum.RawOrigin.html#variant.Root
-	type ForceOrigin = frame_system::EnsureRoot<AccountId>;
-
-	// Set MinLength of nick name to a desired value.
-	type MinLength = ConstU32<8>;
-
-	// Set MaxLength of nick name to a desired value.
-	type MaxLength = ConstU32<32>;
-
-	// The ubiquitous event type.
-	type RuntimeEvent = RuntimeEvent;
 }
 
 impl pallet_contracts::Config for Runtime {
@@ -551,10 +489,6 @@ parameter_types! {
 		BondingDuration::get() as u64 * SessionsPerEra::get() as u64 * EpochDuration::get();
 }
 
-use pallet_dao::EnsureDao;
-pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
-use sp_runtime::traits::NumberFor;
-
 impl pallet_aura::Config for Runtime {
 	type AuthorityId = AuraId;
 	type MaxAuthorities = MaxAuthorities;
@@ -595,43 +529,6 @@ impl pallet_collective::Config<TechnicalCollective> for Runtime {
 	type SetMembersOrigin = EnsureRoot<Self::AccountId>;
 }
 
-// TODO - Update settings
-type DaoCouncilCollective = pallet_dao_collective::Instance1;
-impl pallet_dao_collective::Config<DaoCouncilCollective> for Runtime {
-	type RuntimeCall = RuntimeCall;
-	type RuntimeOrigin = RuntimeOrigin;
-	type Proposal = RuntimeCall;
-	type RuntimeEvent = RuntimeEvent;
-	type ProposalMetadataLimit = DaoMetadataLimit;
-	type MaxProposals = CouncilMaxProposals;
-	type MaxMembers = CouncilMaxMembers;
-	type MaxVotes = CollectiveMaxVotes;
-	type DefaultVote = pallet_dao_collective::MoreThanMajorityVote;
-	type WeightInfo = pallet_dao_collective::weights::SubstrateWeight<Runtime>;
-	type DaoProvider = Dao;
-	type Preimages = Preimage;
-	type Scheduler = Scheduler;
-	type PalletsOrigin = OriginCaller;
-}
-
-type DaoTechnicalCommitteeCollective = pallet_dao_collective::Instance2;
-impl pallet_dao_collective::Config<DaoTechnicalCommitteeCollective> for Runtime {
-	type RuntimeCall = RuntimeCall;
-	type RuntimeOrigin = RuntimeOrigin;
-	type Proposal = RuntimeCall;
-	type RuntimeEvent = RuntimeEvent;
-	type ProposalMetadataLimit = DaoMetadataLimit;
-	type MaxProposals = TechnicalMaxProposals;
-	type MaxMembers = TechnicalMaxMembers;
-	type MaxVotes = CollectiveMaxVotes;
-	type DefaultVote = pallet_dao_collective::MoreThanMajorityVote;
-	type WeightInfo = pallet_dao_collective::weights::SubstrateWeight<Runtime>;
-	type DaoProvider = Dao;
-	type Preimages = Preimage;
-	type Scheduler = Scheduler;
-	type PalletsOrigin = OriginCaller;
-}
-
 parameter_types! {
 	pub const ImOnlineUnsignedPriority: TransactionPriority = TransactionPriority::max_value();
 	/// We prioritize im-online heartbeats over election solution submission.
@@ -660,7 +557,6 @@ parameter_types! {
 	pub const TipReportDepositBase: Balance = DOLLARS;
 	pub const DataDepositPerByte: Balance = CENTS;
 	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
-	pub const DaoTreasuryPalletId: PalletId = PalletId(*b"py/dtrsr");
 	pub const MaximumReasonLength: u32 = 300;
 	pub const MaxApprovals: u32 = 100;
 }
@@ -689,23 +585,6 @@ impl pallet_treasury::Config for Runtime {
 	type WeightInfo = pallet_treasury::weights::SubstrateWeight<Runtime>;
 	type MaxApprovals = MaxApprovals;
 	type SpendOrigin = frame_support::traits::NeverEnsureOrigin<u128>;
-}
-
-pub type AssetId = u128;
-
-impl pallet_dao_treasury::Config for Runtime {
-	type PalletId = DaoTreasuryPalletId;
-	type Currency = Balances;
-	type AssetId = AssetId;
-	type RuntimeEvent = RuntimeEvent;
-	type OnSlash = ();
-	type Burn = Burn;
-	type BurnDestination = ();
-	type SpendFunds = DaoBounties;
-	type WeightInfo = pallet_dao_treasury::weights::SubstrateWeight<Runtime>;
-	type MaxApprovals = MaxApprovals;
-	type DaoProvider = Dao;
-	type AssetProvider = Assets;
 }
 
 parameter_types! {
@@ -896,28 +775,6 @@ impl pallet_membership::Config<pallet_membership::Instance1> for Runtime {
 	type WeightInfo = pallet_membership::weights::SubstrateWeight<Runtime>;
 }
 
-// TODO - Update settings
-type DaoCouncilMembership = pallet_dao_membership::Instance1;
-impl pallet_dao_membership::Config<DaoCouncilMembership> for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type MembershipInitialized = DaoCouncil;
-	type MembershipChanged = DaoCouncil;
-	type MaxMembers = TechnicalMaxMembers;
-	type WeightInfo = pallet_dao_membership::weights::SubstrateWeight<Runtime>;
-	type DaoProvider = Dao;
-}
-
-// TODO - Update settings
-type DaoTechnicalCommitteeMembership = pallet_dao_membership::Instance2;
-impl pallet_dao_membership::Config<DaoTechnicalCommitteeMembership> for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type MembershipInitialized = DaoTechnicalCommittee;
-	type MembershipChanged = DaoTechnicalCommittee;
-	type MaxMembers = TechnicalMaxMembers;
-	type WeightInfo = pallet_dao_membership::weights::SubstrateWeight<Runtime>;
-	type DaoProvider = Dao;
-}
-
 parameter_types! {
 	pub const BountyCuratorDeposit: Permill = Permill::from_percent(50);
 	pub const BountyValueMinimum: Balance = 5 * DOLLARS;
@@ -1060,6 +917,8 @@ parameter_types! {
 	pub const MaxLocks: u32 = 10;
 }
 
+pub type AssetId = u128;
+
 type LocalAssetInstance = pallet_assets::Instance1;
 impl pallet_dao_assets::Config<LocalAssetInstance> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
@@ -1176,70 +1035,6 @@ impl pallet_preimage::Config for Runtime {
 	type ManagerOrigin = EnsureRoot<AccountId>;
 	type BaseDeposit = PreimageBaseDeposit;
 	type ByteDeposit = PreimageByteDeposit;
-}
-
-impl pallet_dao_democracy::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type Currency = Balances;
-	type Assets = Assets;
-	type Proposal = RuntimeCall;
-
-	/// A straight majority of the council can decide what their next motion is.
-	type ExternalOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
-	>;
-	/// A super-majority can have the next scheduled referendum be a straight majority-carries vote.
-	type ExternalMajorityOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
-	>;
-	/// A unanimous council can have the next scheduled referendum be a straight default-carries
-	/// (NTB) vote.
-	type ExternalDefaultOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
-	>;
-	/// Two thirds of the technical committee can have an ExternalMajority/ExternalDefault vote
-	/// be tabled immediately and with a shorter voting/enactment period.
-	type FastTrackOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
-	>;
-	type InstantOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
-	>;
-	// To cancel a proposal which has been passed, 2/3 of the council must agree to it.
-	type CancellationOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
-	>;
-	// To cancel a proposal before it has been passed, the technical committee must be unanimous or
-	// Root must agree.
-	type CancelProposalOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
-	>;
-	type BlacklistOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
-	>;
-	// Any single technical committee member may veto a coming council proposal, however they can
-	// only do it once and it lasts only for the cool-off period.
-	type VetoOrigin =
-		pallet_dao_collective::EnsureMember<AccountId, DaoTechnicalCommitteeCollective>;
-	type Slash = Treasury;
-	type Scheduler = Scheduler;
-	type Preimages = Preimage;
-	type PalletsOrigin = OriginCaller;
-	type MaxVotes = ConstU32<100>;
-	type WeightInfo = pallet_dao_democracy::weights::SubstrateWeight<Runtime>;
-	type MaxProposals = MaxProposals;
-	type MaxDeposits = ConstU32<100>;
-	type MaxBlacklisted = ConstU32<100>;
-	type ProposalMetadataLimit = DaoMetadataLimit;
-	type DaoProvider = Dao;
 }
 
 parameter_types! {
@@ -1362,6 +1157,11 @@ impl pallet_uniques::Config for Runtime {
 	type Helper = ();
 	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
 	type Locker = ();
+}
+
+parameter_types! {
+	pub Features: PalletFeatures = PalletFeatures::all_enabled();
+	pub const MaxAttributesPerCall: u32 = 10;
 }
 
 impl pallet_nfts::Config for Runtime {
@@ -1531,187 +1331,6 @@ impl pallet_scheduler::Config for Runtime {
 	type Preimages = Preimage;
 }
 
-impl pallet_evm_chain_id::Config for Runtime {}
-
-pub struct FindAuthorTruncated<F>(PhantomData<F>);
-impl<F: FindAuthor<u32>> FindAuthor<H160> for FindAuthorTruncated<F> {
-	fn find_author<'a, I>(digests: I) -> Option<H160>
-	where
-		I: 'a + IntoIterator<Item = (ConsensusEngineId, &'a [u8])>,
-	{
-		if let Some(author_index) = F::find_author(digests) {
-			let authority_id = Aura::authorities()[author_index as usize].clone();
-			return Some(H160::from_slice(&authority_id.to_raw_vec()[4..24]))
-		}
-		None
-	}
-}
-
-const WEIGHT_PER_GAS: u64 = 20_000;
-parameter_types! {
-	pub BlockGasLimit: U256 = U256::from(NORMAL_DISPATCH_RATIO * MAXIMUM_BLOCK_WEIGHT.ref_time() / WEIGHT_PER_GAS);
-	pub PrecompilesValue: FrontierPrecompiles<Runtime> = FrontierPrecompiles::<_>::new();
-	pub WeightPerGas: Weight = Weight::from_parts(WEIGHT_PER_GAS, 0);
-}
-
-impl pallet_evm::Config for Runtime {
-	type FeeCalculator = BaseFee;
-	type GasWeightMapping = pallet_evm::FixedGasWeightMapping<Self>;
-	type WeightPerGas = WeightPerGas;
-	type BlockHashMapping = pallet_ethereum::EthereumBlockHashMapping<Self>;
-	type CallOrigin = EnsureAddressTruncated;
-	type WithdrawOrigin = EnsureAddressTruncated;
-	type AddressMapping = HashedAddressMapping<BlakeTwo256>;
-	type Currency = Balances;
-	type RuntimeEvent = RuntimeEvent;
-	type PrecompilesType = FrontierPrecompiles<Self>;
-	type PrecompilesValue = PrecompilesValue;
-	type ChainId = EVMChainId;
-	type BlockGasLimit = BlockGasLimit;
-	type Runner = pallet_evm::runner::stack::Runner<Self>;
-	type OnChargeTransaction = ();
-	type OnCreate = ();
-	type FindAuthor = FindAuthorTruncated<Aura>;
-	type Timestamp = Timestamp;
-	type WeightInfo = pallet_evm::weights::SubstrateWeight<Runtime>;
-}
-
-parameter_types! {
-	pub const PostBlockAndTxnHashes: PostLogContent = PostLogContent::BlockAndTxnHashes;
-	pub const EvmExtraDataLimit: u32 = 500;
-}
-
-// TODO - Update settings
-impl pallet_ethereum::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type StateRoot = pallet_ethereum::IntermediateStateRoot<Self>;
-	type PostLogContent = PostBlockAndTxnHashes;
-	type ExtraDataLength = EvmExtraDataLimit;
-}
-
-parameter_types! {
-	pub BoundDivision: U256 = U256::from(1024);
-}
-
-impl pallet_dynamic_fee::Config for Runtime {
-	type MinGasPriceBoundDivisor = BoundDivision;
-}
-
-parameter_types! {
-	pub DefaultBaseFeePerGas: U256 = U256::from(1_000_000_000);
-	pub DefaultElasticity: Permill = Permill::from_parts(125_000);
-}
-
-pub struct BaseFeeThreshold;
-impl pallet_base_fee::BaseFeeThreshold for BaseFeeThreshold {
-	fn lower() -> Permill {
-		Permill::zero()
-	}
-	fn ideal() -> Permill {
-		Permill::from_parts(500_000)
-	}
-	fn upper() -> Permill {
-		Permill::from_parts(1_000_000)
-	}
-}
-
-impl pallet_base_fee::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type Threshold = BaseFeeThreshold;
-	type DefaultBaseFeePerGas = DefaultBaseFeePerGas;
-	type DefaultElasticity = DefaultElasticity;
-}
-
-impl pallet_hotfix_sufficients::Config for Runtime {
-	type AddressMapping = HashedAddressMapping<BlakeTwo256>;
-	type WeightInfo = pallet_hotfix_sufficients::weights::SubstrateWeight<Runtime>;
-}
-
-parameter_types! {
-	pub const DaoPalletId: PalletId = PalletId(*b"py/sctld");
-	pub const DaoNameLimit: u32 = 20;
-	pub const DaoStringLimit: u32 = 100;
-	pub const DaoMetadataLimit: u32 = 750;
-	pub const DaoMaxCouncilMembers: u32 = 100; // TODO
-	pub const DaoMaxTechnicalCommitteeMembers: u32 = 100; // TODO
-	pub const DaoMaxPendingItems: u32 = 100; // TODO
-	pub const DaoMinTreasurySpendPeriod: u32 = 10; // TODO
-}
-
-impl pallet_dao::Config for Runtime {
-	type RuntimeCall = RuntimeCall;
-	type RuntimeEvent = RuntimeEvent;
-	type Currency = Balances;
-	type PalletId = DaoPalletId;
-	type DaoNameLimit = DaoNameLimit;
-	type DaoStringLimit = DaoStringLimit;
-	type DaoMetadataLimit = DaoMetadataLimit;
-	type DaoMaxCouncilMembers = DaoMaxCouncilMembers;
-	type DaoMaxTechnicalCommitteeMembers = DaoMaxTechnicalCommitteeMembers;
-	type DaoMaxPendingItems = DaoMaxPendingItems;
-	type DaoMinTreasurySpendPeriod = DaoMinTreasurySpendPeriod;
-	type AssetId = AssetId;
-	type Balance = Balance;
-	type CouncilProvider = DaoCouncilMembers;
-	type TechnicalCommitteeProvider = DaoTechnicalCommitteeMembers;
-	type AssetProvider = Assets;
-	type AuthorityId = pallet_dao::crypto::TestAuthId;
-	type OffchainEthService = EthService<Dao>;
-	type ApproveOrigin = EitherOfDiverseWithArg<
-		EnsureDao<AccountId>,
-		pallet_dao_collective::EnsureDaoOriginWithArg<AccountId, DaoCouncilCollective>,
-	>;
-	type Scheduler = Scheduler;
-	type PalletsOrigin = OriginCaller;
-	type Preimages = Preimage;
-	type SpendDaoFunds = DaoTreasury;
-	type DaoReferendumScheduler = DaoDemocracy;
-	type WeightInfo = pallet_dao::weights::SubstrateWeight<Runtime>;
-
-	#[cfg(feature = "runtime-benchmarks")]
-	type DaoReferendumBenchmarkHelper = DaoDemocracy;
-}
-
-parameter_types! {
-	pub const EthGovernanceMaxProposals: u32 = 50;
-	pub const EthGovernanceMaxPendingProposals: u32 = 50;
-	pub const EthGovernanceMaxVotes: u32 = 50;
-	pub const EthGovernanceMaxPendingVotes: u32 = 50;
-}
-
-impl pallet_dao_eth_governance::Config for Runtime {
-	type RuntimeCall = RuntimeCall;
-	type RuntimeEvent = RuntimeEvent;
-	type RuntimeOrigin = RuntimeOrigin;
-	type Balance = Balance;
-	type Proposal = RuntimeCall;
-	type ProposalMetadataLimit = DaoMetadataLimit;
-	type EthRpcUrlLimit = DaoStringLimit;
-	type MaxProposals = EthGovernanceMaxProposals;
-	type MaxPendingProposals = EthGovernanceMaxPendingProposals;
-	type MaxPendingVotes = EthGovernanceMaxPendingVotes;
-	type MaxVotes = EthGovernanceMaxVotes;
-	type DaoProvider = Dao;
-	type Preimages = Preimage;
-	type AuthorityId = pallet_dao::crypto::TestAuthId;
-	type OffchainEthService = EthService<DaoEthGovernance>;
-	type Scheduler = Scheduler;
-	type PalletsOrigin = OriginCaller;
-	type WeightInfo = pallet_dao_eth_governance::weights::SubstrateWeight<Runtime>;
-}
-
-parameter_types! {
-	pub const DaoMaximumReasonLength: u32 = 100;
-}
-
-impl pallet_dao_bounties::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type Assets = Assets;
-	type MaximumReasonLength = DaoMaximumReasonLength;
-	type WeightInfo = pallet_dao_bounties::weights::SubstrateWeight<Runtime>;
-	type ChildBountyManager = ();
-}
-
 impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime
 where
 	RuntimeCall: From<LocalCall>,
@@ -1767,48 +1386,9 @@ impl pallet_utility::Config for Runtime {
 	type WeightInfo = pallet_utility::weights::SubstrateWeight<Runtime>;
 }
 
-parameter_types! {
-	pub const ReservedXcmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT.saturating_div(4);
-	pub const ReservedDmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT.saturating_div(4);
-}
-
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
-impl cumulus_pallet_parachain_system::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type OnSystemEvent = ();
-	type SelfParaId = parachain_info::Pallet<Runtime>;
-	type OutboundXcmpMessageSource = XcmpQueue;
-	type DmpMessageHandler = DmpQueue;
-	type ReservedDmpWeight = ReservedDmpWeight;
-	type XcmpMessageHandler = XcmpQueue;
-	type ReservedXcmpWeight = ReservedXcmpWeight;
-	type CheckAssociatedRelayNumber = cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
-}
-
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 impl parachain_info::Config for Runtime {}
 
 impl cumulus_pallet_aura_ext::Config for Runtime {}
-
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
-impl cumulus_pallet_xcmp_queue::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type XcmExecutor = XcmExecutor<XcmConfig>;
-	type ChannelInfo = ParachainSystem;
-	type VersionWrapper = ();
-	type ExecuteOverweightOrigin = EnsureRoot<AccountId>;
-	type ControllerOrigin = EnsureRoot<AccountId>;
-	type ControllerOriginConverter = XcmOriginToTransactDispatchOrigin;
-	type PriceForSiblingDelivery = ();
-	type WeightInfo = ();
-}
-
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
-impl cumulus_pallet_dmp_queue::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type XcmExecutor = XcmExecutor<XcmConfig>;
-	type ExecuteOverweightOrigin = EnsureRoot<AccountId>;
-}
 
 // We allow root only to execute privileged collator selection operations.
 pub type CollatorSelectionUpdateOrigin = EnsureRoot<AccountId>;
@@ -1827,11 +1407,6 @@ impl pallet_collator_selection::Config for Runtime {
 	type ValidatorIdOf = pallet_collator_selection::IdentityCollator;
 	type ValidatorRegistration = Session;
 	type WeightInfo = ();
-}
-
-parameter_types! {
-	pub Features: PalletFeatures = PalletFeatures::all_enabled();
-	pub const MaxAttributesPerCall: u32 = 10;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -1867,7 +1442,6 @@ construct_runtime!(
 		// FRAME Pallets
 		Sudo: pallet_sudo::{Pallet, Call, Event<T>, Config<T>} = 30,
 		Assets: pallet_dao_assets::<Instance1>::{Pallet, Call, Storage, Event<T>} = 31,
-		Nicks: pallet_nicks::{Pallet, Call, Event<T>} = 32,
 		Scheduler: pallet_scheduler::{Pallet, Call, Storage, Event<T>} = 33,
 		Contracts: pallet_contracts::{Pallet, Call, Storage, Event<T>} = 34,
 		Historical: pallet_session_historical::{Pallet, Storage} = 35,
@@ -1928,30 +1502,6 @@ construct_runtime!(
 	}
 );
 
-pub struct TransactionConverter;
-
-impl fp_rpc::ConvertTransaction<UncheckedExtrinsic> for TransactionConverter {
-	fn convert_transaction(&self, transaction: pallet_ethereum::Transaction) -> UncheckedExtrinsic {
-		UncheckedExtrinsic::new_unsigned(
-			pallet_ethereum::Call::<Runtime>::transact { transaction }.into(),
-		)
-	}
-}
-
-impl fp_rpc::ConvertTransaction<opaque::UncheckedExtrinsic> for TransactionConverter {
-	fn convert_transaction(
-		&self,
-		transaction: pallet_ethereum::Transaction,
-	) -> opaque::UncheckedExtrinsic {
-		let extrinsic = UncheckedExtrinsic::new_unsigned(
-			pallet_ethereum::Call::<Runtime>::transact { transaction }.into(),
-		);
-		let encoded = extrinsic.encode();
-		opaque::UncheckedExtrinsic::decode(&mut &encoded[..])
-			.expect("Encoded extrinsic is always valid")
-	}
-}
-
 /// The address format for describing accounts.
 pub type Address = sp_runtime::MultiAddress<AccountId, ()>;
 /// Block header type as expected by this runtime.
@@ -1982,62 +1532,6 @@ pub type Executive = frame_executive::Executive<
 	Runtime,
 	AllPalletsWithSystem,
 >;
-
-impl fp_self_contained::SelfContainedCall for RuntimeCall {
-	type SignedInfo = H160;
-
-	fn is_self_contained(&self) -> bool {
-		match self {
-			RuntimeCall::Ethereum(call) => call.is_self_contained(),
-			_ => false,
-		}
-	}
-
-	fn check_self_contained(&self) -> Option<Result<Self::SignedInfo, TransactionValidityError>> {
-		match self {
-			RuntimeCall::Ethereum(call) => call.check_self_contained(),
-			_ => None,
-		}
-	}
-
-	fn validate_self_contained(
-		&self,
-		info: &Self::SignedInfo,
-		dispatch_info: &DispatchInfoOf<RuntimeCall>,
-		len: usize,
-	) -> Option<TransactionValidity> {
-		match self {
-			RuntimeCall::Ethereum(call) => call.validate_self_contained(info, dispatch_info, len),
-			_ => None,
-		}
-	}
-
-	fn pre_dispatch_self_contained(
-		&self,
-		info: &Self::SignedInfo,
-		dispatch_info: &DispatchInfoOf<RuntimeCall>,
-		len: usize,
-	) -> Option<Result<(), TransactionValidityError>> {
-		match self {
-			RuntimeCall::Ethereum(call) =>
-				call.pre_dispatch_self_contained(info, dispatch_info, len),
-			_ => None,
-		}
-	}
-
-	fn apply_self_contained(
-		self,
-		info: Self::SignedInfo,
-	) -> Option<sp_runtime::DispatchResultWithInfo<PostDispatchInfoOf<Self>>> {
-		match self {
-			call @ RuntimeCall::Ethereum(pallet_ethereum::Call::transact { .. }) =>
-				Some(call.dispatch(RuntimeOrigin::from(
-					pallet_ethereum::RawOrigin::EthereumTransaction(info),
-				))),
-			_ => None,
-		}
-	}
-}
 
 #[cfg(feature = "runtime-benchmarks")]
 #[macro_use]
@@ -2488,11 +1982,4 @@ impl cumulus_pallet_parachain_system::CheckInherents<Block> for CheckInherents {
 
 		inherent_data.check_extrinsics(block)
 	}
-}
-
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
-cumulus_pallet_parachain_system::register_validate_block! {
-	Runtime = Runtime,
-	BlockExecutor = cumulus_pallet_aura_ext::BlockExecutor::<Runtime, Executive>,
-	CheckInherents = CheckInherents,
 }
