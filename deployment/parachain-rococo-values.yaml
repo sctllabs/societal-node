@@ -1,0 +1,83 @@
+## Image of Parachain Societal Node.
+##
+image:
+  repository: societal/societal-node
+  tag: parachain-latest
+
+node:
+  role: collator
+  isParachain: true
+  command: societal-node
+
+  customChainspecUrl: "https://societal-dev.s3.amazonaws.com/rococo-raw-parachain-chainspec.json"
+  forceDownloadChainspec: true
+
+  allowUnsafeRpcMethods: Unsafe
+
+  enableOffchainIndexing: true
+
+  chainData:
+    volumeSize: 100Gi
+    storageClass: gp2-custom-resize
+
+  chainKeystore:
+    storageClass: gp2-custom-resize
+
+  collatorRelayChain:
+    customChainspecUrl: "https://societal-dev.s3.amazonaws.com/rococo-raw-chainspec.json"
+    chainData:
+      volumeSize: 100Gi
+      storageClass: gp2-custom-resize
+    chainKeystore:
+      storageClass: gp2-custom-resize
+
+  resources:
+    limits:
+      cpu: 1
+      memory: 2Gi
+    requests:
+      cpu: 1
+      memory: 2Gi
+
+tolerations:
+  - key: "validator"
+    operator: "Equal"
+    value: "rococo"
+    effect: "NoSchedule"
+
+## Creates an ingress resource
+##
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-development
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  rules:
+    - host: node-rpc-rococo.testnet.sctl.link
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: societal-rococo-node
+                port:
+                  number: 9933
+    - host: node-ws-rococo.testnet.sctl.link
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: societal-rococo-node
+                port:
+                  number: 9944
+  tls:
+    - hosts:
+        - node-rpc-rococo.testnet.sctl.link
+      secretName: societal-rococo-node-rpc-tls-secret
+    - hosts:
+        - node-ws-rococo.testnet.sctl.link
+      secretName: societal-rococo-node-ws-tls-secret
