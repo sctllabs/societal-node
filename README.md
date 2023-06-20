@@ -1,4 +1,4 @@
-# Societal Node
+# Societal Node <img src="./docs/badges/SBP_M1.svg" width="80">
 
 ## Getting Started
 
