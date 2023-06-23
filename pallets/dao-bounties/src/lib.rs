@@ -1034,9 +1034,11 @@ impl<T: Config<I>, I: 'static> pallet_dao_treasury::SpendFunds<T, I> for Pallet<
 										Err(_) => {
 											*missed_any = true;
 
-											return false
+											return true
 										},
 									};
+
+									bounty.status = BountyStatus::Funded;
 
 									Self::deposit_event(Event::<T, I>::BountyBecameActive {
 										dao_id,
