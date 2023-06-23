@@ -720,28 +720,81 @@ pub mod pallet {
 							Error::<T, I>::Premature
 						);
 						let bounty_account = Self::bounty_account_id(dao_id, bounty_id);
-						let balance = T::Currency::free_balance(&bounty_account);
-						let fee = bounty.fee.min(balance); // just to be safe
-						let payout = balance.saturating_sub(fee);
-						let err_amount = T::Currency::unreserve(&curator, bounty.curator_deposit);
-						debug_assert!(err_amount.is_zero());
 
-						// Get total child bounties curator fees, and subtract it from the parent
-						// curator fee (the fee in present referenced bounty, `self`).
-						let children_fee = T::ChildBountyManager::children_curator_fees(bounty_id);
-						debug_assert!(children_fee <= fee);
+						let payout = match bounty.token_id {
+							None => {
+								let balance = T::Currency::free_balance(&bounty_account);
+								let fee = bounty.fee.min(balance); // just to be safe
+								let payout = balance.saturating_sub(fee);
+								let err_amount =
+									T::Currency::unreserve(&curator, bounty.curator_deposit);
+								debug_assert!(err_amount.is_zero());
 
-						let final_fee = fee.saturating_sub(children_fee);
-						let res =
-							T::Currency::transfer(&bounty_account, &curator, final_fee, AllowDeath); // should not fail
-						debug_assert!(res.is_ok());
-						let res = T::Currency::transfer(
-							&bounty_account,
-							&beneficiary,
-							payout,
-							AllowDeath,
-						); // should not fail
-						debug_assert!(res.is_ok());
+								// Get total child bounties curator fees, and subtract it from the
+								// parent curator fee (the fee in present referenced bounty,
+								// `self`).
+								let children_fee =
+									T::ChildBountyManager::children_curator_fees(bounty_id);
+								debug_assert!(children_fee <= fee);
+
+								let final_fee = fee.saturating_sub(children_fee);
+								let res = T::Currency::transfer(
+									&bounty_account,
+									&curator,
+									final_fee,
+									AllowDeath,
+								); // should not fail
+								debug_assert!(res.is_ok());
+								let res = T::Currency::transfer(
+									&bounty_account,
+									&beneficiary,
+									payout,
+									AllowDeath,
+								); // should not fail
+								debug_assert!(res.is_ok());
+
+								payout
+							},
+							Some(token_id) => {
+								let balance = T::Assets::balance(token_id, &bounty_account);
+								let fee = bounty.fee.min(balance); // just to be safe
+								let payout = balance.saturating_sub(fee);
+								let err_amount = T::Assets::release(
+									token_id,
+									&curator,
+									bounty.curator_deposit,
+									true,
+								)?;
+								debug_assert!(err_amount.is_zero());
+
+								// Get total child bounties curator fees, and subtract it from the
+								// parent curator fee (the fee in present referenced bounty,
+								// `self`).
+								let children_fee =
+									T::ChildBountyManager::children_curator_fees(bounty_id);
+								debug_assert!(children_fee <= fee);
+
+								let final_fee = fee.saturating_sub(children_fee);
+								let res = T::Assets::transfer(
+									token_id,
+									&bounty_account,
+									&curator,
+									final_fee,
+									false,
+								); // should not fail
+								debug_assert!(res.is_ok());
+								let res = T::Assets::transfer(
+									token_id,
+									&bounty_account,
+									&beneficiary,
+									payout,
+									false,
+								); // should not fail
+								debug_assert!(res.is_ok());
+
+								payout
+							},
+						};
 
 						*maybe_bounty = None;
 
