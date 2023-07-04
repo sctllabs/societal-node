@@ -97,9 +97,9 @@ pub mod pallet {
 		type WeightInfo: WeightInfo;
 
 		type DaoProvider: DaoProvider<
+			Self::AccountId,
 			<Self as frame_system::Config>::Hash,
 			Id = u32,
-			AccountId = Self::AccountId,
 			Policy = DaoPolicy,
 			Origin = OriginFor<Self>,
 		>;
@@ -244,14 +244,16 @@ pub mod pallet {
 		}
 
 		/// Swap out the sending member for some other key `new`.
-		#[pallet::weight(T::WeightInfo::change_key())]
+		#[pallet::weight((T::WeightInfo::change_key(), DispatchClass::Normal, Pays::No))]
 		#[pallet::call_index(4)]
 		pub fn change_key(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			new: T::AccountId,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			let remove = ensure_signed(origin)?;
+
+			T::DaoProvider::ensure_member(dao_id, &remove)?;
 
 			if remove != new {
 				let mut members = <Members<T, I>>::get(dao_id);
@@ -272,7 +274,8 @@ pub mod pallet {
 			}
 
 			Self::deposit_event(Event::KeyChanged);
-			Ok(())
+
+			Ok((Some(T::WeightInfo::change_key()), Pays::No).into())
 		}
 	}
 }

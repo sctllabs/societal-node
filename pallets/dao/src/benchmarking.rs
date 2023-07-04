@@ -2,8 +2,6 @@
 
 use super::*;
 
-#[allow(unused)]
-use crate::Pallet as Dao;
 use frame_benchmarking::{account, benchmarks, BenchmarkError};
 use frame_support::traits::fungibles::Transfer;
 use frame_system::RawOrigin;
@@ -79,6 +77,7 @@ fn setup_dao_payload<T: Config>(is_eth: bool) -> Vec<u8> {
 
 fn setup_dao<T: Config>(is_eth: bool) -> Result<(), DispatchError> {
 	let caller = account("caller", 0, SEED);
+	T::Currency::make_free_balance_be(&caller, BalanceOf::<T>::max_value() / 2u32.into());
 	let data = setup_dao_payload::<T>(is_eth);
 
 	DaoFactory::<T>::create_dao(RawOrigin::Signed(caller).into(), vec![], vec![], data)
@@ -124,8 +123,7 @@ benchmarks! {
 			technical_committee.push(account("account", index, TECH_COMMITTEE_SEED));
 		}
 
-		let value: BalanceOf<T> = 100u32.into();
-		let _ = T::Currency::make_free_balance_be(&caller, value);
+		T::Currency::make_free_balance_be(&caller, BalanceOf::<T>::max_value() / 2u32.into());
 
 		let data = setup_dao_payload::<T>(false);
 	}: _(RawOrigin::Signed(caller), council, technical_committee, data)
@@ -235,5 +233,13 @@ benchmarks! {
 	}: _<T::RuntimeOrigin>(origin, 0)
 	verify { }
 
-	impl_benchmark_test_suite!(Dao, crate::mock::new_test_ext(), crate::mock::Test);
+	extend_subscription {
+		setup_dao::<T>(false)?;
+		let origin = get_dao_origin::<T>(0)?;
+		let dao_account_id = DaoFactory::<T>::dao_account_id(0);
+		T::Currency::make_free_balance_be(&dao_account_id, BalanceOf::<T>::max_value() / 2u32.into());
+	}: _<T::RuntimeOrigin>(origin, 0)
+	verify { }
+
+	impl_benchmark_test_suite!(DaoFactory, crate::mock::new_test_ext(), crate::mock::Test);
 }

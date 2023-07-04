@@ -105,9 +105,8 @@ impl InitializeDaoMembers<u32, u64> for TestChangeMembers {
 }
 
 pub struct TestDaoProvider;
-impl DaoProvider<H256> for TestDaoProvider {
+impl DaoProvider<u64, H256> for TestDaoProvider {
 	type Id = u32;
-	type AccountId = u64;
 	type AssetId = u128;
 	type Policy = DaoPolicy;
 	type Origin = RuntimeOrigin;
@@ -133,11 +132,11 @@ impl DaoProvider<H256> for TestDaoProvider {
 		})
 	}
 
-	fn dao_account_id(id: Self::Id) -> Self::AccountId {
+	fn dao_account_id(id: Self::Id) -> u64 {
 		PalletId(*b"py/sctld").into_sub_account_truncating(id)
 	}
 
-	fn ensure_member(_id: Self::Id, _who: &Self::AccountId) -> Result<bool, DispatchError> {
+	fn ensure_member(_id: Self::Id, _who: &u64) -> Result<bool, DispatchError> {
 		Ok(true)
 	}
 
@@ -145,10 +144,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 		todo!()
 	}
 
-	fn ensure_approved(
-		origin: Self::Origin,
-		dao_id: Self::Id,
-	) -> DispatchResultWithDaoOrigin<Self::AccountId> {
+	fn ensure_approved(origin: Self::Origin, dao_id: Self::Id) -> DispatchResultWithDaoOrigin<u64> {
 		let dao_account_id = Self::dao_account_id(dao_id);
 		let approve_origin = Self::policy(dao_id)?.approve_origin;
 		let dao_origin = DaoOrigin { dao_account_id, proportion: approve_origin };
@@ -166,9 +162,9 @@ impl DaoProvider<H256> for TestDaoProvider {
 
 	#[cfg(feature = "runtime-benchmarks")]
 	fn create_dao(
-		_founder: Self::AccountId,
-		_council: Vec<Self::AccountId>,
-		_technical_committee: Vec<Self::AccountId>,
+		_founder: u64,
+		_council: Vec<u64>,
+		_technical_committee: Vec<u64>,
 		_data: Vec<u8>,
 	) -> Result<(), DispatchError> {
 		Ok(())
@@ -180,7 +176,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()> {
+	fn try_successful_origin(dao_origin: &DaoOrigin<u64>) -> Result<Self::Origin, ()> {
 		Self::ApproveOrigin::try_successful_origin(dao_origin)
 	}
 }

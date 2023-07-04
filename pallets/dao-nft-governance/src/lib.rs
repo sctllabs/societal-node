@@ -107,9 +107,9 @@ pub mod pallet {
 		type MaxVotes: Get<u32>;
 
 		type DaoProvider: DaoProvider<
+			Self::AccountId,
 			<Self as frame_system::Config>::Hash,
 			Id = u32,
-			AccountId = Self::AccountId,
 			Policy = DaoPolicy,
 			NFTCollectionId = Self::NFTCollectionId,
 		>;

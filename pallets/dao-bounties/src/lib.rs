@@ -436,16 +436,18 @@ pub mod pallet {
 		/// # <weight>
 		/// - O(1).
 		/// # </weight>
-		#[pallet::weight(<T as Config<I>>::WeightInfo::unassign_curator())]
+		#[pallet::weight((<T as Config<I>>::WeightInfo::unassign_curator(), DispatchClass::Normal, Pays::No))]
 		#[pallet::call_index(3)]
 		pub fn unassign_curator(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			#[pallet::compact] bounty_id: BountyIndex,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			let maybe_sender = ensure_signed(origin.clone())
 				.map(Some)
 				.or_else(|_| T::DaoProvider::ensure_approved(origin, dao_id).map(|_| None))?;
+
+			// TODO: check dao origin
 
 			Bounties::<T, I>::try_mutate_exists(
 				dao_id,
@@ -551,7 +553,7 @@ pub mod pallet {
 				status: BountyStatus::Funded,
 			});
 
-			Ok(())
+			Ok((Some(<T as Config<I>>::WeightInfo::unassign_curator()), Pays::No).into())
 		}
 
 		/// Accept the curator role for a bounty.
@@ -562,13 +564,13 @@ pub mod pallet {
 		/// # <weight>
 		/// - O(1).
 		/// # </weight>
-		#[pallet::weight(<T as Config<I>>::WeightInfo::accept_curator())]
+		#[pallet::weight((<T as Config<I>>::WeightInfo::accept_curator(), DispatchClass::Normal, Pays::No))]
 		#[pallet::call_index(4)]
 		pub fn accept_curator(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			#[pallet::compact] bounty_id: BountyIndex,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			let signer = ensure_signed(origin)?;
 
 			let dao_policy = T::DaoProvider::policy(dao_id)?;
@@ -618,7 +620,7 @@ pub mod pallet {
 				status: status.unwrap(),
 			});
 
-			Ok(())
+			Ok((Some(<T as Config<I>>::WeightInfo::accept_curator()), Pays::No).into())
 		}
 
 		/// Award bounty to a beneficiary account. The beneficiary will be able to claim the funds
@@ -632,14 +634,18 @@ pub mod pallet {
 		/// # <weight>
 		/// - O(1).
 		/// # </weight>
-		#[pallet::weight(<T as Config<I>>::WeightInfo::award_bounty())]
+		#[pallet::weight((
+			<T as Config<I>>::WeightInfo::award_bounty(),
+			DispatchClass::Normal,
+			Pays::No
+		))]
 		#[pallet::call_index(5)]
 		pub fn award_bounty(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			#[pallet::compact] bounty_id: BountyIndex,
 			beneficiary: T::AccountId,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			let signer = ensure_signed(origin)?;
 
 			let dao_policy = T::DaoProvider::policy(dao_id)?;
@@ -686,7 +692,8 @@ pub mod pallet {
 				status: status.unwrap(),
 				beneficiary,
 			});
-			Ok(())
+
+			Ok((Some(<T as Config<I>>::WeightInfo::award_bounty()), Pays::No).into())
 		}
 
 		/// Claim the payout from an awarded bounty after payout delay.
@@ -698,13 +705,17 @@ pub mod pallet {
 		/// # <weight>
 		/// - O(1).
 		/// # </weight>
-		#[pallet::weight(<T as Config<I>>::WeightInfo::claim_bounty())]
+		#[pallet::weight((
+			<T as Config<I>>::WeightInfo::claim_bounty(),
+			DispatchClass::Normal,
+			Pays::No
+		))]
 		#[pallet::call_index(6)]
 		pub fn claim_bounty(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			#[pallet::compact] bounty_id: BountyIndex,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			let _ = ensure_signed(origin)?; // anyone can trigger claim
 
 			Bounties::<T, I>::try_mutate_exists(
@@ -759,7 +770,8 @@ pub mod pallet {
 					}
 				},
 			)?;
-			Ok(())
+
+			Ok((Some(<T as Config<I>>::WeightInfo::claim_bounty()), Pays::No).into())
 		}
 
 		/// Cancel a proposed or active bounty. All the funds will be sent to treasury and
@@ -862,14 +874,18 @@ pub mod pallet {
 		/// # <weight>
 		/// - O(1).
 		/// # </weight>
-		#[pallet::weight(<T as Config<I>>::WeightInfo::extend_bounty_expiry())]
+		#[pallet::weight((
+			<T as Config<I>>::WeightInfo::extend_bounty_expiry(),
+			DispatchClass::Normal,
+			Pays::No
+		))]
 		#[pallet::call_index(8)]
 		pub fn extend_bounty_expiry(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			#[pallet::compact] bounty_id: BountyIndex,
 			_remark: Vec<u8>,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			let signer = ensure_signed(origin)?;
 
 			let dao_policy = T::DaoProvider::policy(dao_id)?;
@@ -903,7 +919,8 @@ pub mod pallet {
 				index: bounty_id,
 				update_due: new_update_due.unwrap(),
 			});
-			Ok(())
+
+			Ok((Some(<T as Config<I>>::WeightInfo::extend_bounty_expiry()), Pays::No).into())
 		}
 	}
 }

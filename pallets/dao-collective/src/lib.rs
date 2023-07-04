@@ -219,9 +219,9 @@ pub mod pallet {
 		type WeightInfo: WeightInfo;
 
 		type DaoProvider: DaoProvider<
+			Self::AccountId,
 			<Self as frame_system::Config>::Hash,
 			Id = u32,
-			AccountId = Self::AccountId,
 			Policy = DaoPolicy,
 			Origin = OriginFor<Self>,
 		>;
@@ -367,18 +367,16 @@ pub mod pallet {
 		/// Add a new proposal to either be voted on or executed directly.
 		///
 		/// Requires the sender to be member.
-		///
-		/// `threshold` determines whether `proposal` is executed directly (`threshold < 2`)
-		/// or put up for voting.
 		#[pallet::weight((
 			T::WeightInfo::propose_with_meta(
 				*length_bound,
 				T::MaxMembers::get(),
 				T::MaxProposals::get()
 			),
-			DispatchClass::Operational
+			DispatchClass::Normal,
+			Pays::No,
 		))]
-		#[pallet::call_index(1)]
+		#[pallet::call_index(0)]
 		pub fn propose(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -390,15 +388,13 @@ pub mod pallet {
 		}
 
 		/// Adds a new proposal with temporary meta field for arbitrary data indexed by node indexer
-		#[pallet::weight((
-			T::WeightInfo::propose_with_meta(
+		#[pallet::weight(
+		(T::WeightInfo::propose_with_meta(
 				*length_bound,
 				T::MaxMembers::get(),
-				T::MaxProposals::get()
-			),
-			DispatchClass::Operational
+				T::MaxProposals::get()), DispatchClass::Normal, Pays::No,
 		))]
-		#[pallet::call_index(2)]
+		#[pallet::call_index(1)]
 		pub fn propose_with_meta(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -408,28 +404,9 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
-			let members = Self::members(dao_id);
-			ensure!(members.contains(&who), Error::<T, I>::NotMember);
+			let weight = Self::do_propose_with_meta(who, dao_id, proposal, length_bound, meta)?;
 
-			let proposal = T::Preimages::bound(proposal)?.transmute();
-
-			if let Some(metadata) = meta.clone() {
-				ensure!(
-					BoundedVec::<u8, <T as Config<I>>::ProposalMetadataLimit>::try_from(metadata)
-						.is_ok(),
-					Error::<T, I>::MetadataTooLong
-				)
-			}
-
-			let (proposal_len, active_proposals) =
-				Self::do_propose_proposed(who, dao_id, proposal, length_bound, meta)?;
-
-			Ok(Some(T::WeightInfo::propose_with_meta(
-				proposal_len,         // B
-				members.len() as u32, // M
-				active_proposals,     // P2
-			))
-			.into())
+			Ok((Some(weight), Pays::No).into())
 		}
 
 		/// Add an aye or nay vote for the sender to the given proposal.
@@ -441,9 +418,10 @@ pub mod pallet {
 		/// fee.
 		#[pallet::weight((
 			T::WeightInfo::vote(T::MaxMembers::get()),
-			DispatchClass::Operational
+			DispatchClass::Normal,
+			Pays::No
 		))]
-		#[pallet::call_index(3)]
+		#[pallet::call_index(2)]
 		pub fn vote(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -452,18 +430,10 @@ pub mod pallet {
 			approve: bool,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			let members = Self::members(dao_id);
-			ensure!(members.contains(&who), Error::<T, I>::NotMember);
 
-			// Detects first vote of the member in the motion
-			let is_account_voting_first_time =
-				Self::do_vote(who, dao_id, proposal, index, approve)?;
+			let weight = Self::do_vote(who, dao_id, proposal, index, approve)?;
 
-			if is_account_voting_first_time {
-				Ok((Some(T::WeightInfo::vote(members.len() as u32)), Pays::No).into())
-			} else {
-				Ok((Some(T::WeightInfo::vote(members.len() as u32)), Pays::Yes).into())
-			}
+			Ok((Some(weight), Pays::No).into())
 		}
 
 		/// Close a vote that is either approved, disapproved or whose voting period has ended.
@@ -472,17 +442,6 @@ pub mod pallet {
 		///
 		/// If called before the end of the voting period it will only close the vote if it is
 		/// has enough votes to be approved or disapproved.
-		///
-		/// If called after the end of the voting period abstentions are counted as rejections
-		///
-		/// If the close operation completes successfully with disapproval, the transaction fee will
-		/// be waived. Otherwise execution of the approved operation will be charged to the caller.
-		///
-		/// + `proposal_weight_bound`: The maximum amount of weight consumed by executing the closed
-		/// proposal.
-		/// proposal.
-		/// + `length_bound`: The upper bound for the length of the proposal in storage. Checked via
-		/// `storage::read` so it is `size_of::<u32>() == 4` larger than the pure length.
 		#[pallet::weight((
 			{
 				let b = *length_bound;
@@ -495,9 +454,10 @@ pub mod pallet {
 					.max(T::WeightInfo::close_disapproved(m, p2))
 					.saturating_add(p1)
 			},
-			DispatchClass::Operational
+			DispatchClass::Normal,
+			Pays::No
 		))]
-		#[pallet::call_index(4)]
+		#[pallet::call_index(3)]
 		pub fn close(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -536,9 +496,9 @@ pub mod pallet {
 					.max(T::WeightInfo::close_disapproved(m, p2))
 					.saturating_add(p1)
 			},
-			DispatchClass::Operational
+			DispatchClass::Normal
 		))]
-		#[pallet::call_index(5)]
+		#[pallet::call_index(4)]
 		pub fn close_scheduled_proposal(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -550,6 +510,54 @@ pub mod pallet {
 			T::DaoProvider::ensure_approved(origin, dao_id)?;
 
 			Self::do_close(dao_id, proposal_hash, index, proposal_weight_bound, length_bound)
+		}
+
+		/// Similar to the `propose_with_meta` but having a fee to pay for.
+		#[pallet::weight((
+			T::WeightInfo::propose_with_meta(
+				*length_bound,
+				T::MaxMembers::get(),
+				T::MaxProposals::get()
+			),
+			DispatchClass::Normal,
+			Pays::Yes,
+		))]
+		#[pallet::call_index(5)]
+		pub fn propose_for_fee(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			proposal: Box<<T as Config<I>>::Proposal>,
+			// TODO: remove since bounded is used
+			#[pallet::compact] length_bound: u32,
+			meta: Option<Vec<u8>>,
+		) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+
+			let weight = Self::do_propose_with_meta(who, dao_id, proposal, length_bound, meta)?;
+
+			Ok((Some(weight), Pays::Yes).into())
+		}
+
+		/// Similar to the `vote` but having a fee to pay for.
+		#[pallet::weight((
+			T::WeightInfo::vote(T::MaxMembers::get()),
+			DispatchClass::Normal,
+			Pays::Yes
+		))]
+		#[pallet::call_index(6)]
+		pub fn vote_for_fee(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			proposal: T::Hash,
+			#[pallet::compact] index: ProposalIndex,
+			approve: bool,
+		) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+
+			// Detects first vote of the member in the motion
+			let weight = Self::do_vote(who, dao_id, proposal, index, approve)?;
+
+			Ok((Some(weight), Pays::Yes).into())
 		}
 	}
 }
@@ -570,6 +578,36 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		// Note: The dispatchables *do not* use this to check membership so make sure
 		// to update those if this is changed.
 		Self::members(dao_id).contains(who)
+	}
+
+	pub fn do_propose_with_meta(
+		who: T::AccountId,
+		dao_id: DaoId,
+		proposal: Box<<T as Config<I>>::Proposal>,
+		length_bound: MemberCount,
+		meta: Option<Vec<u8>>,
+	) -> Result<Weight, DispatchError> {
+		let members = Self::members(dao_id);
+		ensure!(members.contains(&who), Error::<T, I>::NotMember);
+
+		let proposal = T::Preimages::bound(proposal)?.transmute();
+
+		if let Some(metadata) = meta.clone() {
+			ensure!(
+				BoundedVec::<u8, <T as Config<I>>::ProposalMetadataLimit>::try_from(metadata)
+					.is_ok(),
+				Error::<T, I>::MetadataTooLong
+			)
+		}
+
+		let (proposal_len, active_proposals) =
+			Self::do_propose_proposed(who, dao_id, proposal, length_bound, meta)?;
+
+		Ok(T::WeightInfo::propose_with_meta(
+			proposal_len,         // B
+			members.len() as u32, // M
+			active_proposals,     // P2
+		))
 	}
 
 	/// Add a new proposal to be voted.
@@ -677,7 +715,10 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		proposal: T::Hash,
 		index: ProposalIndex,
 		approve: bool,
-	) -> Result<bool, DispatchError> {
+	) -> Result<Weight, DispatchError> {
+		let members = Self::members(dao_id);
+		ensure!(members.contains(&who), Error::<T, I>::NotMember);
+
 		let mut voting = Self::voting(dao_id, proposal).ok_or(Error::<T, I>::ProposalMissing)?;
 		ensure!(voting.index == index, Error::<T, I>::WrongIndex);
 
@@ -686,9 +727,6 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 
 		let position_yes = voting.ayes.iter().position(|a| a == &who);
 		let position_no = voting.nays.iter().position(|a| a == &who);
-
-		// Detects first vote of the member in the motion
-		let is_account_voting_first_time = position_yes.is_none() && position_no.is_none();
 
 		if approve {
 			if position_yes.is_none() {
@@ -732,7 +770,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 
 		Voting::<T, I>::insert(dao_id, proposal, voting);
 
-		Ok(is_account_voting_first_time)
+		Ok(T::WeightInfo::vote(members.len() as u32))
 	}
 
 	/// Close a vote that is either approved, disapproved or whose voting period has ended.
@@ -773,7 +811,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 					T::WeightInfo::close_early_approved(len as u32, seats, proposal_count)
 						.saturating_add(proposal_weight),
 				),
-				Pays::Yes,
+				Pays::No,
 			)
 				.into())
 		} else if disapproved {
@@ -826,7 +864,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 					T::WeightInfo::close_approved(len as u32, seats, proposal_count)
 						.saturating_add(proposal_weight),
 				),
-				Pays::Yes,
+				Pays::No,
 			)
 				.into())
 		} else {
