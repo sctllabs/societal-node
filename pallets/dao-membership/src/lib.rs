@@ -253,8 +253,6 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			let remove = ensure_signed(origin)?;
 
-			T::DaoProvider::ensure_member(dao_id, &remove)?;
-
 			if remove != new {
 				let mut members = <Members<T, I>>::get(dao_id);
 				let location =

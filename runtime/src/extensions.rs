@@ -140,6 +140,10 @@ impl<T: Config + Send + Sync> SignedExtension for PrevalidateAttests<T> {
 					InvalidTransaction::Custom(DaoTxValidityError::NotDaoMember.into())
 				})?;
 
+				DaoSubscription::do_ensure_limited(who, ACCOUNT_CALLS_PER_BLOCK).map_err(|_| {
+					InvalidTransaction::Custom(DaoTxValidityError::AccountRateLimitExceeded.into())
+				})?;
+
 				DaoSubscription::do_ensure_active(*dao_id).map_err(|_| {
 					InvalidTransaction::Custom(DaoTxValidityError::DaoSubscriptionError.into())
 				})?;

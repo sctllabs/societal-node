@@ -26,8 +26,8 @@ pub const EXPECTED_BLOCK_TIME: u32 = 6; // in seconds
 pub const DAY_IN_BLOCKS: u32 = 24 * 60 * 60 / EXPECTED_BLOCK_TIME;
 pub const MONTH_IN_BLOCKS: u32 = 30 * DAY_IN_BLOCKS;
 pub const DEFAULT_SUBSCRIPTION_PRICE: u128 = 1_000_000_000_000_000;
-pub const DEFAULT_FUNCTION_CALL_LIMIT: u128 = 10000;
-pub const DEFAULT_FUNCTION_PER_BLOCK_LIMIT: u128 = 100;
+pub const DEFAULT_FUNCTION_CALL_LIMIT: u32 = 10000;
+pub const DEFAULT_FUNCTION_PER_BLOCK_LIMIT: u32 = 100;
 
 #[derive(
 	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize, MaxEncodedLen,
@@ -566,7 +566,9 @@ pub enum DaoSubscriptionStatus<BlockNumber> {
 	Suspended { at: BlockNumber, reason: SuspensionReason },
 }
 
-pub type DaoFunctionBalance = u128;
+pub type DaoFunctionBalance = u32;
+
+pub type FunctionPerBlock<BlockNumber, FunctionBalance> = (BlockNumber, FunctionBalance);
 
 #[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub struct DaoSubscription<BlockNumber, Tier> {
@@ -575,7 +577,7 @@ pub struct DaoSubscription<BlockNumber, Tier> {
 	pub tier: Tier,
 	pub status: DaoSubscriptionStatus<BlockNumber>,
 	pub fn_balance: DaoFunctionBalance,
-	pub fn_per_block: (BlockNumber, DaoFunctionBalance),
+	pub fn_per_block: FunctionPerBlock<BlockNumber, DaoFunctionBalance>,
 }
 
 pub trait DaoSubscriptionProvider<DaoId, AccountId, BlockNumber> {
@@ -636,10 +638,19 @@ pub enum DaoTxValidityError {
 	NotDaoMember = 1,
 	/// Subscription Error
 	DaoSubscriptionError = 2,
+	/// Too many calls for the account per block
+	AccountRateLimitExceeded = 3,
 }
 
 impl From<DaoTxValidityError> for u8 {
 	fn from(err: DaoTxValidityError) -> Self {
 		err as u8
 	}
+}
+
+/// Account Function Call Rate Limiter
+pub trait AccountFnCallRateLimiter<AccountId, FnCallLimit> {
+	/// Ensures whether Account ID function call is within block limits
+	/// - `account_id`: The Account to check the rate limit for.
+	fn ensure_limited(account_id: &AccountId, limit: FnCallLimit) -> Result<(), DispatchError>;
 }

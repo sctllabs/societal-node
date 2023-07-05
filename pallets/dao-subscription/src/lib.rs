@@ -30,6 +30,9 @@ type SubscriptionOf<T> = DaoSubscription<
 	VersionedDaoSubscription<<T as frame_system::Config>::BlockNumber, BalanceOf<T>>,
 >;
 
+type AccountFunctionBalanceOf<T> =
+	FunctionPerBlock<<T as frame_system::Config>::BlockNumber, DaoFunctionBalance>;
+
 /// Dao ID. Just a `u32`.
 pub type DaoId = u32;
 
@@ -70,7 +73,12 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn subscriptions)]
 	pub(super) type Subscriptions<T: Config> =
-		StorageMap<_, Blake2_128Concat, u32, SubscriptionOf<T>, OptionQuery>;
+		StorageMap<_, Blake2_128Concat, DaoId, SubscriptionOf<T>, OptionQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn account_function_balances)]
+	pub(super) type AccountFunctionBalances<T: Config> =
+		StorageMap<_, Blake2_128Concat, T::AccountId, AccountFunctionBalanceOf<T>, OptionQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -106,6 +114,7 @@ pub mod pallet {
 		NotSupported,
 		AlreadySuspended,
 		TooManyCallsPerBlock,
+		TooManyCallsForAccount,
 	}
 
 	#[pallet::call]
@@ -186,7 +195,7 @@ pub mod pallet {
 									let (block_number, fn_calls) = if block_number == cur_block {
 										(block_number, fn_calls.saturating_add(1))
 									} else {
-										(cur_block, 1_u128)
+										(cur_block, 1_u32)
 									};
 
 									match tier {
@@ -214,6 +223,31 @@ pub mod pallet {
 					}
 				},
 			)
+		}
+
+		pub fn do_ensure_limited(
+			account_id: &T::AccountId,
+			limit: DaoFunctionBalance,
+		) -> Result<(), DispatchError> {
+			let cur_block = frame_system::Pallet::<T>::block_number();
+
+			let (block_number, fn_balance) = AccountFunctionBalances::<T>::get(account_id.clone())
+				.map_or_else(
+					|| (cur_block, 1),
+					|(block_number, fn_calls)| {
+						if block_number == cur_block {
+							(block_number, fn_calls.saturating_add(1))
+						} else {
+							(cur_block, 1_u32)
+						}
+					},
+				);
+
+			ensure!(fn_balance <= limit, Error::<T>::TooManyCallsForAccount);
+
+			AccountFunctionBalances::<T>::insert(account_id, (block_number, fn_balance));
+
+			Ok(())
 		}
 
 		pub fn treasury_account_id() -> T::AccountId {
@@ -259,7 +293,7 @@ impl<T: Config> DaoSubscriptionProvider<DaoId, T::AccountId, T::BlockNumber> for
 			tier: tier.clone(),
 			status: DaoSubscriptionStatus::Active { until },
 			fn_balance: fn_call_limit,
-			fn_per_block: (subscribed_at, 0_u128),
+			fn_per_block: (subscribed_at, 0_u32),
 		};
 
 		Subscriptions::<T>::insert(dao_id, subscription);
@@ -330,5 +364,14 @@ impl<T: Config> DaoSubscriptionProvider<DaoId, T::AccountId, T::BlockNumber> for
 
 	fn ensure_active(dao_id: DaoId) -> Result<(), DispatchError> {
 		Self::do_ensure_active(dao_id)
+	}
+}
+
+impl<T: Config> AccountFnCallRateLimiter<T::AccountId, DaoFunctionBalance> for Pallet<T> {
+	fn ensure_limited(
+		account_id: &T::AccountId,
+		limit: DaoFunctionBalance,
+	) -> Result<(), DispatchError> {
+		Self::do_ensure_limited(account_id, limit)
 	}
 }
