@@ -240,6 +240,7 @@ impl pallet_dao::Config for Test {
 	type Preimages = ();
 	type SpendDaoFunds = ();
 	type DaoReferendumScheduler = ();
+	type DaoSubscriptionProvider = ();
 	type WeightInfo = ();
 
 	#[cfg(feature = "runtime-benchmarks")]

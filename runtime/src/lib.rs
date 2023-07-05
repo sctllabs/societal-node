@@ -106,6 +106,7 @@ pub mod xcm_config;
 
 mod dao_config;
 pub mod evm_config;
+pub mod extensions;
 
 /// Constant values used within the runtime.
 pub mod constants;
@@ -1357,6 +1358,7 @@ where
 			frame_system::CheckNonce::<Runtime>::from(index),
 			frame_system::CheckWeight::<Runtime>::new(),
 			pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
+			extensions::PrevalidateAttests::<Runtime>::new(),
 		);
 
 		#[cfg_attr(not(feature = "std"), allow(unused_variables))]
@@ -1499,6 +1501,7 @@ construct_runtime!(
 		DaoDemocracy: pallet_dao_democracy::{Pallet, Call, Storage, Event<T>} = 106,
 		DaoEthGovernance: pallet_dao_eth_governance::{Pallet, Call, Storage, Event<T>, Config<T>, ValidateUnsigned} = 107,
 		DaoBounties: pallet_dao_bounties::{Pallet, Call, Storage, Event<T>} = 108,
+		DaoSubscription: pallet_dao_subscription::{Pallet, Call, Storage, Event<T>} = 109,
 	}
 );
 
@@ -1518,6 +1521,7 @@ pub type SignedExtra = (
 	frame_system::CheckNonce<Runtime>,
 	frame_system::CheckWeight<Runtime>,
 	pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+	extensions::PrevalidateAttests<Runtime>,
 );
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic =
@@ -1543,14 +1547,15 @@ mod benches {
 		[frame_benchmarking, BaselineBench::<Runtime>]
 		[frame_system, SystemBench::<Runtime>]
 		[pallet_balances, Balances]
-		[pallet_timestamp, Timestamp]
 		[pallet_dao, Dao]
 		[pallet_dao_bounties, DaoBounties]
 		[pallet_dao_collective, DaoCouncil]
-		[pallet_dao_eth_governance, DaoEthGovernance]
 		[pallet_dao_democracy, DaoDemocracy]
+		[pallet_dao_eth_governance, DaoEthGovernance]
 		[pallet_dao_membership, DaoCouncilMembers]
+		[pallet_dao_subscription, DaoSubscription]
 		[pallet_dao_treasury, DaoTreasury]
+		[pallet_timestamp, Timestamp]
 	);
 }
 

@@ -1,6 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use codec::MaxEncodedLen;
+#[cfg(feature = "runtime-benchmarks")]
+use frame_support::dispatch::DispatchResultWithPostInfo;
 use frame_support::{
 	codec::{Decode, Encode},
 	dispatch::{DispatchError, DispatchResult},
@@ -15,8 +17,17 @@ use sp_std::prelude::*;
 
 pub type DispatchResultWithDaoOrigin<T> = Result<DaoOrigin<T>, DispatchError>;
 
+// TODO: retrieve from runtime
+#[cfg(feature = "parachain")]
+pub const EXPECTED_BLOCK_TIME: u32 = 12; // in seconds
+#[cfg(any(not(feature = "parachain"), feature = "runtime-benchmarks"))]
 pub const EXPECTED_BLOCK_TIME: u32 = 6; // in seconds
+
 pub const DAY_IN_BLOCKS: u32 = 24 * 60 * 60 / EXPECTED_BLOCK_TIME;
+pub const MONTH_IN_BLOCKS: u32 = 30 * DAY_IN_BLOCKS;
+pub const DEFAULT_SUBSCRIPTION_PRICE: u128 = 1_000_000_000_000_000;
+pub const DEFAULT_FUNCTION_CALL_LIMIT: u128 = 10000;
+pub const DEFAULT_FUNCTION_PER_BLOCK_LIMIT: u128 = 100;
 
 #[derive(
 	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize, MaxEncodedLen,
@@ -304,9 +315,8 @@ impl Default for DaoPolicyProportion {
 	}
 }
 
-pub trait DaoProvider<Hash> {
+pub trait DaoProvider<AccountId, Hash> {
 	type Id;
-	type AccountId;
 	type AssetId;
 	type Policy;
 	type Origin;
@@ -314,23 +324,23 @@ pub trait DaoProvider<Hash> {
 	type NFTCollectionId;
 
 	fn exists(id: Self::Id) -> Result<(), DispatchError>;
-	fn dao_account_id(id: Self::Id) -> Self::AccountId;
+	fn dao_account_id(id: Self::Id) -> AccountId;
 	fn dao_token(id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError>;
 	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError>;
 	fn dao_nft_collection_id(id: Self::Id) -> Result<Option<Self::NFTCollectionId>, DispatchError>;
 	fn count() -> u32;
-	fn ensure_member(id: Self::Id, who: &Self::AccountId) -> Result<bool, DispatchError>;
+	fn ensure_member(id: Self::Id, who: &AccountId) -> Result<bool, DispatchError>;
 	fn ensure_approved(
 		origin: Self::Origin,
 		dao_id: Self::Id,
-	) -> DispatchResultWithDaoOrigin<Self::AccountId>;
+	) -> DispatchResultWithDaoOrigin<AccountId>;
 
 	/// Note: Should only be used for benchmarking.
 	#[cfg(feature = "runtime-benchmarks")]
 	fn create_dao(
-		founder: Self::AccountId,
-		council: Vec<Self::AccountId>,
-		technical_committee: Vec<Self::AccountId>,
+		founder: AccountId,
+		council: Vec<AccountId>,
+		technical_committee: Vec<AccountId>,
 		data: Vec<u8>,
 	) -> Result<(), DispatchError>;
 
@@ -340,7 +350,7 @@ pub trait DaoProvider<Hash> {
 
 	/// Note: Should only be used for benchmarking.
 	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()>;
+	fn try_successful_origin(dao_origin: &DaoOrigin<AccountId>) -> Result<Self::Origin, ()>;
 }
 
 pub trait InitializeDaoMembers<DaoId, AccountId> {
@@ -449,8 +459,12 @@ impl<DaoId> DaoReferendumScheduler<DaoId> for () {
 
 #[cfg(feature = "runtime-benchmarks")]
 pub trait DaoReferendumBenchmarkHelper<DaoId, AccountId, Proposal, Balance> {
-	fn propose(who: AccountId, dao_id: DaoId, proposal: Proposal, value: Balance)
-		-> DispatchResult;
+	fn propose(
+		who: AccountId,
+		dao_id: DaoId,
+		proposal: Proposal,
+		value: Balance,
+	) -> DispatchResultWithPostInfo;
 }
 
 /// Empty implementation.
@@ -463,8 +477,8 @@ impl<DaoId, AccountId, Proposal, Balance>
 		_dao_id: DaoId,
 		_proposal: Proposal,
 		_value: Balance,
-	) -> DispatchResult {
-		Ok(())
+	) -> DispatchResultWithPostInfo {
+		Ok(().into())
 	}
 }
 
@@ -538,3 +552,94 @@ pub trait EncodeInto: Encode {
 }
 
 impl<T: Encode> EncodeInto for T {}
+
+#[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+pub enum SuspensionReason {
+	BadActor,
+	NotRenewed,
+	Other,
+}
+
+#[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+pub enum DaoSubscriptionStatus<BlockNumber> {
+	Active { until: BlockNumber },
+	Suspended { at: BlockNumber, reason: SuspensionReason },
+}
+
+pub type DaoFunctionBalance = u128;
+
+#[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+pub struct DaoSubscription<BlockNumber, Tier> {
+	pub subscribed_at: BlockNumber,
+	pub last_renewed_at: Option<BlockNumber>,
+	pub tier: Tier,
+	pub status: DaoSubscriptionStatus<BlockNumber>,
+	pub fn_balance: DaoFunctionBalance,
+	pub fn_per_block: (BlockNumber, DaoFunctionBalance),
+}
+
+pub trait DaoSubscriptionProvider<DaoId, AccountId, BlockNumber> {
+	/// Subscribes DAO
+	/// - `dao_id`: DAO ID.
+	/// - `account_id`: The Account to charge the initial subscription payment from.
+	fn subscribe(dao_id: DaoId, account_id: &AccountId) -> Result<(), DispatchError>;
+
+	/// Extends DAO subscription
+	/// - `dao_id`: DAO ID.
+	/// - `account_id`: The Account to charge the subscription payment from.
+	fn extend_subscription(dao_id: DaoId, account_id: AccountId) -> Result<(), DispatchError>;
+
+	/// Ensures if subscription is active and indexes function call
+	/// - `dao_id`: DAO ID.
+	fn ensure_active(dao_id: DaoId) -> Result<(), DispatchError>;
+}
+
+/// Empty implementation.
+impl<DaoId, AccountId, BlockNumber> DaoSubscriptionProvider<DaoId, AccountId, BlockNumber> for () {
+	fn subscribe(_dao_id: DaoId, _account_id: &AccountId) -> Result<(), DispatchError> {
+		Ok(())
+	}
+
+	fn extend_subscription(_dao_id: DaoId, _account_id: AccountId) -> Result<(), DispatchError> {
+		Ok(())
+	}
+
+	fn ensure_active(_dao_id: DaoId) -> Result<(), DispatchError> {
+		Ok(())
+	}
+}
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen, Serialize, Deserialize,
+)]
+pub enum DaoSubscriptionTiersV1<BlockTime, Balance> {
+	Basic {
+		duration: BlockTime,
+		price: Balance,
+		fn_call_limit: DaoFunctionBalance,
+		fn_per_block_limit: DaoFunctionBalance,
+	},
+}
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen, Serialize, Deserialize,
+)]
+pub enum VersionedDaoSubscription<BlockTime, Balance> {
+	Default(DaoSubscriptionTiersV1<BlockTime, Balance>),
+}
+
+#[repr(u8)]
+pub enum DaoTxValidityError {
+	/// Unknown
+	Unknown = 0,
+	/// Not DAO Member
+	NotDaoMember = 1,
+	/// Subscription Error
+	DaoSubscriptionError = 2,
+}
+
+impl From<DaoTxValidityError> for u8 {
+	fn from(err: DaoTxValidityError) -> Self {
+		err as u8
+	}
+}

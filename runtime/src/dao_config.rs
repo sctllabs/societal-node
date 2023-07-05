@@ -44,6 +44,7 @@ impl pallet_dao::Config for Runtime {
 	type Preimages = Preimage;
 	type SpendDaoFunds = DaoTreasury;
 	type DaoReferendumScheduler = DaoDemocracy;
+	type DaoSubscriptionProvider = DaoSubscription;
 	type WeightInfo = pallet_dao::weights::SubstrateWeight<Runtime>;
 
 	#[cfg(feature = "runtime-benchmarks")]
@@ -255,4 +256,11 @@ impl pallet_dao_bounties::Config for Runtime {
 	type MaximumReasonLength = DaoBountiesMaximumReasonLength;
 	type WeightInfo = pallet_dao_bounties::weights::SubstrateWeight<Runtime>;
 	type ChildBountyManager = ();
+}
+
+impl pallet_dao_subscription::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type TreasuryPalletId = TreasuryPalletId;
+	type WeightInfo = pallet_dao_subscription::weights::SubstrateWeight<Runtime>;
 }

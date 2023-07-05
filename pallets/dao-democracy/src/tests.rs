@@ -27,8 +27,8 @@ use dao_primitives::{ContainsDaoMember, InitializeDaoMembers};
 use frame_support::{
 	assert_noop, assert_ok, ord_parameter_types, parameter_types,
 	traits::{
-		AsEnsureOriginWithArg, ConstU32, ConstU64, Contains, EnsureOriginWithArg,
-		EqualPrivilegeOnly, OnInitialize, SortedMembers, StorePreimage,
+		AsEnsureOriginWithArg, ConstU32, ConstU64, Contains, EqualPrivilegeOnly, OnInitialize,
+		SortedMembers, StorePreimage,
 	},
 	weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight},
 	PalletId,
@@ -310,6 +310,7 @@ impl pallet_dao::Config for Test {
 	type Preimages = ();
 	type SpendDaoFunds = ();
 	type DaoReferendumScheduler = Democracy;
+	type DaoSubscriptionProvider = ();
 	type WeightInfo = ();
 
 	#[cfg(feature = "runtime-benchmarks")]
@@ -433,7 +434,12 @@ fn init_dao_token_accounts(dao_id: DaoId) -> DispatchResult {
 	Ok(())
 }
 
-fn propose_set_balance(dao_id: DaoId, who: Public, value: u128, delay: u128) -> DispatchResult {
+fn propose_set_balance(
+	dao_id: DaoId,
+	who: Public,
+	value: u128,
+	delay: u128,
+) -> DispatchResultWithPostInfo {
 	Democracy::propose(RuntimeOrigin::signed(who), dao_id, set_balance_proposal(value), delay)
 }
 

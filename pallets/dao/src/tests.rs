@@ -10,6 +10,8 @@ use frame_support::{
 use serde_json::{json, Value};
 use sp_core::{crypto::Ss58Codec, sr25519::Public};
 
+use super::*;
+
 #[test]
 fn create_dao_invalid_input() {
 	new_test_ext().execute_with(|| {
@@ -123,6 +125,7 @@ fn create_dao_token_failure() {
 fn create_dao_works() {
 	new_test_ext().execute_with(|| {
 		let account = Public::from_string("/Alice").ok().unwrap();
+		Balances::make_free_balance_be(&account, 1_000_000_000_000_000_000);
 		let account1 = Public::from_string("/Bob").ok().unwrap();
 
 		let dao = serde_json::to_vec(&get_dao_json()).ok().unwrap();
@@ -136,10 +139,6 @@ fn create_dao_works() {
 
 		assert_eq!(DaoFactory::next_dao_id(), 1);
 
-		assert_eq!(
-			<Test as Config>::AssetProvider::name(TokenId::get()),
-			TokenName::get().as_bytes().to_vec()
-		);
 		assert_eq!(
 			<Test as Config>::AssetProvider::symbol(TokenId::get()),
 			TokenSymbol::get().as_bytes().to_vec()

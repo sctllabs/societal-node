@@ -6291,6 +6291,7 @@ dependencies = [
  "pallet-balances",
  "pallet-dao-assets 4.0.0-dev (git+https://github.com/sctllabs/societal-node?branch=polkadot-v0.9.41-assets)",
  "pallet-dao-democracy",
+ "pallet-dao-subscription",
  "pallet-preimage",
  "pallet-scheduler",
  "parity-scale-codec",
@@ -6580,6 +6581,27 @@ dependencies = [
  "parity-scale-codec",
  "precompile-utils",
  "sp-core",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-dao-subscription"
+version = "1.0.0-dev"
+dependencies = [
+ "dao-primitives",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "hex",
+ "log",
+ "pallet-balances",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "serde_json",
+ "sp-core",
+ "sp-io",
  "sp-runtime",
  "sp-std",
 ]
@@ -11826,6 +11848,7 @@ dependencies = [
  "pallet-dao-membership",
  "pallet-dao-membership-precompile",
  "pallet-dao-precompile",
+ "pallet-dao-subscription",
  "pallet-dao-treasury",
  "pallet-dao-treasury-precompile",
  "pallet-democracy",

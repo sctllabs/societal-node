@@ -34,6 +34,8 @@ type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
 type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 
+use super::*;
+
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
 	pub enum Test where
@@ -48,6 +50,7 @@ frame_support::construct_runtime!(
 		Scheduler: pallet_scheduler::{Pallet, Call, Storage, Event<T>},
 		Assets: pallet_dao_assets::<Instance1>::{Pallet, Call, Storage, Event<T>},
 		Democracy: pallet_dao_democracy::{Pallet, Call, Storage, Event<T>},
+		Subscription: pallet_dao_subscription::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
@@ -127,6 +130,7 @@ impl pallet_balances::Config for Test {
 
 parameter_types! {
 	pub const DaoPalletId: PalletId = PalletId(*b"py/sctld");
+	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
 	pub static Members: HashMap<u32, Vec<AccountId>> = HashMap::new();
 	pub static TechnicalCommittee: HashMap<u32, Vec<AccountId>> = HashMap::new();
 
@@ -221,6 +225,7 @@ impl pallet_dao::Config for Test {
 	type Preimages = ();
 	type SpendDaoFunds = ();
 	type DaoReferendumScheduler = Democracy;
+	type DaoSubscriptionProvider = Subscription;
 	type WeightInfo = ();
 
 	#[cfg(feature = "runtime-benchmarks")]
@@ -303,6 +308,13 @@ impl pallet_dao_democracy::Config for Test {
 	type Proposal = RuntimeCall;
 	type ProposalMetadataLimit = ConstU32<750>;
 	type DaoProvider = DaoFactory;
+}
+
+impl pallet_dao_subscription::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = pallet_balances::Pallet<Test>;
+	type TreasuryPalletId = TreasuryPalletId;
+	type WeightInfo = ();
 }
 
 // Build genesis storage according to the mock runtime.

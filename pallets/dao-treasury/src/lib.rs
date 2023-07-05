@@ -179,9 +179,9 @@ pub mod pallet {
 		type MaxApprovals: Get<u32>;
 
 		type DaoProvider: DaoProvider<
+			Self::AccountId,
 			<Self as frame_system::Config>::Hash,
 			Id = u32,
-			AccountId = Self::AccountId,
 			AssetId = Self::AssetId,
 			Policy = DaoPolicy,
 			Origin = OriginFor<Self>,
@@ -221,19 +221,6 @@ pub mod pallet {
 		DaoId,
 		Twox64Concat,
 		ProposalIndex,
-		Proposal<T::AccountId, BalanceOf<T, I>>,
-		OptionQuery,
-	>;
-
-	/// Proposals pending approval.
-	#[pallet::storage]
-	#[pallet::getter(fn pending_proposals)]
-	pub type PendingProposals<T: Config<I>, I: 'static = ()> = StorageDoubleMap<
-		_,
-		Twox64Concat,
-		DaoId,
-		Identity,
-		T::Hash,
 		Proposal<T::AccountId, BalanceOf<T, I>>,
 		OptionQuery,
 	>;

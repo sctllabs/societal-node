@@ -162,6 +162,7 @@ use dao_primitives::{
 	GovernanceV1Policy, RawOrigin,
 };
 use frame_support::{
+	dispatch::{DispatchResult, DispatchResultWithPostInfo, Pays},
 	ensure,
 	traits::{
 		defensive_prelude::*,
@@ -174,7 +175,7 @@ use frame_support::{
 use frame_system::pallet_prelude::OriginFor;
 use sp_runtime::{
 	traits::{Bounded as ArithBounded, One, Saturating, StaticLookup, Zero},
-	ArithmeticError, DispatchError, DispatchResult,
+	ArithmeticError, DispatchError,
 };
 use sp_std::prelude::*;
 
@@ -219,7 +220,7 @@ type AccountIdLookupOf<T> = <<T as frame_system::Config>::Lookup as StaticLookup
 
 #[frame_support::pallet]
 pub mod pallet {
-	use super::{DispatchResult, *};
+	use super::*;
 	use frame_support::{
 		dispatch::{GetDispatchInfo, PostDispatchInfo},
 		pallet_prelude::*,
@@ -344,9 +345,9 @@ pub mod pallet {
 		type Slash: OnUnbalanced<NegativeImbalanceOf<Self>>;
 
 		type DaoProvider: DaoProvider<
+			Self::AccountId,
 			<Self as frame_system::Config>::Hash,
 			Id = u32,
-			AccountId = Self::AccountId,
 			AssetId = u128,
 			Policy = DaoPolicy,
 			Origin = OriginFor<Self>,
@@ -575,19 +576,19 @@ pub mod pallet {
 		/// - `value`: The amount of deposit (must be at least `MinimumDeposit`).
 		///
 		/// Emits `Proposed`.
-		#[pallet::weight(T::WeightInfo::propose_with_meta())]
+		#[pallet::weight((T::WeightInfo::propose_with_meta(), DispatchClass::Normal, Pays::No))]
 		#[pallet::call_index(0)]
 		pub fn propose(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			proposal: BoundedCallOf<T>,
 			#[pallet::compact] value: BalanceOf<T>,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			Self::propose_with_meta(origin, dao_id, proposal, value, None)
 		}
 
 		/// Adds a new proposal with temporary meta field for arbitrary data indexed by node indexer
-		#[pallet::weight(T::WeightInfo::propose_with_meta())]
+		#[pallet::weight((T::WeightInfo::propose_with_meta(), DispatchClass::Normal, Pays::No))]
 		#[pallet::call_index(1)]
 		pub fn propose_with_meta(
 			origin: OriginFor<T>,
@@ -595,7 +596,7 @@ pub mod pallet {
 			proposal: BoundedCallOf<T>,
 			#[pallet::compact] value: BalanceOf<T>,
 			meta: Option<Vec<u8>>,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
 			Self::do_propose(who, dao_id, proposal, value, meta)
@@ -607,13 +608,13 @@ pub mod pallet {
 		/// must have funds to cover the deposit, equal to the original deposit.
 		///
 		/// - `proposal`: The index of the proposal to second.
-		#[pallet::weight(T::WeightInfo::second())]
+		#[pallet::weight((T::WeightInfo::second(), DispatchClass::Normal, Pays::No))]
 		#[pallet::call_index(2)]
 		pub fn second(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			#[pallet::compact] proposal: PropIndex,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
 			let seconds =
@@ -636,7 +637,8 @@ pub mod pallet {
 				seconder: who,
 				prop_index: proposal,
 			});
-			Ok(())
+
+			Ok((Some(T::WeightInfo::second()), Pays::No).into())
 		}
 
 		/// Vote in a referendum. If `vote.is_aye()`, the vote is to enact the proposal;
@@ -646,15 +648,20 @@ pub mod pallet {
 		///
 		/// - `ref_index`: The index of the referendum to vote for.
 		/// - `vote`: The vote configuration.
-		#[pallet::weight(T::WeightInfo::vote_new().max(T::WeightInfo::vote_existing()))]
+		#[pallet::weight((
+			T::WeightInfo::vote_new().max(T::WeightInfo::vote_existing()),
+			DispatchClass::Normal,
+			Pays::No
+		))]
 		#[pallet::call_index(3)]
 		pub fn vote(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			#[pallet::compact] ref_index: ReferendumIndex,
 			vote: AccountVote<BalanceOf<T>>,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
+
 			Self::try_vote(dao_id, &who, ref_index, vote)
 		}
 
@@ -666,7 +673,7 @@ pub mod pallet {
 		/// -`ref_index`: The index of the referendum to cancel.
 		///
 		/// Weight: `O(1)`.
-		#[pallet::weight((T::WeightInfo::emergency_cancel(), DispatchClass::Operational))]
+		#[pallet::weight((T::WeightInfo::emergency_cancel(), DispatchClass::Normal))]
 		#[pallet::call_index(4)]
 		pub fn emergency_cancel(
 			origin: OriginFor<T>,
@@ -955,7 +962,11 @@ pub mod pallet {
 		///   voted on. Weight is charged as if maximum votes.
 		// NOTE: weight must cover an incorrect voting of origin with max votes, this is ensure
 		// because a valid delegation cover decoding a direct voting with max votes.
-		#[pallet::weight(T::WeightInfo::delegate(T::MaxVotes::get()))]
+		#[pallet::weight((
+			T::WeightInfo::delegate(T::MaxVotes::get()),
+			DispatchClass::Normal,
+			Pays::No,
+		))]
 		#[pallet::call_index(11)]
 		pub fn delegate(
 			origin: OriginFor<T>,
@@ -967,8 +978,7 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 			let to = T::Lookup::lookup(to)?;
 			let votes = Self::try_delegate(dao_id, who, to, conviction, balance)?;
-
-			Ok(Some(T::WeightInfo::delegate(votes)).into())
+			Ok((Some(T::WeightInfo::delegate(votes)), Pays::No).into())
 		}
 
 		/// Undelegate the voting power of the sending account.
@@ -985,12 +995,17 @@ pub mod pallet {
 		///   voted on. Weight is charged as if maximum votes.
 		// NOTE: weight must cover an incorrect voting of origin with max votes, this is ensure
 		// because a valid delegation cover decoding a direct voting with max votes.
-		#[pallet::weight(T::WeightInfo::undelegate(T::MaxVotes::get()))]
+		#[pallet::weight((
+			T::WeightInfo::undelegate(T::MaxVotes::get()),
+			DispatchClass::Normal,
+			Pays::No
+		))]
 		#[pallet::call_index(12)]
 		pub fn undelegate(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
+			T::DaoProvider::ensure_member(dao_id, &who)?;
 			let votes = Self::try_undelegate(dao_id, who)?;
-			Ok(Some(T::WeightInfo::undelegate(votes)).into())
+			Ok((Some(T::WeightInfo::undelegate(votes)), Pays::No).into())
 		}
 
 		/// Unlock tokens that have an expired lock.
@@ -1000,17 +1015,30 @@ pub mod pallet {
 		/// - `target`: The account to remove the lock on.
 		///
 		/// Weight: `O(R)` with R number of vote of target.
-		#[pallet::weight(T::WeightInfo::unlock_set(T::MaxVotes::get()).max(T::WeightInfo::unlock_remove(T::MaxVotes::get())))]
+		#[pallet::weight((
+			T::WeightInfo::unlock_set(
+				T::MaxVotes::get()).max(T::WeightInfo::unlock_remove(T::MaxVotes::get())),
+			DispatchClass::Normal,
+			Pays::No,
+		))]
 		#[pallet::call_index(14)]
 		pub fn unlock(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			target: AccountIdLookupOf<T>,
-		) -> DispatchResult {
-			ensure_signed(origin)?;
+		) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+			T::DaoProvider::ensure_member(dao_id, &who)?;
 			let target = T::Lookup::lookup(target)?;
 			Self::update_lock(dao_id, &target, T::DaoProvider::dao_token(dao_id)?);
-			Ok(())
+			Ok((
+				Some(
+					T::WeightInfo::unlock_set(T::MaxVotes::get())
+						.max(T::WeightInfo::unlock_remove(T::MaxVotes::get())),
+				),
+				Pays::No,
+			)
+				.into())
 		}
 
 		/// Remove a vote for a referendum.
@@ -1040,15 +1068,21 @@ pub mod pallet {
 		///
 		/// Weight: `O(R + log R)` where R is the number of referenda that `target` has voted on.
 		///   Weight is calculated for the maximum number of vote.
-		#[pallet::weight(T::WeightInfo::remove_vote(T::MaxVotes::get()))]
+		#[pallet::weight((
+			T::WeightInfo::remove_vote(T::MaxVotes::get()),
+			DispatchClass::Normal,
+			Pays::No,
+		))]
 		#[pallet::call_index(15)]
 		pub fn remove_vote(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			index: ReferendumIndex,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			Self::try_remove_vote(dao_id, &who, index, UnvoteScope::Any)
+			T::DaoProvider::ensure_member(dao_id, &who)?;
+			Self::try_remove_vote(dao_id, &who, index, UnvoteScope::Any)?;
+			Ok((Some(T::WeightInfo::remove_vote(T::MaxVotes::get())), Pays::No).into())
 		}
 
 		/// Remove a vote for a referendum.
@@ -1066,19 +1100,24 @@ pub mod pallet {
 		///
 		/// Weight: `O(R + log R)` where R is the number of referenda that `target` has voted on.
 		///   Weight is calculated for the maximum number of vote.
-		#[pallet::weight(T::WeightInfo::remove_other_vote(T::MaxVotes::get()))]
+		#[pallet::weight((
+			T::WeightInfo::remove_other_vote(T::MaxVotes::get()),
+			DispatchClass::Normal,
+			Pays::No,
+		))]
 		#[pallet::call_index(16)]
 		pub fn remove_other_vote(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			target: AccountIdLookupOf<T>,
 			index: ReferendumIndex,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
+			T::DaoProvider::ensure_member(dao_id, &who)?;
 			let target = T::Lookup::lookup(target)?;
 			let scope = if target == who { UnvoteScope::Any } else { UnvoteScope::OnlyExpired };
 			Self::try_remove_vote(dao_id, &target, index, scope)?;
-			Ok(())
+			Ok((Some(T::WeightInfo::remove_other_vote(T::MaxVotes::get())), Pays::No).into())
 		}
 
 		/// Permanently place a proposal into the blacklist. This prevents it from ever being
@@ -1096,7 +1135,7 @@ pub mod pallet {
 		///
 		/// Weight: `O(p)` (though as this is an high-privilege dispatch, we assume it has a
 		///   reasonable value).
-		#[pallet::weight((T::WeightInfo::blacklist(), DispatchClass::Operational))]
+		#[pallet::weight((T::WeightInfo::blacklist(), DispatchClass::Normal))]
 		#[pallet::call_index(17)]
 		pub fn blacklist(
 			origin: OriginFor<T>,
@@ -1227,7 +1266,7 @@ impl<T: Config> Pallet<T> {
 		proposal: BoundedCallOf<T>,
 		value: BalanceOf<T>,
 		meta: Option<Vec<u8>>,
-	) -> DispatchResult {
+	) -> DispatchResultWithPostInfo {
 		let GovernanceV1Policy { minimum_deposit, .. } = Self::ensure_democracy_supported(dao_id)?;
 
 		if let Some(metadata) = meta.clone() {
@@ -1278,7 +1317,7 @@ impl<T: Config> Pallet<T> {
 			meta,
 		});
 
-		Ok(())
+		Ok((Some(T::WeightInfo::propose_with_meta()), Pays::No).into())
 	}
 
 	/// Get the amount locked in support of `proposal`; `None` if proposal isn't a valid proposal
@@ -1346,7 +1385,7 @@ impl<T: Config> Pallet<T> {
 		who: &T::AccountId,
 		ref_index: ReferendumIndex,
 		vote: AccountVote<BalanceOf<T>>,
-	) -> DispatchResult {
+	) -> DispatchResultWithPostInfo {
 		let mut status = Self::referendum_status(dao_id, ref_index)?;
 
 		let dao_token = T::DaoProvider::dao_token(dao_id)?;
@@ -1402,7 +1441,8 @@ impl<T: Config> Pallet<T> {
 		}
 
 		ReferendumInfoOf::<T>::insert(dao_id, ref_index, ReferendumInfo::Ongoing(status));
-		Ok(())
+
+		Ok((Some(T::WeightInfo::vote_new().max(T::WeightInfo::vote_existing())), Pays::No).into())
 	}
 
 	/// Remove the account's vote for the given referendum if possible. This is possible when:
@@ -1885,7 +1925,7 @@ impl<T: Config> DaoReferendumBenchmarkHelper<DaoId, T::AccountId, CallOf<T>, Bal
 		dao_id: DaoId,
 		proposal: CallOf<T>,
 		value: BalanceOf<T>,
-	) -> DispatchResult {
+	) -> DispatchResultWithPostInfo {
 		Self::do_propose(
 			who,
 			dao_id,

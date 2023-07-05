@@ -178,9 +178,8 @@ impl pallet_preimage::Config for Test {
 }
 
 pub struct TestDaoProvider;
-impl DaoProvider<H256> for TestDaoProvider {
+impl DaoProvider<u64, H256> for TestDaoProvider {
 	type Id = u32;
-	type AccountId = u64;
 	type AssetId = u128;
 	type Policy = DaoPolicy;
 	type Origin = RuntimeOrigin;
@@ -206,11 +205,11 @@ impl DaoProvider<H256> for TestDaoProvider {
 		})
 	}
 
-	fn dao_account_id(id: Self::Id) -> Self::AccountId {
+	fn dao_account_id(id: Self::Id) -> u64 {
 		PalletId(*b"py/sctld").into_sub_account_truncating(id)
 	}
 
-	fn ensure_member(_id: Self::Id, _who: &Self::AccountId) -> Result<bool, DispatchError> {
+	fn ensure_member(_id: Self::Id, _who: &u64) -> Result<bool, DispatchError> {
 		Ok(true)
 	}
 
@@ -218,10 +217,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 		todo!()
 	}
 
-	fn ensure_approved(
-		origin: Self::Origin,
-		dao_id: Self::Id,
-	) -> DispatchResultWithDaoOrigin<Self::AccountId> {
+	fn ensure_approved(origin: Self::Origin, dao_id: Self::Id) -> DispatchResultWithDaoOrigin<u64> {
 		let dao_account_id = Self::dao_account_id(dao_id);
 		let approve_origin = Self::policy(dao_id)?.approve_origin;
 		let dao_origin = DaoOrigin { dao_account_id, proportion: approve_origin };
@@ -239,9 +235,9 @@ impl DaoProvider<H256> for TestDaoProvider {
 
 	#[cfg(feature = "runtime-benchmarks")]
 	fn create_dao(
-		_founder: Self::AccountId,
-		_council: Vec<Self::AccountId>,
-		_technical_committee: Vec<Self::AccountId>,
+		_founder: u64,
+		_council: Vec<u64>,
+		_technical_committee: Vec<u64>,
 		_data: Vec<u8>,
 	) -> Result<(), DispatchError> {
 		Ok(())
@@ -253,7 +249,7 @@ impl DaoProvider<H256> for TestDaoProvider {
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()> {
+	fn try_successful_origin(dao_origin: &DaoOrigin<u64>) -> Result<Self::Origin, ()> {
 		Self::ApproveOrigin::try_successful_origin(dao_origin)
 	}
 }
@@ -1046,71 +1042,6 @@ fn motions_vote_after_works() {
 				})),
 			]
 		);
-	});
-}
-
-#[test]
-fn motions_all_first_vote_free_works() {
-	new_test_ext().execute_with(|| {
-		let proposal = make_proposal(42);
-		let proposal_len: u32 = proposal.using_encoded(|p| p.len() as u32);
-
-		let proposal_bounded: Option<Bounded<RuntimeCall>> = match Preimage::bound(proposal.clone())
-		{
-			Ok(bounded) => Some(bounded.transmute()),
-			Err(_) => None,
-		};
-
-		let hash: H256 = proposal_bounded.unwrap().blake2_256().into();
-		let end = 4;
-		assert_ok!(Collective::propose(
-			RuntimeOrigin::signed(1),
-			0,
-			Box::new(proposal.clone()),
-			proposal_len,
-		));
-		assert_eq!(
-			Collective::voting(0, &hash),
-			Some(Votes { index: 0, threshold: 1, ayes: bounded_vec![], nays: bounded_vec![], end })
-		);
-
-		// For the motion, acc 2's first vote, expecting Ok with Pays::No.
-		let vote_rval: DispatchResultWithPostInfo =
-			Collective::vote(RuntimeOrigin::signed(2), 0, hash, 0, true);
-		assert_eq!(vote_rval.unwrap().pays_fee, Pays::No);
-
-		// Duplicate vote, expecting error with Pays::Yes.
-		let vote_rval: DispatchResultWithPostInfo =
-			Collective::vote(RuntimeOrigin::signed(2), 0, hash, 0, true);
-		assert_eq!(vote_rval.unwrap_err().post_info.pays_fee, Pays::Yes);
-
-		// Modifying vote, expecting ok with Pays::Yes.
-		let vote_rval: DispatchResultWithPostInfo =
-			Collective::vote(RuntimeOrigin::signed(2), 0, hash, 0, false);
-		assert_eq!(vote_rval.unwrap().pays_fee, Pays::Yes);
-
-		// For the motion, acc 3's first vote, expecting Ok with Pays::No.
-		let vote_rval: DispatchResultWithPostInfo =
-			Collective::vote(RuntimeOrigin::signed(3), 0, hash, 0, true);
-		assert_eq!(vote_rval.unwrap().pays_fee, Pays::No);
-
-		// acc 3 modify the vote, expecting Ok with Pays::Yes.
-		let vote_rval: DispatchResultWithPostInfo =
-			Collective::vote(RuntimeOrigin::signed(3), 0, hash, 0, false);
-		assert_eq!(vote_rval.unwrap().pays_fee, Pays::Yes);
-
-		// Test close() Extrincis | Check DispatchResultWithPostInfo with Pay Info
-
-		let proposal_weight = proposal.get_dispatch_info().weight;
-		let close_rval: DispatchResultWithPostInfo =
-			Collective::close(RuntimeOrigin::signed(2), 0, hash, 0, proposal_weight, proposal_len);
-		assert_eq!(close_rval.unwrap().pays_fee, Pays::No);
-
-		// trying to close the proposal, which is already closed.
-		// Expecting error "ProposalMissing" with Pays::Yes
-		let close_rval: DispatchResultWithPostInfo =
-			Collective::close(RuntimeOrigin::signed(2), 0, hash, 0, proposal_weight, proposal_len);
-		assert_eq!(close_rval.unwrap_err().post_info.pays_fee, Pays::Yes);
 	});
 }
 

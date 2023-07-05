@@ -28,7 +28,7 @@ use dao_primitives::*;
 use eth_primitives::EthRpcProvider;
 
 #[cfg(test)]
-mod mock;
+pub mod mock;
 
 #[cfg(test)]
 mod tests;
@@ -262,6 +262,12 @@ pub mod pallet {
 
 		type DaoReferendumScheduler: DaoReferendumScheduler<DaoId>;
 
+		type DaoSubscriptionProvider: DaoSubscriptionProvider<
+			DaoId,
+			Self::AccountId,
+			Self::BlockNumber,
+		>;
+
 		/// Weight information for extrinsics in this pallet.
 		type WeightInfo: WeightInfo;
 
@@ -489,7 +495,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(T::WeightInfo::approve_dao())]
-		#[pallet::call_index(2)]
+		#[pallet::call_index(1)]
 		pub fn approve_dao(
 			origin: OriginFor<T>,
 			dao_hash: T::Hash,
@@ -501,7 +507,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(T::WeightInfo::update_dao_metadata())]
-		#[pallet::call_index(3)]
+		#[pallet::call_index(2)]
 		pub fn update_dao_metadata(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -524,7 +530,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(T::WeightInfo::update_dao_policy())]
-		#[pallet::call_index(4)]
+		#[pallet::call_index(3)]
 		pub fn update_dao_policy(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -548,7 +554,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(T::WeightInfo::mint_dao_token())]
-		#[pallet::call_index(5)]
+		#[pallet::call_index(4)]
 		pub fn mint_dao_token(
 			origin: OriginFor<T>,
 			dao_id: DaoId,
@@ -571,7 +577,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(T::WeightInfo::spend_dao_funds())]
-		#[pallet::call_index(6)]
+		#[pallet::call_index(5)]
 		pub fn spend_dao_funds(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
 			Self::ensure_approved(origin, dao_id)?;
 
@@ -581,7 +587,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(T::WeightInfo::launch_dao_referendum())]
-		#[pallet::call_index(7)]
+		#[pallet::call_index(6)]
 		pub fn launch_dao_referendum(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
 			Self::ensure_approved(origin, dao_id)?;
 
@@ -589,11 +595,27 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(T::WeightInfo::bake_dao_referendum())]
-		#[pallet::call_index(8)]
+		#[pallet::call_index(7)]
 		pub fn bake_dao_referendum(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
 			Self::ensure_approved(origin, dao_id)?;
 
 			T::DaoReferendumScheduler::bake_referendum(dao_id)
+		}
+
+		#[pallet::weight(10_000)]
+		#[pallet::call_index(8)]
+		pub fn subscribe(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			T::DaoSubscriptionProvider::subscribe(dao_id, &Self::dao_account_id(dao_id))
+		}
+
+		#[pallet::weight(T::WeightInfo::extend_subscription())]
+		#[pallet::call_index(9)]
+		pub fn extend_subscription(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			T::DaoSubscriptionProvider::extend_subscription(dao_id, Self::dao_account_id(dao_id))
 		}
 	}
 
@@ -784,14 +806,12 @@ pub mod pallet {
 
 					offchain_index::set(&key, &data.encode());
 
-					let dao_event_source = dao.clone();
-
 					Self::deposit_event(Event::DaoPendingApproval {
 						dao_id,
-						founder: dao_event_source.founder,
-						account_id: dao_event_source.account_id,
-						token: dao_event_source.token,
-						config: dao_event_source.config,
+						founder: dao.founder,
+						account_id: dao.account_id,
+						token: dao.token,
+						config: dao.config,
 						policy,
 					});
 
@@ -802,12 +822,15 @@ pub mod pallet {
 			}
 
 			let dao = Dao {
-				founder,
+				founder: founder.clone(),
 				config,
 				account_id: dao_account_id,
 				token: DaoToken::FungibleToken(has_token_id.unwrap()),
 				status: DaoStatus::Success,
 			};
+
+			// TODO: approach for pending daos
+			T::DaoSubscriptionProvider::subscribe(dao_id, &founder)?;
 
 			Self::do_register_dao(dao, policy, council, technical_committee)
 		}
@@ -842,11 +865,9 @@ pub mod pallet {
 			dao.account_id = Self::account_id(dao_id);
 			dao.status = DaoStatus::Success;
 
-			let dao_event_source = dao.clone();
-
 			Policies::<T>::insert(dao_id, policy.clone());
 
-			Daos::<T>::insert(dao_id, dao);
+			Daos::<T>::insert(dao_id, dao.clone());
 
 			T::CouncilProvider::initialize_members(dao_id, council.to_vec())?;
 
@@ -861,12 +882,12 @@ pub mod pallet {
 
 			Self::deposit_event(Event::DaoRegistered {
 				dao_id,
-				founder: dao_event_source.founder,
-				account_id: dao_event_source.account_id,
+				founder: dao.founder,
+				account_id: dao.account_id,
 				council,
 				technical_committee,
-				token: dao_event_source.token,
-				config: dao_event_source.config,
+				token: dao.token,
+				config: dao.config,
 				policy,
 			});
 
@@ -943,6 +964,20 @@ pub mod pallet {
 			Ok(())
 		}
 
+		pub fn do_ensure_member(id: DaoId, who: &T::AccountId) -> Result<bool, DispatchError> {
+			let has_token = match Self::dao_token(id)? {
+				DaoToken::FungibleToken(token_id) =>
+					Ok(!T::AssetProvider::balance(token_id, who).is_zero()),
+				DaoToken::EthTokenAddress(_) => Err(Error::<T>::NotSupported),
+			}?;
+
+			let is_member = has_token ||
+				T::CouncilProvider::contains(id, who)? ||
+				T::TechnicalCommitteeProvider::contains(id, who)?;
+
+			Ok(is_member)
+		}
+
 		#[deny(clippy::clone_double_ref)]
 		pub(crate) fn derived_key(block_number: T::BlockNumber) -> Vec<u8> {
 			block_number.using_encoded(|encoded_bn| {
@@ -957,9 +992,8 @@ pub mod pallet {
 	}
 }
 
-impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
+impl<T: Config> DaoProvider<T::AccountId, T::Hash> for Pallet<T> {
 	type Id = u32;
-	type AccountId = T::AccountId;
 	type AssetId = T::AssetId;
 	type Policy = PolicyOf;
 	type Origin = OriginFor<T>;
@@ -986,10 +1020,10 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 	}
 
 	fn ensure_member(id: Self::Id, who: &T::AccountId) -> Result<bool, DispatchError> {
-		T::CouncilProvider::contains(id, who)
+		Self::do_ensure_member(id, who)
 	}
 
-	fn dao_account_id(id: Self::Id) -> Self::AccountId {
+	fn dao_account_id(id: Self::Id) -> T::AccountId {
 		Self::account_id(id)
 	}
 
@@ -1013,12 +1047,12 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 	fn ensure_approved(
 		origin: OriginFor<T>,
 		dao_id: Self::Id,
-	) -> DispatchResultWithDaoOrigin<Self::AccountId> {
+	) -> DispatchResultWithDaoOrigin<T::AccountId> {
 		let dao_account_id = Self::dao_account_id(dao_id);
 		let approve_origin = Self::policy(dao_id)?.approve_origin;
 		let dao_origin = DaoOrigin { dao_account_id, proportion: approve_origin };
 
-		Self::ApproveOrigin::ensure_origin(origin, &dao_origin)?;
+		T::ApproveOrigin::ensure_origin(origin, &dao_origin)?;
 
 		Ok(dao_origin)
 	}
@@ -1039,8 +1073,8 @@ impl<T: Config> DaoProvider<T::Hash> for Pallet<T> {
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	fn try_successful_origin(dao_origin: &DaoOrigin<Self::AccountId>) -> Result<Self::Origin, ()> {
-		Self::ApproveOrigin::try_successful_origin(dao_origin)
+	fn try_successful_origin(dao_origin: &DaoOrigin<T::AccountId>) -> Result<Self::Origin, ()> {
+		T::ApproveOrigin::try_successful_origin(dao_origin)
 	}
 }
 

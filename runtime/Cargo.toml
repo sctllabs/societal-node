@@ -155,6 +155,7 @@ pallet-dao-eth-governance-precompile = { workspace = true }
 pallet-dao-membership = { workspace = true }
 pallet-dao-membership-precompile = { workspace = true }
 pallet-dao-precompile = { workspace = true }
+pallet-dao-subscription = { workspace = true }
 pallet-dao-treasury = { workspace = true }
 pallet-dao-treasury-precompile = { workspace = true }
 
@@ -206,6 +207,7 @@ std = [
 	"pallet-dao-democracy/std",
 	"pallet-dao-eth-governance/std",
 	"pallet-dao-membership/std",
+	"pallet-dao-subscription/std",
 	"pallet-dao-treasury/std",
 	"pallet-democracy/std",
 	"pallet-dynamic-fee/std",
@@ -293,6 +295,7 @@ runtime-benchmarks = [
 	"pallet-dao-democracy/runtime-benchmarks",
 	"pallet-dao-eth-governance/runtime-benchmarks",
 	"pallet-dao-membership/runtime-benchmarks",
+	"pallet-dao-subscription/runtime-benchmarks",
 	"pallet-dao-treasury/runtime-benchmarks",
 	"pallet-election-provider-multi-phase/runtime-benchmarks",
 	"pallet-elections-phragmen/runtime-benchmarks",
@@ -337,6 +340,7 @@ try-runtime = [
 	"pallet-dao-bounties/try-runtime",
 	"pallet-dao-collective/try-runtime",
 	"pallet-dao-membership/try-runtime",
+	"pallet-dao-subscription/try-runtime",
 	"pallet-dao-treasury/try-runtime",
 	"pallet-timestamp/try-runtime",
 	"pallet-transaction-payment/try-runtime",
