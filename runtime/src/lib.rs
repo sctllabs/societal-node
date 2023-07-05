@@ -36,7 +36,7 @@ use frame_support::{
 	},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight},
-		IdentityFee, Weight,
+		ConstantMultiplier, Weight,
 	},
 	PalletId, RuntimeDebugNoBound,
 };
@@ -119,6 +119,7 @@ pub use constants::{
 use eth_primitives::EthService;
 
 mod precompiles;
+use crate::constants::{currency::MICROUNIT, fee::WeightToFee};
 use precompiles::{FOREIGN_ASSET_PRECOMPILE_ADDRESS_PREFIX, LOCAL_ASSET_PRECOMPILE_ADDRESS_PREFIX};
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
@@ -815,13 +816,18 @@ impl pallet_child_bounties::Config for Runtime {
 	type WeightInfo = pallet_child_bounties::weights::SubstrateWeight<Runtime>;
 }
 
+parameter_types! {
+	/// Relay Chain `TransactionByteFee` / 10
+	pub const TransactionByteFee: Balance = 10 * MICROUNIT;
+}
+
 // TODO - Update settings
 impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type OnChargeTransaction = CurrencyAdapter<Balances, ()>;
 	type OperationalFeeMultiplier = ConstU8<5>;
-	type WeightToFee = IdentityFee<Balance>;
-	type LengthToFee = IdentityFee<Balance>;
+	type WeightToFee = WeightToFee;
+	type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
 	type FeeMultiplierUpdate = ();
 }
 
