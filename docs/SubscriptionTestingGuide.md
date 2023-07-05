@@ -110,7 +110,7 @@ cargo b --release
 
 - Go to `Developer --> Extrinsics` and select `daoCouncil --> propose` 
 
-- Use the account that you've created recently(0 SCTL tokens) as a tx submitter
+- Use the account that you've created first(0 SCTL tokens) as a tx submitter
   
 - Set the following parameters for a call:
 
@@ -124,7 +124,7 @@ daoId: 0
 proposal: daoTreasury --> transferToken
 daoId: 0
 amount: 1000
-beneficiary: select the wallet account you'be recently created
+beneficiary: select the wallet account you've created first
 lengthBound: 10000
 ```
 
@@ -171,7 +171,7 @@ lengthBound: 10000
 ```
 account: Alice
 daoId: 0
-proposal: 0x5ed15c6ac27c4bd22a5f084e4be38af2904f2e669abf5b35e7f97975aeefcbf0
+proposal: <proposal hash from the steps above>
 index: 0
 approve: Yes
 ```
@@ -189,7 +189,7 @@ approve: Yes
 ```
 account: 1st account from the wallet
 daoId: 0
-proposal: 0x5ed15c6ac27c4bd22a5f084e4be38af2904f2e669abf5b35e7f97975aeefcbf0
+proposal: <proposal hash from the steps above>
 index: 0
 refTime: 1000000
 proofSize: 0
@@ -435,7 +435,7 @@ fnPerBlockLimit: 100
 ```
 account: 1st account from the wallet
 daoId: 2
-proposal: 0x41e98a57212332578226a52d254f52ffd2b4de23d0226b0c4956d61313cad1f7
+proposal: <proposal hash from the steps above>
 index: 0
 approve: Yes
 ```
@@ -468,7 +468,7 @@ approve: Yes
 
 - From the list of available extrinsics select `daoCouncil --> propose` callable
 
-- Use the account that you've created recently(0 SCTL tokens) as a tx submitter
+- Use the account that you've created first(0 SCTL tokens) as a tx submitter
   
 - Set the following parameters for a call:
 
@@ -494,8 +494,9 @@ lengthBound: 10000
 
 ```
 dao_id: 0
-proposalIndex: 1
-proposalHash: 0xbca84298f0b0c6823ef4863168bc5c545dc7553560850987b455256dc3dc950e
+proposal: <proposal hash from the steps above>
+index: 1
+approve: Yes
 ```
 
 - Make sure you vote for both `Alice` and `1st account from the wallet` to vote the proposal through
@@ -507,7 +508,7 @@ proposalHash: 0xbca84298f0b0c6823ef4863168bc5c545dc7553560850987b455256dc3dc950e
 ```
 account: 1st account from the wallet
 daoId: 0
-proposal: 0xbca84298f0b0c6823ef4863168bc5c545dc7553560850987b455256dc3dc950e
+proposal: <proposal hash from the steps above>
 index: 1
 refTime: 1000000
 proofSize: 0
