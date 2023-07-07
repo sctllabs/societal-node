@@ -6,5 +6,7 @@ echo "*** Start Societal Node ***"
 
 cd $(dirname ${BASH_SOURCE[0]})/..
 
+mkdir -p .local
+
 docker-compose down --remove-orphans
 docker-compose run --rm --service-ports dev $@
