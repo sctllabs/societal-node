@@ -75,6 +75,7 @@ pub(crate) fn db_config_dir(config: &Configuration) -> PathBuf {
 		})
 }
 
+#[allow(clippy::type_complexity)]
 pub fn new_partial(
 	config: &Configuration,
 	cli: &Cli,
@@ -163,6 +164,7 @@ pub fn new_partial(
 	let fee_history_cache: FeeHistoryCache = Arc::new(Mutex::new(BTreeMap::new()));
 	let fee_history_cache_limit: FeeHistoryCacheLimit = cli.run.fee_history_limit;
 
+	#[allow(clippy::redundant_clone)]
 	let (grandpa_block_import, grandpa_link) = sc_consensus_grandpa::block_import(
 		client.clone(),
 		&(client.clone() as Arc<_>),
@@ -562,6 +564,7 @@ pub fn new_full(
 		.map(|NewFullBase { task_manager, .. }| task_manager)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn spawn_frontier_tasks(
 	task_manager: &TaskManager,
 	client: Arc<FullClient>,
