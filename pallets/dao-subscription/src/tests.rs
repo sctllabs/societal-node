@@ -134,6 +134,8 @@ fn extend_subscription_balance_low() {
 #[test]
 fn extend_subscription_works() {
 	new_test_ext().execute_with(|| {
+		assert_noop!(Subscription::extend_subscription(0, 1), Error::<Test>::SubscriptionNotExists);
+
 		Balances::make_free_balance_be(&1, DEFAULT_SUBSCRIPTION_PRICE.saturating_mul(3_u32.into()));
 
 		assert_ok!(Subscription::subscribe(0, &1));
@@ -161,6 +163,72 @@ fn extend_subscription_works() {
 				fn_balance: DEFAULT_FUNCTION_CALL_LIMIT.saturating_mul(2),
 				fn_per_block: (0_u32.into(), 0)
 			})
+		);
+	})
+}
+
+#[test]
+fn set_subscription_tiers_works() {
+	new_test_ext().execute_with(|| {
+		let tiers = VersionedDaoSubscription::Default(DaoSubscriptionTiersV1::Basic {
+			duration: 10,
+			price: 10,
+			fn_call_limit: 10,
+			fn_per_block_limit: 10,
+		});
+
+		assert_ok!(Subscription::set_subscription_tiers(RuntimeOrigin::root(), tiers.clone()));
+
+		assert_eq!(Subscription::subscription_tiers().unwrap(), tiers);
+	})
+}
+
+#[test]
+fn suspend_subscription_works() {
+	new_test_ext().execute_with(|| {
+		assert_noop!(Subscription::extend_subscription(0, 1), Error::<Test>::SubscriptionNotExists);
+
+		Balances::make_free_balance_be(&1, DEFAULT_SUBSCRIPTION_PRICE.saturating_mul(3_u32.into()));
+
+		assert_ok!(Subscription::subscribe(0, &1));
+
+		fast_forward_to(1);
+
+		assert_ok!(Subscription::suspend_subscription(
+			RuntimeOrigin::root(),
+			0,
+			SuspensionReason::BadActor
+		));
+
+		let tier = VersionedDaoSubscription::Default(DaoSubscriptionTiersV1::Basic {
+			duration: MONTH_IN_BLOCKS.into(),
+			price: DEFAULT_SUBSCRIPTION_PRICE,
+			fn_call_limit: DEFAULT_FUNCTION_CALL_LIMIT,
+			fn_per_block_limit: DEFAULT_FUNCTION_PER_BLOCK_LIMIT,
+		});
+
+		assert_eq!(
+			Subscription::subscriptions(0),
+			Some(DaoSubscription {
+				subscribed_at: 0_u32.into(),
+				last_renewed_at: None,
+				tier: tier.clone(),
+				status: DaoSubscriptionStatus::Suspended {
+					at: 1,
+					reason: SuspensionReason::BadActor
+				},
+				fn_balance: DEFAULT_FUNCTION_CALL_LIMIT,
+				fn_per_block: (0_u32.into(), 0)
+			})
+		);
+
+		assert_noop!(
+			Subscription::suspend_subscription(
+				RuntimeOrigin::root(),
+				0,
+				SuspensionReason::BadActor
+			),
+			Error::<Test>::AlreadySuspended
 		);
 	})
 }

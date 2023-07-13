@@ -189,6 +189,7 @@ pub trait AssetsCallback<AssetId, AccountId> {
 /// Empty implementation in case no callbacks are required.
 impl<AssetId, AccountId> AssetsCallback<AssetId, AccountId> for () {}
 
+#[allow(clippy::too_many_arguments)]
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;

@@ -23,6 +23,7 @@ impl FromStr for Sealing {
 	}
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, clap::Subcommand)]
 pub enum Subcommand {
 	/// Key management cli utilities

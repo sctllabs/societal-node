@@ -1370,6 +1370,7 @@ impl<T: Config> Pallet<T> {
 		}
 	}
 
+	#[allow(clippy::type_complexity)]
 	fn referendum_status(
 		dao_id: DaoId,
 		ref_index: ReferendumIndex,

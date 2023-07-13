@@ -408,6 +408,7 @@ pub mod pallet {
 		}
 	}
 
+	#[allow(clippy::type_complexity)]
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
