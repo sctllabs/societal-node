@@ -64,6 +64,10 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		Asset::<T, I>::get(id).map(|x| x.supply)
 	}
 
+	pub fn accounts_total(id: T::AssetId) -> Option<u32> {
+		Asset::<T, I>::get(id).map(|x| x.accounts)
+	}
+
 	pub(super) fn new_account(
 		who: &T::AccountId,
 		d: &mut AssetDetails<T::Balance, T::AccountId, DepositBalanceOf<T, I>>,
