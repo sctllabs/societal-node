@@ -58,6 +58,7 @@ pub mod fee {
 
 /// Time.
 pub mod time {
+	use dao_primitives::DaoFunctionBalance;
 	pub use frame_support::weights::Weight;
 	use node_primitives::{BlockNumber, Moment};
 
@@ -104,6 +105,12 @@ pub mod time {
 	pub const MINUTES: BlockNumber = 60 / (SECS_PER_BLOCK as BlockNumber);
 	pub const HOURS: BlockNumber = MINUTES * 60;
 	pub const DAYS: BlockNumber = HOURS * 24;
+
+	/// Assuming single Account calls per block shouldn't exceed `SECS_PER_BLOCK` value
+	#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+	pub const ACCOUNT_CALLS_PER_BLOCK: DaoFunctionBalance = 12;
+	#[cfg(not(any(feature = "parachain", feature = "runtime-benchmarks")))]
+	pub const ACCOUNT_CALLS_PER_BLOCK: DaoFunctionBalance = 6;
 }
 
 /// Ratio.

@@ -1003,7 +1003,6 @@ pub mod pallet {
 		#[pallet::call_index(12)]
 		pub fn undelegate(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			T::DaoProvider::ensure_member(dao_id, &who)?;
 			let votes = Self::try_undelegate(dao_id, who)?;
 			Ok((Some(T::WeightInfo::undelegate(votes)), Pays::No).into())
 		}
@@ -1027,8 +1026,7 @@ pub mod pallet {
 			dao_id: DaoId,
 			target: AccountIdLookupOf<T>,
 		) -> DispatchResultWithPostInfo {
-			let who = ensure_signed(origin)?;
-			T::DaoProvider::ensure_member(dao_id, &who)?;
+			let _ = ensure_signed(origin)?;
 			let target = T::Lookup::lookup(target)?;
 			Self::update_lock(dao_id, &target, T::DaoProvider::dao_token(dao_id)?);
 			Ok((
@@ -1080,7 +1078,6 @@ pub mod pallet {
 			index: ReferendumIndex,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			T::DaoProvider::ensure_member(dao_id, &who)?;
 			Self::try_remove_vote(dao_id, &who, index, UnvoteScope::Any)?;
 			Ok((Some(T::WeightInfo::remove_vote(T::MaxVotes::get())), Pays::No).into())
 		}
@@ -1113,7 +1110,6 @@ pub mod pallet {
 			index: ReferendumIndex,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			T::DaoProvider::ensure_member(dao_id, &who)?;
 			let target = T::Lookup::lookup(target)?;
 			let scope = if target == who { UnvoteScope::Any } else { UnvoteScope::OnlyExpired };
 			Self::try_remove_vote(dao_id, &target, index, scope)?;
