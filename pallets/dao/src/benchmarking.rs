@@ -18,7 +18,7 @@ const COUNCIL_SEED: u32 = 1;
 const TECH_COMMITTEE_SEED: u32 = 2;
 
 // Create the pre-requisite information needed to create a dao.
-fn setup_dao_payload<T: Config>(is_eth: bool) -> Vec<u8> {
+fn setup_dao_payload<T: Config>(is_eth: bool, tier: Option<Value>) -> Vec<u8> {
 	let mut dao_json = json!({
 		"name": "name",
 		"purpose": "purpose",
@@ -72,13 +72,17 @@ fn setup_dao_payload<T: Config>(is_eth: bool) -> Vec<u8> {
 		});
 	}
 
+	if tier.is_some() {
+		dao_json["tier"] = tier.unwrap();
+	}
+
 	serde_json::to_vec(&dao_json).ok().unwrap()
 }
 
-fn setup_dao<T: Config>(is_eth: bool) -> Result<(), DispatchError> {
+fn setup_dao<T: Config>(is_eth: bool, tier: Option<Value>) -> Result<(), DispatchError> {
 	let caller = account("caller", 0, SEED);
 	T::Currency::make_free_balance_be(&caller, BalanceOf::<T>::max_value() / 2u32.into());
-	let data = setup_dao_payload::<T>(is_eth);
+	let data = setup_dao_payload::<T>(is_eth, tier);
 
 	DaoFactory::<T>::create_dao(RawOrigin::Signed(caller).into(), vec![], vec![], data)
 }
@@ -125,14 +129,14 @@ benchmarks! {
 
 		T::Currency::make_free_balance_be(&caller, BalanceOf::<T>::max_value() / 2u32.into());
 
-		let data = setup_dao_payload::<T>(false);
+		let data = setup_dao_payload::<T>(false, None);
 	}: _(RawOrigin::Signed(caller), council, technical_committee, data)
 	verify {
 		assert_eq!(NextDaoId::<T>::get(), 1);
 	}
 
 	approve_dao {
-		setup_dao::<T>(true)?;
+		setup_dao::<T>(true, None)?;
 		let dao_hash = PendingDaos::<T>::iter_keys().next().unwrap();
 	}: _(RawOrigin::None, dao_hash, true)
 	verify {
@@ -140,7 +144,7 @@ benchmarks! {
 	}
 
 	update_dao_metadata {
-		setup_dao::<T>(false)?;
+		setup_dao::<T>(false, None)?;
 		let new_metadata = "Lorem Lorem dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor \
 			incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud \
 			exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure \
@@ -158,7 +162,7 @@ benchmarks! {
 	}
 
 	update_dao_policy {
-		setup_dao::<T>(false)?;
+		setup_dao::<T>(false, None)?;
 		let new_proposal_period = 500000;
 		let policy = json!({
 			"proposal_period": new_proposal_period,
@@ -196,7 +200,7 @@ benchmarks! {
 	}
 
 	mint_dao_token {
-		setup_dao::<T>(false)?;
+		setup_dao::<T>(false, None)?;
 		let origin = get_dao_origin::<T>(0)?;
 	}: _<T::RuntimeOrigin>(origin, 0, 100_u32.into())
 	verify {
@@ -205,13 +209,13 @@ benchmarks! {
 	}
 
 	spend_dao_funds {
-		setup_dao::<T>(false)?;
+		setup_dao::<T>(false, None)?;
 		let origin = get_dao_origin::<T>(0)?;
 	}: _<T::RuntimeOrigin>(origin, 0)
 	verify { }
 
 	launch_dao_referendum {
-		setup_dao::<T>(false)?;
+		setup_dao::<T>(false, None)?;
 
 		let proposer = funded_account::<T>("proposer", 0)?;
 		let proposal = CallOf::<T>::from(Call::spend_dao_funds { dao_id: 0 });
@@ -222,7 +226,7 @@ benchmarks! {
 	verify { }
 
 	bake_dao_referendum {
-		setup_dao::<T>(false)?;
+		setup_dao::<T>(false, None)?;
 
 		let proposer = funded_account::<T>("proposer", 0)?;
 		let proposal = CallOf::<T>::from(Call::spend_dao_funds { dao_id: 0 });
@@ -233,12 +237,34 @@ benchmarks! {
 	}: _<T::RuntimeOrigin>(origin, 0)
 	verify { }
 
+	subscribe {
+		let tier = json!({
+			"Default": "NoTier"
+		});
+		setup_dao::<T>(false, Some(tier))?;
+		let origin = get_dao_origin::<T>(0)?;
+		let dao_account_id = DaoFactory::<T>::dao_account_id(0);
+		T::Currency::make_free_balance_be(&dao_account_id, BalanceOf::<T>::max_value() / 2u32.into());
+	}: _<T::RuntimeOrigin>(origin, 0, None)
+	verify { }
+
 	extend_subscription {
-		setup_dao::<T>(false)?;
+		setup_dao::<T>(false, None)?;
 		let origin = get_dao_origin::<T>(0)?;
 		let dao_account_id = DaoFactory::<T>::dao_account_id(0);
 		T::Currency::make_free_balance_be(&dao_account_id, BalanceOf::<T>::max_value() / 2u32.into());
 	}: _<T::RuntimeOrigin>(origin, 0)
+	verify { }
+
+	change_subscription {
+		setup_dao::<T>(false, None)?;
+		let origin = get_dao_origin::<T>(0)?;
+		let dao_account_id = DaoFactory::<T>::dao_account_id(0);
+		T::Currency::make_free_balance_be(&dao_account_id, BalanceOf::<T>::max_value() / 2u32.into());
+		T::DaoSubscriptionProvider::assign_subscription_tier(
+			VersionedDaoSubscriptionTier::Default(DaoSubscriptionTierV1::Standard)
+		)?;
+	}: _<T::RuntimeOrigin>(origin, 0, VersionedDaoSubscriptionTier::Default(DaoSubscriptionTierV1::Standard))
 	verify { }
 
 	impl_benchmark_test_suite!(DaoFactory, crate::mock::new_test_ext(), crate::mock::Test);

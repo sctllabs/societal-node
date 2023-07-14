@@ -926,7 +926,7 @@ parameter_types! {
 
 pub type AssetId = u128;
 
-type LocalAssetInstance = pallet_assets::Instance1;
+type LocalAssetInstance = pallet_dao_assets::Instance1;
 impl pallet_dao_assets::Config<LocalAssetInstance> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Balance = Balance;

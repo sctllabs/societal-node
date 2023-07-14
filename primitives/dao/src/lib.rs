@@ -26,8 +26,10 @@ pub const EXPECTED_BLOCK_TIME: u32 = 6; // in seconds
 pub const DAY_IN_BLOCKS: u32 = 24 * 60 * 60 / EXPECTED_BLOCK_TIME;
 pub const MONTH_IN_BLOCKS: u32 = 30 * DAY_IN_BLOCKS;
 pub const DEFAULT_SUBSCRIPTION_PRICE: u128 = 1_000_000_000_000_000;
+
 pub const DEFAULT_FUNCTION_CALL_LIMIT: u32 = 10000;
 pub const DEFAULT_FUNCTION_PER_BLOCK_LIMIT: u32 = 100;
+pub const DEFAULT_MEMBER_COUNT_LIMIT: u32 = 100;
 
 #[derive(
 	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, Serialize, Deserialize, MaxEncodedLen,
@@ -98,6 +100,7 @@ pub struct DaoPayload {
 	#[serde(deserialize_with = "de_option_string_to_bytes")]
 	pub token_address: Option<Vec<u8>>,
 	pub policy: DaoPolicy,
+	pub tier: Option<VersionedDaoSubscriptionTier>,
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
@@ -570,64 +573,199 @@ pub type DaoFunctionBalance = u32;
 
 pub type FunctionPerBlock<BlockNumber, FunctionBalance> = (BlockNumber, FunctionBalance);
 
+pub type DaoMembersCount = u32;
+
 #[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
-pub struct DaoSubscription<BlockNumber, Tier> {
+pub struct DaoSubscription<BlockNumber, Tier, Details> {
+	pub tier: Tier,
+	pub details: Details,
 	pub subscribed_at: BlockNumber,
 	pub last_renewed_at: Option<BlockNumber>,
-	pub tier: Tier,
 	pub status: DaoSubscriptionStatus<BlockNumber>,
 	pub fn_balance: DaoFunctionBalance,
 	pub fn_per_block: FunctionPerBlock<BlockNumber, DaoFunctionBalance>,
 }
 
-pub trait DaoSubscriptionProvider<DaoId, AccountId, BlockNumber> {
+pub trait DaoSubscriptionProvider<DaoId, AccountId, BlockNumber, Tier, Details> {
 	/// Subscribes DAO
 	/// - `dao_id`: DAO ID.
 	/// - `account_id`: The Account to charge the initial subscription payment from.
-	fn subscribe(dao_id: DaoId, account_id: &AccountId) -> Result<(), DispatchError>;
+	/// - `tier`: Subscription tier to subscribe to. Optional.
+	fn subscribe(
+		dao_id: DaoId,
+		account_id: &AccountId,
+		tier: Option<Tier>,
+	) -> Result<(), DispatchError>;
 
 	/// Extends DAO subscription
 	/// - `dao_id`: DAO ID.
 	/// - `account_id`: The Account to charge the subscription payment from.
-	fn extend_subscription(dao_id: DaoId, account_id: AccountId) -> Result<(), DispatchError>;
+	fn extend_subscription(dao_id: DaoId, account_id: &AccountId) -> Result<(), DispatchError>;
+
+	/// Extends DAO subscription
+	/// - `dao_id`: DAO ID.
+	/// - `account_id`: The Account to charge the subscription payment from.
+	/// - `tier`: Subscription tier to switch to.
+	fn change_subscription_tier(
+		dao_id: DaoId,
+		account_id: &AccountId,
+		tier: Tier,
+	) -> Result<(), DispatchError>;
+
+	// /// Switch DAO subscription
+	// /// - `dao_id`: DAO ID.
+	// /// - `account_id`: The Account to charge the subscription payment from.
+	// fn switch_subscription(dao_id: DaoId, tier: Tier) -> Result<(), DispatchError>;
 
 	/// Ensures if subscription is active and indexes function call
 	/// - `dao_id`: DAO ID.
-	fn ensure_active(dao_id: DaoId) -> Result<(), DispatchError>;
+	fn ensure_active(
+		dao_id: DaoId,
+	) -> Result<DaoSubscription<BlockNumber, Tier, Details>, DispatchError>;
+
+	/// Note: Should only be used for benchmarking.
+	#[cfg(feature = "runtime-benchmarks")]
+	fn assign_subscription_tier(tier: VersionedDaoSubscriptionTier) -> DispatchResult;
 }
 
 /// Empty implementation.
-impl<DaoId, AccountId, BlockNumber> DaoSubscriptionProvider<DaoId, AccountId, BlockNumber> for () {
-	fn subscribe(_dao_id: DaoId, _account_id: &AccountId) -> Result<(), DispatchError> {
+impl<DaoId, AccountId, BlockNumber, Balance>
+	DaoSubscriptionProvider<
+		DaoId,
+		AccountId,
+		BlockNumber,
+		VersionedDaoSubscriptionTier,
+		VersionedDaoSubscriptionDetails<BlockNumber, Balance>,
+	> for ()
+{
+	fn subscribe(
+		_dao_id: DaoId,
+		_account_id: &AccountId,
+		_tier: Option<VersionedDaoSubscriptionTier>,
+	) -> Result<(), DispatchError> {
 		Ok(())
 	}
 
-	fn extend_subscription(_dao_id: DaoId, _account_id: AccountId) -> Result<(), DispatchError> {
+	fn extend_subscription(_dao_id: DaoId, _account_id: &AccountId) -> Result<(), DispatchError> {
 		Ok(())
 	}
 
-	fn ensure_active(_dao_id: DaoId) -> Result<(), DispatchError> {
+	fn change_subscription_tier(
+		_dao_id: DaoId,
+		_account_id: &AccountId,
+		_tier: VersionedDaoSubscriptionTier,
+	) -> Result<(), DispatchError> {
 		Ok(())
+	}
+
+	fn ensure_active(
+		_dao_id: DaoId,
+	) -> Result<
+		DaoSubscription<
+			BlockNumber,
+			VersionedDaoSubscriptionTier,
+			VersionedDaoSubscriptionDetails<BlockNumber, Balance>,
+		>,
+		DispatchError,
+	> {
+		todo!()
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn assign_subscription_tier(_tier: VersionedDaoSubscriptionTier) -> DispatchResult {
+		todo!()
 	}
 }
 
 #[derive(
 	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen, Serialize, Deserialize,
 )]
-pub enum DaoSubscriptionTiersV1<BlockTime, Balance> {
-	Basic {
-		duration: BlockTime,
-		price: Balance,
-		fn_call_limit: DaoFunctionBalance,
-		fn_per_block_limit: DaoFunctionBalance,
-	},
+pub struct BountiesSubscriptionDetailsV1 {
+	pub enabled: bool,
+	pub unassign_curator: bool,
+	pub accept_curator: bool,
+	pub award_bounty: bool,
+	pub claim_bounty: bool,
+	pub extend_bounty_expiry: bool,
 }
 
 #[derive(
 	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen, Serialize, Deserialize,
 )]
-pub enum VersionedDaoSubscription<BlockTime, Balance> {
-	Default(DaoSubscriptionTiersV1<BlockTime, Balance>),
+pub struct CollectiveSubscriptionDetailsV1 {
+	pub enabled: bool,
+	pub propose: bool,
+	pub vote: bool,
+	pub close: bool,
+}
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen, Serialize, Deserialize,
+)]
+pub struct DemocracySubscriptionDetailsV1 {
+	pub enabled: bool,
+	pub propose: bool,
+	pub second: bool,
+	pub vote: bool,
+	pub delegate: bool,
+	pub undelegate: bool,
+	pub unlock: bool,
+	pub remove_vote: bool,
+	pub remove_other_vote: bool,
+}
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen, Serialize, Deserialize,
+)]
+pub struct MembershipSubscriptionDetailsV1 {
+	pub enabled: bool,
+	pub change_key: bool,
+}
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen, Serialize, Deserialize,
+)]
+pub struct DaoSubscriptionDetailsV1<BlockTime, Balance> {
+	pub duration: BlockTime,
+	pub price: Balance,
+	pub fn_call_limit: DaoFunctionBalance,
+	pub fn_per_block_limit: DaoFunctionBalance,
+	pub max_members: DaoMembersCount,
+	pub bounties: BountiesSubscriptionDetailsV1,
+	pub council: CollectiveSubscriptionDetailsV1,
+	pub tech_committee: CollectiveSubscriptionDetailsV1,
+	pub democracy: DemocracySubscriptionDetailsV1,
+	pub council_membership: MembershipSubscriptionDetailsV1,
+	pub tech_committee_membership: MembershipSubscriptionDetailsV1,
+}
+
+// impl Default for DaoSubscriptionDetailsV1<Bl>
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen, Serialize, Deserialize,
+)]
+pub enum VersionedDaoSubscriptionDetails<BlockTime, Balance> {
+	Default(DaoSubscriptionDetailsV1<BlockTime, Balance>),
+}
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen, Serialize, Deserialize,
+)]
+pub enum DaoSubscriptionTierV1 {
+	Basic,
+	Standard,
+	Premium,
+
+	/// Note: Should only be used for benchmarking.
+	#[cfg(feature = "runtime-benchmarks")]
+	NoTier,
+}
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen, Serialize, Deserialize,
+)]
+pub enum VersionedDaoSubscriptionTier {
+	Default(DaoSubscriptionTierV1),
 }
 
 #[repr(u8)]
@@ -640,6 +778,10 @@ pub enum DaoTxValidityError {
 	DaoSubscriptionError = 2,
 	/// Too many calls for the account per block
 	AccountRateLimitExceeded = 3,
+	/// Function
+	Forbidden = 4,
+	/// Member Count Error
+	TooManyDaoMembers = 5,
 }
 
 impl From<DaoTxValidityError> for u8 {
