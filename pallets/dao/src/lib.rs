@@ -266,6 +266,8 @@ pub mod pallet {
 			DaoId,
 			Self::AccountId,
 			Self::BlockNumber,
+			VersionedDaoSubscriptionTier,
+			VersionedDaoSubscriptionDetails<Self::BlockNumber, Self::Balance>,
 		>;
 
 		/// Weight information for extrinsics in this pallet.
@@ -603,12 +605,16 @@ pub mod pallet {
 			T::DaoReferendumScheduler::bake_referendum(dao_id)
 		}
 
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::subscribe())]
 		#[pallet::call_index(8)]
-		pub fn subscribe(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
+		pub fn subscribe(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			tier: Option<VersionedDaoSubscriptionTier>,
+		) -> DispatchResult {
 			Self::ensure_approved(origin, dao_id)?;
 
-			T::DaoSubscriptionProvider::subscribe(dao_id, &Self::dao_account_id(dao_id))
+			T::DaoSubscriptionProvider::subscribe(dao_id, &Self::dao_account_id(dao_id), tier)
 		}
 
 		#[pallet::weight(T::WeightInfo::extend_subscription())]
@@ -616,7 +622,23 @@ pub mod pallet {
 		pub fn extend_subscription(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
 			Self::ensure_approved(origin, dao_id)?;
 
-			T::DaoSubscriptionProvider::extend_subscription(dao_id, Self::dao_account_id(dao_id))
+			T::DaoSubscriptionProvider::extend_subscription(dao_id, &Self::dao_account_id(dao_id))
+		}
+
+		#[pallet::weight(T::WeightInfo::change_subscription())]
+		#[pallet::call_index(10)]
+		pub fn change_subscription(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+			tier: VersionedDaoSubscriptionTier,
+		) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			T::DaoSubscriptionProvider::change_subscription_tier(
+				dao_id,
+				&Self::dao_account_id(dao_id),
+				tier,
+			)
 		}
 	}
 
@@ -651,9 +673,16 @@ pub mod pallet {
 			technical_committee: Vec<T::AccountId>,
 			data: Vec<u8>,
 		) -> DispatchResult {
-			let DaoPayload { name, purpose, metadata, token, token_id, token_address, policy } =
-				serde_json::from_slice::<DaoPayload>(&data)
-					.map_err(|_| Error::<T>::InvalidInput)?;
+			let DaoPayload {
+				name,
+				purpose,
+				metadata,
+				token,
+				token_id,
+				token_address,
+				policy,
+				tier,
+			} = serde_json::from_slice::<DaoPayload>(&data).map_err(|_| Error::<T>::InvalidInput)?;
 
 			let dao_id = <NextDaoId<T>>::get();
 			let dao_account_id = Self::account_id(dao_id);
@@ -831,7 +860,7 @@ pub mod pallet {
 			};
 
 			// TODO: approach for pending daos
-			T::DaoSubscriptionProvider::subscribe(dao_id, &founder)?;
+			T::DaoSubscriptionProvider::subscribe(dao_id, &founder, tier)?;
 
 			Self::do_register_dao(dao, policy, council, technical_committee)
 		}
@@ -965,10 +994,13 @@ pub mod pallet {
 			Ok(())
 		}
 
-		pub fn do_ensure_member(id: DaoId, who: &T::AccountId) -> Result<bool, DispatchError> {
-			let has_token = match Self::dao_token(id)? {
+		pub fn do_ensure_member(
+			id: DaoId,
+			who: &T::AccountId,
+		) -> Result<(bool, T::AssetId), DispatchError> {
+			let (has_token, token_id) = match Self::dao_token(id)? {
 				DaoToken::FungibleToken(token_id) =>
-					Ok(!T::AssetProvider::balance(token_id, who).is_zero()),
+					Ok((!T::AssetProvider::balance(token_id, who).is_zero(), token_id)),
 				DaoToken::EthTokenAddress(_) => Err(Error::<T>::NotSupported),
 			}?;
 
@@ -976,7 +1008,7 @@ pub mod pallet {
 				T::CouncilProvider::contains(id, who)? ||
 				T::TechnicalCommitteeProvider::contains(id, who)?;
 
-			Ok(is_member)
+			Ok((is_member, token_id))
 		}
 
 		#[deny(clippy::clone_double_ref)]
@@ -1021,7 +1053,9 @@ impl<T: Config> DaoProvider<T::AccountId, T::Hash> for Pallet<T> {
 	}
 
 	fn ensure_member(id: Self::Id, who: &T::AccountId) -> Result<bool, DispatchError> {
-		Self::do_ensure_member(id, who)
+		let (is_member, _) = Self::do_ensure_member(id, who)?;
+
+		Ok(is_member)
 	}
 
 	fn dao_account_id(id: Self::Id) -> T::AccountId {

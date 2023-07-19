@@ -1859,6 +1859,12 @@ impl<T: Config> Pallet<T> {
 			.ok()
 			.unwrap()
 	}
+
+	pub fn extract_original_call(
+		proposal: &BoundedCallOf<T>,
+	) -> Result<(T::RuntimeCall, Option<u32>), DispatchError> {
+		T::Preimages::peek(proposal)
+	}
 }
 
 impl<T: Config> DaoReferendumScheduler<DaoId> for Pallet<T> {

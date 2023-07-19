@@ -13,34 +13,19 @@ const SEED: u32 = 0;
 fn setup_subscription<T: Config>() -> Result<(), DispatchError> {
 	let caller: T::AccountId = account("caller", 0, SEED);
 	T::Currency::make_free_balance_be(&caller, BalanceOf::<T>::max_value() / 2u32.into());
-	Subscription::<T>::subscribe(0, &caller)
+	Subscription::<T>::subscribe(0, &caller, None)
 }
 
 benchmarks! {
 
-	set_subscription_tiers {
-		let duration = MONTH_IN_BLOCKS.into();
-		let price = TryInto::<BalanceOf<T>>::try_into(DEFAULT_SUBSCRIPTION_PRICE).ok().unwrap();
-		let fn_call_limit = DEFAULT_FUNCTION_CALL_LIMIT;
-		let fn_per_block_limit = DEFAULT_FUNCTION_PER_BLOCK_LIMIT;
-
-		let tier = VersionedDaoSubscription::Default(DaoSubscriptionTiersV1::Basic {
-			duration,
-			price,
-			fn_call_limit,
-			fn_per_block_limit,
-		});
-	}: _(RawOrigin::Root, tier)
+	set_subscription_tier {
+		let (tier, details) = Subscription::<T>::get_default_tier_details();
+	}: _(RawOrigin::Root, tier.clone(), details.clone())
 	verify {
-		let subscription_tiers = Subscription::<T>::subscription_tiers().unwrap();
+		let subscription_tier = Subscription::<T>::subscription_tiers(tier).unwrap();
 		assert_eq!(
-			subscription_tiers,
-			VersionedDaoSubscription::Default(DaoSubscriptionTiersV1::Basic {
-				duration,
-				price,
-				fn_call_limit,
-				fn_per_block_limit,
-			})
+			subscription_tier,
+			details
 		);
 	}
 

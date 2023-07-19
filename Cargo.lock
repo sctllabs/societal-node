@@ -5958,21 +5958,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-assets"
-version = "4.0.0-dev"
-source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.41#3bd809d59c31c7205a0f36c6ddcba603e43051fc"
-dependencies = [
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "parity-scale-codec",
- "scale-info",
- "sp-core",
- "sp-runtime",
- "sp-std",
-]
-
-[[package]]
 name = "pallet-aura"
 version = "4.0.0-dev"
 source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.41#3bd809d59c31c7205a0f36c6ddcba603e43051fc"
@@ -6324,7 +6309,7 @@ dependencies = [
 [[package]]
 name = "pallet-dao-assets"
 version = "4.0.0-dev"
-source = "git+https://github.com/sctllabs/societal-node?branch=polkadot-v0.9.41-assets#0f3a52bc6eb514f5b9735df0fdf1837589aba504"
+source = "git+https://github.com/sctllabs/societal-node?branch=polkadot-v0.9.41-assets#7a399cd9b49c724e55d1770f43dc575dca05d6c5"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11724,7 +11709,6 @@ dependencies = [
  "node-primitives",
  "node-rpc",
  "pallet-asset-tx-payment",
- "pallet-assets",
  "pallet-contracts",
  "pallet-im-online",
  "pallet-transaction-payment",
@@ -11820,7 +11804,6 @@ dependencies = [
  "node-primitives",
  "num_enum",
  "pallet-asset-tx-payment",
- "pallet-assets",
  "pallet-aura",
  "pallet-authority-discovery",
  "pallet-authorship",
