@@ -79,10 +79,7 @@ pub mod time {
 	/// `SLOT_DURATION` should have the same value.
 	///
 	/// <https://research.web3.foundation/en/latest/polkadot/block-production/Babe.html#-6.-practical-results>
-	#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 	pub const MILLISECS_PER_BLOCK: Moment = 12000;
-	#[cfg(not(any(feature = "parachain", feature = "runtime-benchmarks")))]
-	pub const MILLISECS_PER_BLOCK: Moment = 6000;
 	pub const SECS_PER_BLOCK: Moment = MILLISECS_PER_BLOCK / 1000;
 
 	// NOTE: Currently it is not possible to change the slot duration after the chain has started.
@@ -107,10 +104,7 @@ pub mod time {
 	pub const DAYS: BlockNumber = HOURS * 24;
 
 	/// Assuming single Account calls per block shouldn't exceed `SECS_PER_BLOCK` value
-	#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 	pub const ACCOUNT_CALLS_PER_BLOCK: DaoFunctionBalance = 12;
-	#[cfg(not(any(feature = "parachain", feature = "runtime-benchmarks")))]
-	pub const ACCOUNT_CALLS_PER_BLOCK: DaoFunctionBalance = 6;
 }
 
 /// Ratio.

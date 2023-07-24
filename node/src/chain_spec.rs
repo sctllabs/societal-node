@@ -8,13 +8,10 @@ use societal_node_runtime::{
 	wasm_binary_unwrap, AccountId, AuthorityDiscoveryConfig, Balance, BalancesConfig,
 	CollatorSelectionConfig, CouncilConfig, DaoConfig, DaoEthGovernanceConfig, DemocracyConfig,
 	EVMChainIdConfig, EVMConfig, ElectionsConfig, GenesisConfig, GrandpaConfig, IndicesConfig,
-	MaxNominations, NominationPoolsConfig, SessionConfig, SessionKeys, Signature, SocietyConfig,
-	StakerStatus, StakingConfig, SudoConfig, SystemConfig, TechnicalCommitteeConfig, DOLLARS,
-	EXISTENTIAL_DEPOSIT,
+	MaxNominations, NominationPoolsConfig, ParachainInfoConfig, PolkadotXcmConfig, SessionConfig,
+	SessionKeys, Signature, SocietyConfig, StakerStatus, StakingConfig, SudoConfig, SystemConfig,
+	TechnicalCommitteeConfig, DOLLARS, EXISTENTIAL_DEPOSIT,
 };
-
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
-use societal_node_runtime::{ParachainInfoConfig, PolkadotXcmConfig};
 
 use sc_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
@@ -28,7 +25,6 @@ use sp_runtime::{
 const ETH_RPC_URL_TESTNET: &str = "https://goerli.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161";
 
 /// The default XCM version to set in genesis config.
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 const SAFE_XCM_VERSION: u32 = xcm::prelude::XCM_VERSION;
 
 /// Node `ChainSpec` extensions.
@@ -43,7 +39,6 @@ pub struct Extensions {
 	pub para_id: u32,
 }
 
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 impl Extensions {
 	/// Try to get the extension from the given `ChainSpec`.
 	pub fn try_get(chain_spec: &dyn sc_service::ChainSpec) -> Option<&Self> {
@@ -117,7 +112,7 @@ pub fn development_config() -> ChainSpec {
 		None,
 		Some(properties()),
 		// Extensions
-		Extensions { relay_chain: "dev-service".into(), para_id: Default::default() },
+		Extensions { relay_chain: "rococo-local".into(), para_id: Default::default() },
 	)
 }
 
@@ -267,7 +262,6 @@ pub fn testnet_genesis(
 			// Assign network admin rights.
 			key: Some(root_key),
 		},
-		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 		parachain_info: ParachainInfoConfig { parachain_id: _para_id },
 		collator_selection: CollatorSelectionConfig {
 			invulnerables: initial_authorities.iter().map(|x| x.0.clone()).collect(),
@@ -386,9 +380,7 @@ pub fn testnet_genesis(
 				_phantom: Default::default(),
 			}
 		},
-		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 		parachain_system: Default::default(),
-		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 		polkadot_xcm: PolkadotXcmConfig { safe_xcm_version: Some(SAFE_XCM_VERSION) },
 	}
 }

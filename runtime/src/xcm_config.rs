@@ -5,10 +5,12 @@ use super::{
 		time::DAYS,
 		weight::MAXIMUM_BLOCK_WEIGHT,
 	},
-	AccountId, Balance, Balances, BlockNumber, CheckInherents, DmpQueue, EnsureRoot, Executive,
-	ParachainInfo, ParachainSystem, PolkadotXcm, Runtime, RuntimeCall, RuntimeEvent, RuntimeOrigin,
-	XcmpQueue,
+	AccountId, Balance, Balances, BlockNumber, DmpQueue, EnsureRoot, ParachainInfo,
+	ParachainSystem, PolkadotXcm, Runtime, RuntimeCall, RuntimeEvent, RuntimeOrigin, XcmpQueue,
 };
+
+#[allow(unused_imports)]
+use super::{CheckInherents, Executive};
 
 use core::{marker::PhantomData, ops::ControlFlow};
 use frame_support::{

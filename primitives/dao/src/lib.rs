@@ -18,10 +18,7 @@ use sp_std::prelude::*;
 pub type DispatchResultWithDaoOrigin<T> = Result<DaoOrigin<T>, DispatchError>;
 
 // TODO: retrieve from runtime
-#[cfg(feature = "parachain")]
 pub const EXPECTED_BLOCK_TIME: u32 = 12; // in seconds
-#[cfg(any(not(feature = "parachain"), feature = "runtime-benchmarks"))]
-pub const EXPECTED_BLOCK_TIME: u32 = 6; // in seconds
 
 pub const DAY_IN_BLOCKS: u32 = 24 * 60 * 60 / EXPECTED_BLOCK_TIME;
 pub const MONTH_IN_BLOCKS: u32 = 30 * DAY_IN_BLOCKS;
