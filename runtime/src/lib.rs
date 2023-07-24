@@ -100,8 +100,7 @@ pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 /// Generated voter bag information.
 mod voter_bags;
 
-// XCM Configuration.
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
+// XCM Configuration.]
 pub mod xcm_config;
 
 mod dao_config;
@@ -256,10 +255,7 @@ impl frame_system::Config for Runtime {
 	/// This is used as an identifier of the chain. 42 is the generic substrate prefix.
 	type SS58Prefix = SS58Prefix;
 	/// The set code logic, just the default since we're not a parachain.
-	#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 	type OnSetCode = cumulus_pallet_parachain_system::ParachainSetCode<Self>;
-	#[cfg(not(any(feature = "parachain", feature = "runtime-benchmarks")))]
-	type OnSetCode = ();
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
@@ -1426,12 +1422,10 @@ construct_runtime!(
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
 		System: frame_system::{Pallet, Call, Storage, Config, Event<T>} = 0,
-		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 		ParachainSystem: cumulus_pallet_parachain_system::{
 			Pallet, Call, Config, Storage, Inherent, Event<T>, ValidateUnsigned,
 		} = 1,
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent} = 2,
-		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 		ParachainInfo: parachain_info::{Pallet, Storage, Config} = 3,
 
 		// Monetary stuff=.
@@ -1488,13 +1482,9 @@ construct_runtime!(
 		HotfixSufficients: pallet_hotfix_sufficients::{Pallet, Call, Storage} = 75,
 
 		// XCM helpers.
-		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 		XcmpQueue: cumulus_pallet_xcmp_queue::{Pallet, Call, Storage, Event<T>} = 80,
-		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 		PolkadotXcm: pallet_xcm::{Pallet, Call, Event<T>, Origin, Config} = 81,
-		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 		CumulusXcm: cumulus_pallet_xcm::{Pallet, Event<T>, Origin} = 82,
-		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>} = 83,
 
 		// DAO management.
@@ -1898,7 +1888,6 @@ impl_runtime_apis! {
 		}
 	}
 
-	#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 	impl cumulus_primitives_core::CollectCollationInfo<Block> for Runtime {
 		fn collect_collation_info(header: &<Block as BlockT>::Header) -> cumulus_primitives_core::CollationInfo {
 			ParachainSystem::collect_collation_info(header)

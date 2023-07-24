@@ -1,27 +1,19 @@
 use std::net::SocketAddr;
 
+use crate::service;
+use cumulus_client_cli::generate_genesis_block;
+use cumulus_primitives_core::ParaId;
+use fc_db::DatabaseSource;
 use frame_benchmarking_cli::{BenchmarkCmd, ExtrinsicFactory, SUBSTRATE_REFERENCE_HARDWARE};
+use log::info;
 use sc_cli::{
 	ChainSpec, CliConfiguration, DefaultConfigurationValues, ImportParams, KeystoreParams,
 	NetworkParams, Result, RuntimeVersion, SharedParams, SubstrateCli,
 };
 use sc_service::{config::PrometheusConfig, BasePath, PartialComponents};
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
-use {
-	crate::para_service as service,
-	cumulus_client_cli::generate_genesis_block,
-	cumulus_primitives_core::ParaId,
-	fc_db::DatabaseSource,
-	log::info,
-	service::{new_partial, ExecutorDispatch},
-	sp_core::{hexdisplay::HexDisplay, Encode},
-	sp_runtime::traits::{AccountIdConversion, Block as BlockT},
-};
-#[cfg(not(any(feature = "parachain", feature = "runtime-benchmarks")))]
-use {
-	crate::service,
-	service::{new_partial, ExecutorDispatch},
-};
+use service::{new_partial, ExecutorDispatch};
+use sp_core::{hexdisplay::HexDisplay, Encode};
+use sp_runtime::traits::{AccountIdConversion, Block as BlockT};
 
 use societal_node_runtime::{Block, EXISTENTIAL_DEPOSIT};
 use sp_keyring::Sr25519Keyring;
@@ -289,9 +281,6 @@ pub fn run() -> sc_cli::Result<()> {
 				Ok((cmd.run(client, import_queue), task_manager))
 			})
 		},
-		#[cfg(not(any(feature = "parachain", feature = "runtime-benchmarks")))]
-		Some(Subcommand::PurgeChain(_cmd)) => Ok(()),
-		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 		Some(Subcommand::PurgeChain(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 
@@ -451,16 +440,6 @@ pub fn run() -> sc_cli::Result<()> {
 				Ok((cmd.run::<Block, ExecutorDispatch>(config), task_manager))
 			})
 		},
-		#[cfg(not(any(feature = "parachain", feature = "runtime-benchmarks")))]
-		None => {
-			let runner = cli.create_runner(&(*cli.run).normalize())?;
-
-			runner.run_node_until_exit(|config| async move {
-				service::new_full(config, cli.no_hardware_benchmarks, &cli)
-					.map_err(sc_cli::Error::Service)
-			})
-		},
-		#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 		None => {
 			let runner = cli.create_runner(&(*cli.run).normalize())?;
 
@@ -506,8 +485,7 @@ pub fn run() -> sc_cli::Result<()> {
 				let state_version =
 					RelayChainCli::native_runtime_version(&config.chain_spec).state_version();
 
-				let block: Block = generate_genesis_block(&*config.chain_spec, state_version)
-					.map_err(|e| e.to_string())?;
+				let block: Block = generate_genesis_block(&*config.chain_spec, state_version)?;
 				let genesis_state = format!("0x{:?}", HexDisplay::from(&block.header().encode()));
 
 				let tokio_handle = config.tokio_handle.clone();

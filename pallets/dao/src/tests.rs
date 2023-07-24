@@ -182,9 +182,9 @@ fn create_dao_works() {
 				proposal_period: 100,
 				approve_origin: DaoPolicyProportion::AtLeast((1, 2)),
 				governance: None,
-				bounty_payout_delay: BountyPayoutDelay(14400),
-				bounty_update_period: BountyUpdatePeriod(14400),
-				spend_period: TreasurySpendPeriod(14400),
+				bounty_payout_delay: BountyPayoutDelay(7200),
+				bounty_update_period: BountyUpdatePeriod(7200),
+				spend_period: TreasurySpendPeriod(7200),
 			}
 		);
 	});

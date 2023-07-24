@@ -163,7 +163,6 @@ pub struct RelayChainCli {
 	pub base_path: Option<PathBuf>,
 }
 
-#[cfg(any(feature = "parachain", feature = "runtime-benchmarks"))]
 impl RelayChainCli {
 	/// Parse the relay chain CLI parameters using the para chain `Configuration`.
 	pub fn new<'a>(
