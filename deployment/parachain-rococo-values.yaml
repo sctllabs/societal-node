@@ -2,7 +2,7 @@
 ##
 image:
   repository: societal/societal-node
-  tag: parachain-latest
+  tag: latest
 
 node:
   role: collator

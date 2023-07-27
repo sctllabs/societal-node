@@ -2,7 +2,7 @@
 ##
 image:
   repository: societal/societal-node
-  tag: parachain-latest
+  tag: latest
 
 node:
   role: collator
@@ -19,6 +19,7 @@ node:
   enableOffchainIndexing: true
 
   chainData:
+    pruning: archive
     volumeSize: 50Gi
     storageClass: gp2-custom-resize
 
@@ -50,30 +51,30 @@ ingress:
      cert-manager.io/cluster-issuer: letsencrypt-development
      nginx.ingress.kubernetes.io/rewrite-target: /
    rules:
-     - host: node-rpc-rococo.dev.sctl.link
+     - host: node-rpc.testnet.sctl.link
        http:
          paths:
            - path: /
              pathType: ImplementationSpecific
              backend:
                service:
-                 name: societal-parachain-node
+                 name: societal-node
                  port:
                    number: 9933
-     - host: node-ws-rococo.dev.sctl.link
+     - host: node-ws.testnet.sctl.link
        http:
          paths:
            - path: /
              pathType: ImplementationSpecific
              backend:
                service:
-                 name: societal-parachain-node
+                 name: societal-node
                  port:
                    number: 9944
    tls:
      - hosts:
-         - node-rpc-rococo.dev.sctl.link
-       secretName: societal-parachain-node-rpc-tls-secret
+         - node-rpc.testnet.sctl.link
+       secretName: societal-node-rpc-tls-secret
      - hosts:
-         - node-ws-rococo.dev.sctl.link
-       secretName: societal-parachain-node-ws-tls-secret
+         - node-ws.testnet.sctl.link
+       secretName: societal-node-ws-tls-secret

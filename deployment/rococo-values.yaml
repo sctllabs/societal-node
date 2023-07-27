@@ -2,7 +2,7 @@
 ##
 image:
  repository: parity/polkadot
- tag: latest
+ tag: v0.9.41
 
 node:
   chain: rococo-local
