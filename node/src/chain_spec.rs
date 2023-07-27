@@ -94,7 +94,7 @@ fn development_config_genesis() -> GenesisConfig {
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
 		None,
 		1516,
-		1516.into(),
+		2000.into(),
 		ETH_RPC_URL_TESTNET,
 	)
 }
@@ -161,7 +161,57 @@ fn local_testnet_genesis() -> GenesisConfig {
 		root_key,
 		Some(endowed_accounts),
 		1516,
-		1516.into(),
+		2000.into(),
+		ETH_RPC_URL_TESTNET,
+	)
+}
+
+fn live_testnet_genesis() -> GenesisConfig {
+	#[rustfmt::skip]
+	// stash, controller, session-key
+	// generated with secret:
+	// for i in 1 2 3 4 ; do for j in stash controller; do subkey inspect "$secret"//fir//$j//$i; done; done
+	//
+	// and
+	//
+	// for i in 1 2 3 4 ; do for j in session; do subkey --ed25519 inspect "$secret"//fir//$j//$i; done; done
+	let initial_authorities: Vec<(
+		AccountId,
+		AccountId,
+		GrandpaId,
+		AuraId,
+		AuthorityDiscoveryId,
+	)> = vec![(
+		// 5FvApmAXkALe1YRtfiUr7X4ar5wk8MpBkqSE6uhWPhJM7HEh
+		array_bytes::hex_n_into_unchecked("0xaa6e812efbe2fcc309ca614ee85df0f10af789e53a76841a92014fdfdfd2973b"),
+		// 5CfqC6hZ1oZRs644d8DpS8Hr8Vwnj5WsADZrh2QtM12nMdgw
+		array_bytes::hex_n_into_unchecked("0x1aca47ee7ad89b9019aa2bbe47a56e110eddd390ce4b41e1ac721abf6d63ee6e"),
+		// 5H9nC62w1eMkyuBfF1SVBedGJBaHELC1qZRct2znKZKF7dov
+		array_bytes::hex2array_unchecked("0xe10bfc8e8d08f82e700520879bd8a3563e78f30f5bc7844d8b3244468c870faa")
+			.unchecked_into(),
+		// 5DCWpjyj3AcdcMWXSggTDUXYpTnbH4Lzadb21k6QqCw3ez7k
+		array_bytes::hex2array_unchecked("0x32310e386bb37fe6ffc3ba8b40ec47c83b35791652f589493ccc8d614b472c7b")
+			.unchecked_into(),
+		// 5DCWpjyj3AcdcMWXSggTDUXYpTnbH4Lzadb21k6QqCw3ez7k
+		array_bytes::hex2array_unchecked("0x32310e386bb37fe6ffc3ba8b40ec47c83b35791652f589493ccc8d614b472c7b")
+			.unchecked_into(),
+	)];
+
+	// generated with secret: subkey inspect "$secret"//fir
+	let root_key: AccountId = array_bytes::hex_n_into_unchecked(
+		// 5GmhCNaVnsTtrmNZMg6gb2EJAQQpqgg1GpnLwjCRtdm9ivtQ
+		"0xd033c5d047d45a6209f20496dd0aefd5339975c4d54c63d86947c3c07cf8174f",
+	);
+
+	let endowed_accounts: Vec<AccountId> = vec![root_key.clone()];
+
+	testnet_genesis(
+		initial_authorities,
+		vec![],
+		root_key,
+		Some(endowed_accounts),
+		1516,
+		2000.into(),
 		ETH_RPC_URL_TESTNET,
 	)
 }
@@ -178,7 +228,23 @@ pub fn local_testnet_config() -> ChainSpec {
 		None,
 		None,
 		Some(properties()),
-		Extensions { relay_chain: "rococo-local".into(), para_id: 1516_u32 },
+		Extensions { relay_chain: "rococo-local".into(), para_id: 2000_u32 },
+	)
+}
+
+/// Live testnet config
+pub fn live_testnet_config() -> ChainSpec {
+	ChainSpec::from_genesis(
+		"Societal Live Testnet",
+		"societal_live_testnet",
+		ChainType::Live,
+		live_testnet_genesis,
+		vec![],
+		None,
+		None,
+		None,
+		Some(properties()),
+		Extensions { relay_chain: "rococo".into(), para_id: 2000_u32 },
 	)
 }
 
@@ -197,7 +263,7 @@ pub fn testnet_genesis(
 	root_key: AccountId,
 	endowed_accounts: Option<Vec<AccountId>>,
 	chain_id: u64,
-	_para_id: ParaId,
+	para_id: ParaId,
 	eth_rpc_url: &str,
 ) -> GenesisConfig {
 	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
@@ -262,7 +328,7 @@ pub fn testnet_genesis(
 			// Assign network admin rights.
 			key: Some(root_key),
 		},
-		parachain_info: ParachainInfoConfig { parachain_id: _para_id },
+		parachain_info: ParachainInfoConfig { parachain_id: para_id },
 		collator_selection: CollatorSelectionConfig {
 			invulnerables: initial_authorities.iter().map(|x| x.0.clone()).collect(),
 			candidacy_bond: EXISTENTIAL_DEPOSIT * 16,
@@ -327,23 +393,6 @@ pub fn testnet_genesis(
 			accounts: {
 				let mut map = BTreeMap::new();
 				map.insert(
-					// H160 address of Alice dev account
-					// Derived from SS58 (42 prefix) address
-					// SS58: 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY
-					// hex: 0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d
-					// Using the full hex key, truncating to the first 20 bytes (the first 40 hex
-					// chars)
-					H160::from_str("d43593c715fdd31c61141abd04a99fd6822c8558")
-						.expect("internal H160 is valid; qed"),
-					fp_evm::GenesisAccount {
-						balance: U256::from_str("0xffffffffffffffffffffffffffffffff")
-							.expect("internal U256 is valid; qed"),
-						code: Default::default(),
-						nonce: Default::default(),
-						storage: Default::default(),
-					},
-				);
-				map.insert(
 					// H160 address of CI test runner account
 					H160::from_str("6be02d1d3665660d22ff9624b7be0551ee1ac91b")
 						.expect("internal H160 is valid; qed"),
@@ -353,17 +402,6 @@ pub fn testnet_genesis(
 						code: Default::default(),
 						nonce: Default::default(),
 						storage: Default::default(),
-					},
-				);
-				map.insert(
-					// H160 address for benchmark usage
-					H160::from_str("1000000000000000000000000000000000000001")
-						.expect("internal H160 is valid; qed"),
-					fp_evm::GenesisAccount {
-						nonce: U256::from(1),
-						balance: U256::from(1_000_000_000_000_000_000_000_000u128),
-						storage: Default::default(),
-						code: vec![0x00],
 					},
 				);
 				map
