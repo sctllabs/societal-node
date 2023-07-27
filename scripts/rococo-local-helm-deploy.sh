@@ -11,7 +11,7 @@ helm \
   rococo-alice \
   --install \
   ../helm-charts/charts/node \
-  -f ./examples/rococo-values.yaml \
+  -f ./deployment/rococo-values.yaml \
   --set node.role="validator" \
   --set node.customNodeKey="91cb59d86820419075b08e3043cd802ba3506388d8b161d2d4acd203af5194c1" \
   --set node.perNodeServices.relayP2pService.enabled=true \
@@ -25,11 +25,11 @@ helm \
   rococo-bob \
   --install \
   ../helm-charts/charts/node \
-  -f ./examples/rococo-values.yaml \
+  -f ./deployment/rococo-values.yaml \
   --set node.role="validator" \
   --set "node.flags[0]=--bob" \
   --set "node.flags[1]=--bootnodes" \
-  --set "node.flags[2]='/dns4/rococo-alice-node-0-relay-chain-p2p/tcp/30333/p2p/12D3KooWMeR4iQLRBNq87ViDf9W7f6cc9ydAPJgmq48rAH116WoC'"
+  --set "node.flags[2]='/dns4/rococo-alice-node-0-relay-chain-p2p/tcp/30333/p2p/12D3KooWJHhnF64TXSmyxNkhPkXAHtYNRy86LuvGQu1LTi5vrJCL'"
 
 # Charlie Validator
 helm \
@@ -38,7 +38,7 @@ helm \
   rococo-charlie \
   --install \
   ../helm-charts/charts/node \
-  -f ./examples/rococo-values.yaml \
+  -f ./deployment/rococo-values.yaml \
   --set node.role="validator" \
   --set "node.flags[0]=--charlie" \
   --set "node.flags[1]=--bootnodes" \
@@ -53,7 +53,7 @@ helm \
   rococo-pool \
   --install \
   ../helm-charts/charts/node \
-  -f ./examples/rococo-values.yaml \
+  -f ./deployment/rococo-values.yaml \
   --set node.replicas=2 \
   --set "node.flags[0]=--bootnodes" \
   --set "node.flags[1]='/dns4/rococo-alice-node-0-relay-chain-p2p/tcp/30333/p2p/12D3KooWMeR4iQLRBNq87ViDf9W7f6cc9ydAPJgmq48rAH116WoC'"
@@ -64,10 +64,10 @@ echo "*** Deploying Societal Parachain 2000 ***"
 helm \
   -n rococo-dev \
   upgrade \
-  societal-parachain-node \
+  societal-node \
   --install \
   ../helm-charts/charts/node \
-  -f ./examples/parachain-values.yaml \
+  -f ./deployment/parachain-values.yaml \
   --set "node.collatorRelayChain.flags[0]=--bootnodes" \
   --set "node.collatorRelayChain.flags[1]='/dns4/rococo-alice-node-0-relay-chain-p2p/tcp/30333/p2p/12D3KooWMeR4iQLRBNq87ViDf9W7f6cc9ydAPJgmq48rAH116WoC'"
 
@@ -80,6 +80,6 @@ helm \
   societal-parachain-node \
   --install \
   ../helm-charts/charts/node \
-  -f ./examples/parachain-2001-values.yaml \
+  -f ./deployment/parachain-2001-values.yaml \
   --set "node.collatorRelayChain.flags[0]=--bootnodes" \
   --set "node.collatorRelayChain.flags[1]='/dns4/rococo-alice-node-0-relay-chain-p2p/tcp/30333/p2p/12D3KooWMeR4iQLRBNq87ViDf9W7f6cc9ydAPJgmq48rAH116WoC'"
