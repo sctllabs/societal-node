@@ -151,7 +151,6 @@ pallet-evm-precompile-dispatch = { version = "2.0.0-dev", default-features = fal
 pallet-evm-precompile-modexp = { version = "2.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.41" }
 pallet-evm-precompile-sha3fips = { version = "2.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.41" }
 pallet-evm-precompile-simple = { version = "2.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.41" }
-pallet-hotfix-sufficients = { version = "1.0.0-dev", default-features = false, git = "https://github.com/sctllabs/frontier.git", branch = "polkadot-v0.9.41" }
 
 # Used for the node's RPCs
 frame-system-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.41" }

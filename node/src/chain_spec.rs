@@ -5,22 +5,29 @@ use sc_chain_spec::{ChainSpecExtension, Properties};
 use sc_service::ChainType;
 use serde::{Deserialize, Serialize};
 use societal_node_runtime::{
-	wasm_binary_unwrap, AccountId, AuthorityDiscoveryConfig, Balance, BalancesConfig,
-	CollatorSelectionConfig, CouncilConfig, DaoConfig, DaoEthGovernanceConfig, DemocracyConfig,
-	EVMChainIdConfig, EVMConfig, ElectionsConfig, GenesisConfig, GrandpaConfig, IndicesConfig,
-	MaxNominations, NominationPoolsConfig, ParachainInfoConfig, PolkadotXcmConfig, SessionConfig,
-	SessionKeys, Signature, SocietyConfig, StakerStatus, StakingConfig, SudoConfig, SystemConfig,
-	TechnicalCommitteeConfig, DOLLARS, EXISTENTIAL_DEPOSIT,
+	wasm_binary_unwrap, AccountId, AuthorityDiscoveryConfig, BalancesConfig,
+	CollatorSelectionConfig, CouncilConfig, DaoConfig, DaoEthGovernanceConfig, GenesisConfig,
+	GrandpaConfig, ParachainInfoConfig, PolkadotXcmConfig, SessionConfig, SessionKeys, Signature,
+	SudoConfig, SystemConfig, EXISTENTIAL_DEPOSIT,
 };
+
+#[cfg(feature = "full")]
+use {
+	societal_node_runtime::{
+		chain_config::MaxNominations, Balance, DemocracyConfig, ElectionsConfig, IndicesConfig,
+		NominationPoolsConfig, SocietyConfig, StakerStatus, StakingConfig,
+		TechnicalCommitteeConfig, DOLLARS,
+	},
+	sp_runtime::Perbill,
+};
+
+use societal_node_runtime::{EVMChainIdConfig, EVMConfig};
 
 use sc_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::UncheckedInto, sr25519, Pair, Public, H160, U256};
-use sp_runtime::{
-	traits::{IdentifyAccount, Verify},
-	Perbill,
-};
+use sp_runtime::traits::{IdentifyAccount, Verify};
 
 const ETH_RPC_URL_TESTNET: &str = "https://goerli.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161";
 
@@ -266,7 +273,9 @@ pub fn testnet_genesis(
 	para_id: ParaId,
 	eth_rpc_url: &str,
 ) -> GenesisConfig {
+	#[cfg(feature = "full")]
 	const ENDOWMENT: Balance = 10_000_000 * DOLLARS;
+	#[cfg(feature = "full")]
 	const STASH: Balance = ENDOWMENT / 1000;
 
 	let mut endowed_accounts: Vec<AccountId> = endowed_accounts.unwrap_or_else(|| {
@@ -286,6 +295,7 @@ pub fn testnet_genesis(
 		]
 	});
 
+	#[cfg(feature = "full")]
 	let num_endowed_accounts = endowed_accounts.len();
 
 	// endow all authorities and nominators.
@@ -300,7 +310,9 @@ pub fn testnet_genesis(
 		});
 
 	// stakers: all validators and nominators.
+	#[cfg(feature = "full")]
 	let mut rng = rand::thread_rng();
+	#[cfg(feature = "full")]
 	let stakers = initial_authorities
 		.iter()
 		.map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator))
@@ -343,6 +355,7 @@ pub fn testnet_genesis(
 				})
 				.collect::<Vec<_>>(),
 		},
+		#[cfg(feature = "full")]
 		staking: StakingConfig {
 			validator_count: initial_authorities.len() as u32,
 			minimum_validator_count: initial_authorities.len() as u32,
@@ -354,12 +367,14 @@ pub fn testnet_genesis(
 		council: CouncilConfig::default(),
 		aura: Default::default(),
 		aura_ext: Default::default(),
+		#[cfg(feature = "full")]
 		nomination_pools: NominationPoolsConfig {
 			min_create_bond: 10 * DOLLARS,
 			min_join_bond: DOLLARS,
 			..Default::default()
 		},
 		authority_discovery: AuthorityDiscoveryConfig { keys: vec![] },
+		#[cfg(feature = "full")]
 		technical_committee: TechnicalCommitteeConfig {
 			members: endowed_accounts
 				.iter()
@@ -368,8 +383,11 @@ pub fn testnet_genesis(
 				.collect(),
 			phantom: Default::default(),
 		},
+		#[cfg(feature = "full")]
 		democracy: DemocracyConfig::default(),
+		#[cfg(feature = "full")]
 		indices: IndicesConfig { indices: vec![] },
+		#[cfg(feature = "full")]
 		elections: ElectionsConfig {
 			members: endowed_accounts
 				.iter()
@@ -378,6 +396,7 @@ pub fn testnet_genesis(
 				.map(|member| (member, STASH))
 				.collect(),
 		},
+		#[cfg(feature = "full")]
 		society: SocietyConfig {
 			members: endowed_accounts
 				.iter()

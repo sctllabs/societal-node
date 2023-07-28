@@ -6897,22 +6897,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-hotfix-sufficients"
-version = "1.0.0"
-source = "git+https://github.com/sctllabs/frontier.git?branch=polkadot-v0.9.41#85cdbee575277f038cfd65b6538ef535f742ac64"
-dependencies = [
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "pallet-evm",
- "parity-scale-codec",
- "scale-info",
- "sp-core",
- "sp-runtime",
- "sp-std",
-]
-
-[[package]]
 name = "pallet-identity"
 version = "4.0.0-dev"
 source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.41#3bd809d59c31c7205a0f36c6ddcba603e43051fc"
@@ -11849,7 +11833,6 @@ dependencies = [
  "pallet-evm-precompile-simple",
  "pallet-evm-precompileset-assets-erc20",
  "pallet-grandpa",
- "pallet-hotfix-sufficients",
  "pallet-im-online",
  "pallet-indices",
  "pallet-insecure-randomness-collective-flip",

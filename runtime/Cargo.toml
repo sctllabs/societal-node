@@ -103,7 +103,6 @@ pallet-evm-precompile-dispatch = { workspace = true }
 pallet-evm-precompile-modexp = { workspace = true }
 pallet-evm-precompile-sha3fips = { workspace = true }
 pallet-evm-precompile-simple = { workspace = true }
-pallet-hotfix-sufficients = { workspace = true }
 
 # Used for the node's RPCs
 frame-system-rpc-runtime-api = { workspace = true }
@@ -164,6 +163,10 @@ substrate-wasm-builder = { workspace = true }
 [features]
 default = ["std"]
 
+full = []
+
+evm = []
+
 std = [
 	"codec/std",
 	"cumulus-pallet-aura-ext/std",
@@ -216,7 +219,6 @@ std = [
 	"pallet-evm-precompile-sha3fips/std",
 	"pallet-evm-precompile-simple/std",
 	"pallet-grandpa/std",
-	"pallet-hotfix-sufficients/std",
 	"pallet-im-online/std",
 	"pallet-indices/std",
 	"pallet-membership/std",
@@ -297,7 +299,6 @@ runtime-benchmarks = [
 	"pallet-ethereum/runtime-benchmarks",
 	"pallet-evm/runtime-benchmarks",
 	"pallet-grandpa/runtime-benchmarks",
-	"pallet-hotfix-sufficients/runtime-benchmarks",
 	"pallet-im-online/runtime-benchmarks",
 	"pallet-indices/runtime-benchmarks",
 	"pallet-membership/runtime-benchmarks",

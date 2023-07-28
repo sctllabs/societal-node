@@ -1,4 +1,6 @@
 use super::*;
+
+use eth_primitives::EthService;
 use frame_support::{parameter_types, PalletId};
 use node_primitives::BlockNumber;
 use pallet_dao::EnsureDao;
@@ -52,7 +54,6 @@ impl pallet_dao::Config for Runtime {
 }
 
 parameter_types! {
-	pub const CouncilMotionDuration: BlockNumber = 5 * DAYS;
 	pub const CouncilMaxProposals: u32 = 50;
 	pub const CouncilMaxMembers: u32 = 100;
 	pub const CollectiveMaxVotes: u32 = 100;
