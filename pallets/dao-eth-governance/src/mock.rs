@@ -239,7 +239,9 @@ impl pallet_dao::Config for Test {
 	type PalletsOrigin = OriginCaller;
 	type Preimages = ();
 	type SpendDaoFunds = ();
-	type DaoReferendumScheduler = ();
+	type DaoDemocracyProvider = ();
+	type DaoEthGovernanceProvider = ();
+	type DaoBountiesProvider = ();
 	type DaoSubscriptionProvider = ();
 	type WeightInfo = ();
 

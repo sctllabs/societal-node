@@ -43,7 +43,9 @@ impl pallet_dao::Config for Runtime {
 	type PalletsOrigin = OriginCaller;
 	type Preimages = Preimage;
 	type SpendDaoFunds = DaoTreasury;
-	type DaoReferendumScheduler = DaoDemocracy;
+	type DaoDemocracyProvider = DaoDemocracy;
+	type DaoEthGovernanceProvider = DaoEthGovernance;
+	type DaoBountiesProvider = DaoBounties;
 	type DaoSubscriptionProvider = DaoSubscription;
 	type WeightInfo = pallet_dao::weights::SubstrateWeight<Runtime>;
 
@@ -131,6 +133,7 @@ impl pallet_dao_membership::Config<DaoCouncilMembership> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type MembershipInitialized = DaoCouncil;
 	type MembershipChanged = DaoCouncil;
+	type MembershipRemoved = DaoCouncil;
 	type MaxMembers = TechnicalMaxMembers;
 	type WeightInfo = pallet_dao_membership::weights::SubstrateWeight<Runtime>;
 	type DaoProvider = Dao;
@@ -142,6 +145,7 @@ impl pallet_dao_membership::Config<DaoTechnicalCommitteeMembership> for Runtime 
 	type RuntimeEvent = RuntimeEvent;
 	type MembershipInitialized = DaoTechnicalCommittee;
 	type MembershipChanged = DaoTechnicalCommittee;
+	type MembershipRemoved = DaoTechnicalCommittee;
 	type MaxMembers = TechnicalMaxMembers;
 	type WeightInfo = pallet_dao_membership::weights::SubstrateWeight<Runtime>;
 	type DaoProvider = Dao;

@@ -158,8 +158,8 @@ use codec::Encode;
 #[cfg(feature = "runtime-benchmarks")]
 use dao_primitives::DaoReferendumBenchmarkHelper;
 use dao_primitives::{
-	DaoGovernance, DaoOrigin, DaoPolicy, DaoProvider, DaoReferendumScheduler, DaoToken, EncodeInto,
-	GovernanceV1Policy, RawOrigin,
+	DaoDemocracyProvider, DaoGovernance, DaoOrigin, DaoPolicy, DaoProvider, DaoReferendumScheduler,
+	DaoToken, EncodeInto, GovernanceV1Policy, RawOrigin,
 };
 use frame_support::{
 	dispatch::{DispatchResult, DispatchResultWithPostInfo, Pays},
@@ -508,6 +508,8 @@ pub mod pallet {
 		Seconded { dao_id: DaoId, seconder: T::AccountId, prop_index: PropIndex },
 		/// A proposal got canceled.
 		ProposalCanceled { dao_id: DaoId, prop_index: PropIndex },
+		/// Purged DAO related storage data
+		DaoPurged { dao_id: DaoId },
 	}
 
 	#[pallet::error]
@@ -1914,6 +1916,31 @@ impl<T: Config> DaoReferendumScheduler<DaoId> for Pallet<T> {
 				*ref_index += 1
 			}
 		});
+
+		Ok(())
+	}
+}
+
+impl<T: Config> DaoDemocracyProvider<DaoId> for Pallet<T> {
+	fn purge_dao(dao_id: DaoId) -> DispatchResult {
+		let proposals = PublicProps::<T>::get(dao_id);
+		for (index, _, _) in proposals {
+			if let Some((_, _)) = DepositOf::<T>::get(dao_id, index) {
+				// TODO: return deposits
+			}
+
+			DepositOf::<T>::remove(dao_id, index)
+		}
+
+		PublicProps::<T>::remove(dao_id);
+
+		let ref_index = ReferendumCount::<T>::get(dao_id);
+		ReferendumInfoOf::<T>::remove(dao_id, ref_index);
+		ReferendumCount::<T>::remove(dao_id);
+
+		let _ = VotingOf::<T>::clear_prefix(dao_id, T::MaxVotes::get(), None);
+
+		Self::deposit_event(Event::DaoPurged { dao_id });
 
 		Ok(())
 	}

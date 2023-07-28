@@ -361,6 +361,10 @@ pub trait ContainsDaoMember<DaoId, AccountId> {
 	fn contains(dao_id: DaoId, who: &AccountId) -> Result<bool, DispatchError>;
 }
 
+pub trait RemoveDaoMembers<DaoId> {
+	fn remove_members(dao_id: DaoId, purge: bool) -> Result<(), DispatchError>;
+}
+
 /// Trait for type that can handle incremental changes to a set of account IDs.
 pub trait ChangeDaoMembers<DaoId, AccountId: Clone + Ord> {
 	/// A number of members `incoming` just joined the set and replaced some `outgoing` ones. The
@@ -453,6 +457,39 @@ impl<DaoId> DaoReferendumScheduler<DaoId> for () {
 		Ok(())
 	}
 	fn bake_referendum(_dao_id: DaoId) -> DispatchResult {
+		Ok(())
+	}
+}
+
+pub trait DaoDemocracyProvider<DaoId> {
+	fn purge_dao(dao_id: DaoId) -> DispatchResult;
+}
+
+/// Empty implementation.
+impl<DaoId> DaoDemocracyProvider<DaoId> for () {
+	fn purge_dao(_: DaoId) -> DispatchResult {
+		Ok(())
+	}
+}
+
+pub trait DaoEthGovernanceProvider<DaoId> {
+	fn purge_dao(dao_id: DaoId) -> DispatchResult;
+}
+
+/// Empty implementation.
+impl<DaoId> DaoEthGovernanceProvider<DaoId> for () {
+	fn purge_dao(_: DaoId) -> DispatchResult {
+		Ok(())
+	}
+}
+
+pub trait DaoBountiesProvider<DaoId> {
+	fn purge_dao(dao_id: DaoId) -> DispatchResult;
+}
+
+/// Empty implementation.
+impl<DaoId> DaoBountiesProvider<DaoId> for () {
+	fn purge_dao(_: DaoId) -> DispatchResult {
 		Ok(())
 	}
 }
@@ -594,6 +631,10 @@ pub trait DaoSubscriptionProvider<DaoId, AccountId, BlockNumber, Tier, Details> 
 		tier: Option<Tier>,
 	) -> Result<(), DispatchError>;
 
+	/// Unsubscribes DAO
+	/// - `dao_id`: DAO ID.
+	fn unsubscribe(dao_id: DaoId) -> Result<(), DispatchError>;
+
 	/// Extends DAO subscription
 	/// - `dao_id`: DAO ID.
 	/// - `account_id`: The Account to charge the subscription payment from.
@@ -629,6 +670,10 @@ impl<DaoId, AccountId, BlockNumber, Balance>
 		_account_id: &AccountId,
 		_tier: Option<VersionedDaoSubscriptionTier>,
 	) -> Result<(), DispatchError> {
+		Ok(())
+	}
+
+	fn unsubscribe(_: DaoId) -> Result<(), DispatchError> {
 		Ok(())
 	}
 

@@ -54,6 +54,7 @@ pub use weights::WeightInfo;
 
 use dao_primitives::{
 	ChangeDaoMembers, ContainsDaoMember, DaoPolicy, DaoProvider, InitializeDaoMembers,
+	RemoveDaoMembers,
 };
 
 /// Dao ID. Just a `u32`.
@@ -85,6 +86,9 @@ pub mod pallet {
 
 		/// The receiver of the signal for when the membership has changed.
 		type MembershipChanged: ChangeDaoMembers<DaoId, Self::AccountId>;
+
+		/// The receiver of the signal for when the membership is removed.
+		type MembershipRemoved: RemoveDaoMembers<DaoId>;
 
 		/// The maximum number of members that this membership can have.
 		///
@@ -338,6 +342,16 @@ impl<T: Config<I>, I: 'static> InitializeDaoMembers<DaoId, T::AccountId> for Pal
 			T::MembershipInitialized::initialize_members(dao_id, members.clone().into())?;
 			<Members<T, I>>::insert(dao_id, members);
 		}
+
+		Ok(())
+	}
+}
+
+impl<T: Config<I>, I: 'static> RemoveDaoMembers<DaoId> for Pallet<T, I> {
+	fn remove_members(dao_id: DaoId, purge: bool) -> Result<(), DispatchError> {
+		<Members<T, I>>::remove(dao_id);
+
+		T::MembershipRemoved::remove_members(dao_id, purge)?;
 
 		Ok(())
 	}

@@ -116,6 +116,9 @@ pub mod pallet {
 			dao_id: DaoId,
 			reason: SuspensionReason,
 		},
+		DaoUnsubscribed {
+			dao_id: DaoId,
+		},
 	}
 
 	#[derive(PartialEq)]
@@ -391,6 +394,17 @@ impl<T: Config>
 		Subscriptions::<T>::insert(dao_id, subscription);
 
 		Self::deposit_event(Event::DaoSubscribed { dao_id, subscribed_at, until, tier, details });
+
+		Ok(())
+	}
+
+	fn unsubscribe(dao_id: DaoId) -> Result<(), DispatchError> {
+		let subscription = Subscriptions::<T>::get(dao_id);
+		if let Some(_) = subscription {
+			Subscriptions::<T>::remove(dao_id);
+
+			Self::deposit_event(Event::DaoUnsubscribed { dao_id });
+		}
 
 		Ok(())
 	}
