@@ -166,6 +166,12 @@ impl ContainsDaoMember<u32, AccountId> for TestCouncilProvider {
 	}
 }
 
+impl RemoveDaoMembers<u32> for TestCouncilProvider {
+	fn remove_members(_dao_id: u32, _purge: bool) -> Result<(), DispatchError> {
+		Ok(())
+	}
+}
+
 pub struct TestTechnicalCommitteeProvider;
 impl InitializeDaoMembers<u32, AccountId> for TestTechnicalCommitteeProvider {
 	fn initialize_members(
@@ -184,6 +190,12 @@ impl InitializeDaoMembers<u32, AccountId> for TestTechnicalCommitteeProvider {
 impl ContainsDaoMember<u32, AccountId> for TestTechnicalCommitteeProvider {
 	fn contains(_dao_id: u32, _who: &AccountId) -> Result<bool, DispatchError> {
 		Ok(true)
+	}
+}
+
+impl RemoveDaoMembers<u32> for TestTechnicalCommitteeProvider {
+	fn remove_members(_dao_id: u32, _purge: bool) -> Result<(), DispatchError> {
+		Ok(())
 	}
 }
 

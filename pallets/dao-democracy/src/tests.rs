@@ -23,7 +23,7 @@
 
 use super::*;
 use crate as pallet_democracy;
-use dao_primitives::{ContainsDaoMember, InitializeDaoMembers};
+use dao_primitives::{ContainsDaoMember, InitializeDaoMembers, RemoveDaoMembers};
 use frame_support::{
 	assert_noop, assert_ok, ord_parameter_types, parameter_types,
 	traits::{
@@ -242,6 +242,12 @@ impl InitializeDaoMembers<u32, AccountId> for TestCouncilProvider {
 impl ContainsDaoMember<u32, AccountId> for TestCouncilProvider {
 	fn contains(_dao_id: u32, _who: &AccountId) -> Result<bool, DispatchError> {
 		Ok(true)
+	}
+}
+
+impl RemoveDaoMembers<u32> for TestCouncilProvider {
+	fn remove_members(_dao_id: u32, _purge: bool) -> Result<(), DispatchError> {
+		Ok(())
 	}
 }
 

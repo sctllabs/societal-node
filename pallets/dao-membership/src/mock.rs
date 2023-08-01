@@ -104,6 +104,12 @@ impl InitializeDaoMembers<u32, u64> for TestChangeMembers {
 	}
 }
 
+impl RemoveDaoMembers<u32> for TestChangeMembers {
+	fn remove_members(_dao_id: u32, _purge: bool) -> Result<(), DispatchError> {
+		Ok(())
+	}
+}
+
 pub struct TestDaoProvider;
 impl DaoProvider<u64, H256> for TestDaoProvider {
 	type Id = u32;
@@ -185,6 +191,7 @@ impl Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type MembershipInitialized = TestChangeMembers;
 	type MembershipChanged = TestChangeMembers;
+	type MembershipRemoved = TestChangeMembers;
 	type MaxMembers = ConstU32<10>;
 	type WeightInfo = ();
 	type DaoProvider = TestDaoProvider;

@@ -189,3 +189,26 @@ fn create_dao_works() {
 		);
 	});
 }
+
+#[test]
+fn remove_dao_works() {
+	new_test_ext().execute_with(|| {
+		let account = Public::from_string("/Alice").ok().unwrap();
+		Balances::make_free_balance_be(&account, 1_000_000_000_000_000_000);
+		let account1 = Public::from_string("/Bob").ok().unwrap();
+
+		let dao = serde_json::to_vec(&get_dao_json()).ok().unwrap();
+
+		assert_ok!(DaoFactory::create_dao(
+			RuntimeOrigin::signed(account.clone()),
+			vec![account.clone(), account1.clone()],
+			vec![],
+			dao
+		));
+
+		assert_ok!(DaoFactory::remove_dao(RuntimeOrigin::root(), 0));
+
+		assert_eq!(DaoFactory::daos(0).is_none(), true);
+		assert_eq!(DaoFactory::policies(0).is_none(), true);
+	})
+}

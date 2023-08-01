@@ -650,19 +650,14 @@ pub mod pallet {
 			)
 		}
 
-		// TODO: add benchmarking
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::remove_dao())]
 		#[pallet::call_index(11)]
 		pub fn remove_dao(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
 			ensure_root(origin)?;
 
-			Daos::<T>::get(dao_id)
-				.ok_or(Error::<T>::DaoNotExist.into())
-				.map_err(|e: Error<T>| e)?;
+			Daos::<T>::get(dao_id).ok_or(Error::<T>::DaoNotExist)?;
 
-			let policy = Policies::<T>::get(dao_id)
-				.ok_or(Error::<T>::PolicyNotExist.into())
-				.map_err(|e: Error<T>| e)?;
+			let policy = Policies::<T>::get(dao_id).ok_or(Error::<T>::PolicyNotExist)?;
 
 			Daos::<T>::remove(dao_id);
 			Policies::<T>::remove(dao_id);
@@ -683,14 +678,12 @@ pub mod pallet {
 			T::Scheduler::cancel_named(spend_task_id)?;
 
 			let DaoPolicy { governance, .. } = policy;
-			if let Some(governance) = governance {
-				if let DaoGovernance::GovernanceV1(_) = governance {
-					let ref_launch_task_id = Self::launch_dao_referendum_task_id(dao_id);
-					T::Scheduler::cancel_named(ref_launch_task_id)?;
+			if let Some(DaoGovernance::GovernanceV1(_)) = governance {
+				let ref_launch_task_id = Self::launch_dao_referendum_task_id(dao_id);
+				T::Scheduler::cancel_named(ref_launch_task_id)?;
 
-					let ref_bake_task_id = Self::bake_dao_referendum_task_id(dao_id);
-					T::Scheduler::cancel_named(ref_bake_task_id)?;
-				}
+				let ref_bake_task_id = Self::bake_dao_referendum_task_id(dao_id);
+				T::Scheduler::cancel_named(ref_bake_task_id)?;
 			}
 
 			Self::deposit_event(Event::DaoRemoved { dao_id });
