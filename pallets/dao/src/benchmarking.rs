@@ -267,5 +267,10 @@ benchmarks! {
 	}: _<T::RuntimeOrigin>(origin, 0, VersionedDaoSubscriptionTier::Default(DaoSubscriptionTierV1::Standard))
 	verify { }
 
+	remove_dao {
+		setup_dao::<T>(false, None)?;
+	}: _<T::RuntimeOrigin>(RawOrigin::Root.into(), 0)
+	verify { }
+
 	impl_benchmark_test_suite!(DaoFactory, crate::mock::new_test_ext(), crate::mock::Test);
 }

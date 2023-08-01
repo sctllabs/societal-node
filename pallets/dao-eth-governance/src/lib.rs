@@ -1317,7 +1317,7 @@ impl<T: Config> DaoEthGovernanceProvider<DaoId> for Pallet<T> {
 
 			Voting::<T>::remove(dao_id, hash);
 
-			if let Some(_) = PendingVoting::<T>::get(dao_id, hash) {
+			if PendingVoting::<T>::get(dao_id, hash).is_some() {
 				PendingVoting::<T>::remove(dao_id, hash);
 			}
 		}

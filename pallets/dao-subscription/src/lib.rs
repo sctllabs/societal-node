@@ -400,7 +400,7 @@ impl<T: Config>
 
 	fn unsubscribe(dao_id: DaoId) -> Result<(), DispatchError> {
 		let subscription = Subscriptions::<T>::get(dao_id);
-		if let Some(_) = subscription {
+		if subscription.is_some() {
 			Subscriptions::<T>::remove(dao_id);
 
 			Self::deposit_event(Event::DaoUnsubscribed { dao_id });
@@ -419,6 +419,10 @@ impl<T: Config>
 				match maybe_subscription {
 					None => Err(Error::<T>::SubscriptionNotExists.into()),
 					Some(subscription) => {
+						let (_, default_details) = Self::get_default_tier_details();
+						let details = SubscriptionTiers::<T>::get(subscription.tier.clone())
+							.map_or(default_details, |t| t);
+
 						let (duration, fn_call_limit, price) = match subscription.details {
 							VersionedDaoSubscriptionDetails::Default(
 								DaoSubscriptionDetailsV1 { duration, price, fn_call_limit, .. },
@@ -448,6 +452,7 @@ impl<T: Config>
 						subscription.status = status.clone();
 						subscription.last_renewed_at = Some(cur_block);
 						subscription.fn_balance = fn_balance;
+						subscription.details = details;
 
 						Ok((status, fn_balance))
 					},
