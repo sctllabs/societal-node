@@ -86,7 +86,7 @@ use sp_runtime::{
 
 use frame_support::dispatch::DispatchResultWithPostInfo;
 
-use dao_primitives::{DaoGovernance, DaoPolicy, DaoProvider, DaoToken};
+use dao_primitives::{DaoBountiesProvider, DaoGovernance, DaoPolicy, DaoProvider, DaoToken};
 use frame_support::{pallet_prelude::*, traits::fungibles::Transfer};
 use frame_system::pallet_prelude::*;
 use scale_info::TypeInfo;
@@ -290,6 +290,8 @@ pub mod pallet {
 		BountyCanceled { dao_id: DaoId, index: BountyIndex },
 		/// A bounty expiry is extended.
 		BountyExtended { dao_id: DaoId, index: BountyIndex, update_due: T::BlockNumber },
+		/// Purged DAO related storage data
+		DaoPurged { dao_id: DaoId },
 	}
 
 	/// Number of bounty proposals that have been made.
@@ -1142,5 +1144,23 @@ impl<Balance: Zero> ChildBountyManager<Balance> for () {
 
 	fn children_curator_fees(_bounty_id: BountyIndex) -> Balance {
 		Zero::zero()
+	}
+}
+
+impl<T: Config<I>, I: 'static> DaoBountiesProvider<DaoId> for Pallet<T, I> {
+	fn purge_dao(dao_id: DaoId) -> DispatchResult {
+		let bounty_count = BountyCount::<T, I>::get(dao_id);
+
+		for index in 0..bounty_count {
+			Bounties::<T, I>::remove(dao_id, index);
+			BountyDescriptions::<T, I>::remove(dao_id, index);
+		}
+
+		BountyApprovals::<T, I>::remove(dao_id);
+		BountyCount::<T, I>::remove(dao_id);
+
+		Self::deposit_event(Event::DaoPurged { dao_id });
+
+		Ok(())
 	}
 }

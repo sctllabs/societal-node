@@ -50,7 +50,7 @@ use sp_std::{marker::PhantomData, prelude::*, result, str};
 
 use dao_primitives::{
 	ChangeDaoMembers, DaoOrigin, DaoPolicy, DaoPolicyProportion, DaoProvider, EncodeInto,
-	InitializeDaoMembers, RawOrigin as DaoRawOrigin,
+	InitializeDaoMembers, RawOrigin as DaoRawOrigin, RemoveDaoMembers,
 };
 
 use frame_support::{
@@ -327,6 +327,8 @@ pub mod pallet {
 			yes: MemberCount,
 			no: MemberCount,
 		},
+		/// Purged DAO related storage data
+		DaoPurged { dao_id: DaoId },
 	}
 
 	#[pallet::error]
@@ -1136,6 +1138,30 @@ impl<T: Config<I>, I: 'static> InitializeDaoMembers<DaoId, T::AccountId> for Pal
 			BoundedVec::<T::AccountId, T::MaxMembers>::try_from(members)
 				.map_err(|_| Error::<T, I>::TooManyMembers)?,
 		);
+
+		Ok(())
+	}
+}
+
+impl<T: Config<I>, I: 'static> RemoveDaoMembers<DaoId> for Pallet<T, I> {
+	fn remove_members(dao_id: DaoId, purge: bool) -> Result<(), DispatchError> {
+		<Members<T, I>>::remove(dao_id);
+
+		if purge {
+			let proposals = Proposals::<T, I>::get(dao_id);
+
+			for hash in proposals {
+				ProposalOf::<T, I>::remove(dao_id, hash);
+
+				Voting::<T, I>::remove(dao_id, hash);
+			}
+
+			Proposals::<T, I>::remove(dao_id);
+
+			ProposalCount::<T, I>::remove(dao_id);
+
+			Self::deposit_event(Event::DaoPurged { dao_id });
+		}
 
 		Ok(())
 	}

@@ -13,8 +13,8 @@ use sp_runtime::{
 use sp_std::{iter::Sum, prelude::*, str};
 
 use dao_primitives::{
-	AccountTokenBalance, DaoPolicy, DaoProvider, DaoToken, EncodeInto, PendingProposal,
-	PendingVote, RawOrigin,
+	AccountTokenBalance, DaoEthGovernanceProvider, DaoPolicy, DaoProvider, DaoToken, EncodeInto,
+	PendingProposal, PendingVote, RawOrigin,
 };
 
 // TODO
@@ -545,6 +545,8 @@ pub mod pallet {
 			ayes: BalanceOf<T>,
 			nays: BalanceOf<T>,
 		},
+		/// Purged DAO related storage data
+		DaoPurged { dao_id: DaoId },
 	}
 
 	#[pallet::error]
@@ -1304,5 +1306,30 @@ impl<T: Config> BlockNumberProvider for Pallet<T> {
 impl<T: Config> EthRpcProvider for Pallet<T> {
 	fn get_rpc_url() -> Vec<u8> {
 		EthRpcUrl::<T>::get().to_vec()
+	}
+}
+
+impl<T: Config> DaoEthGovernanceProvider<DaoId> for Pallet<T> {
+	fn purge_dao(dao_id: DaoId) -> DispatchResult {
+		let proposals = Proposals::<T>::get(dao_id);
+		for hash in proposals {
+			ProposalOf::<T>::remove(dao_id, hash);
+
+			Voting::<T>::remove(dao_id, hash);
+
+			if let Some(_) = PendingVoting::<T>::get(dao_id, hash) {
+				PendingVoting::<T>::remove(dao_id, hash);
+			}
+		}
+
+		Proposals::<T>::remove(dao_id);
+
+		ProposalCount::<T>::remove(dao_id);
+
+		PendingProposals::<T>::remove(dao_id);
+
+		Self::deposit_event(Event::DaoPurged { dao_id });
+
+		Ok(())
 	}
 }

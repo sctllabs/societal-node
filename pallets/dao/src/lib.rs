@@ -220,10 +220,12 @@ pub mod pallet {
 		type DaoMinTreasurySpendPeriod: Get<u32>;
 
 		type CouncilProvider: InitializeDaoMembers<u32, Self::AccountId>
-			+ ContainsDaoMember<u32, Self::AccountId>;
+			+ ContainsDaoMember<u32, Self::AccountId>
+			+ RemoveDaoMembers<u32>;
 
 		type TechnicalCommitteeProvider: InitializeDaoMembers<u32, Self::AccountId>
-			+ ContainsDaoMember<u32, Self::AccountId>;
+			+ ContainsDaoMember<u32, Self::AccountId>
+			+ RemoveDaoMembers<u32>;
 
 		type AssetProvider: Inspect<
 				Self::AccountId,
@@ -260,7 +262,11 @@ pub mod pallet {
 		/// Runtime hooks to external pallet using treasury to compute spend funds.
 		type SpendDaoFunds: SpendDaoFunds<DaoId>;
 
-		type DaoReferendumScheduler: DaoReferendumScheduler<DaoId>;
+		type DaoDemocracyProvider: DaoDemocracyProvider<DaoId> + DaoReferendumScheduler<DaoId>;
+
+		type DaoEthGovernanceProvider: DaoEthGovernanceProvider<DaoId>;
+
+		type DaoBountiesProvider: DaoBountiesProvider<DaoId>;
 
 		type DaoSubscriptionProvider: DaoSubscriptionProvider<
 			DaoId,
@@ -454,6 +460,9 @@ pub mod pallet {
 			dao_id: DaoId,
 			policy: DaoPolicy,
 		},
+		DaoRemoved {
+			dao_id: DaoId,
+		},
 	}
 
 	#[pallet::error]
@@ -594,7 +603,7 @@ pub mod pallet {
 		pub fn launch_dao_referendum(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
 			Self::ensure_approved(origin, dao_id)?;
 
-			T::DaoReferendumScheduler::launch_referendum(dao_id)
+			T::DaoDemocracyProvider::launch_referendum(dao_id)
 		}
 
 		#[pallet::weight(T::WeightInfo::bake_dao_referendum())]
@@ -602,7 +611,7 @@ pub mod pallet {
 		pub fn bake_dao_referendum(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
 			Self::ensure_approved(origin, dao_id)?;
 
-			T::DaoReferendumScheduler::bake_referendum(dao_id)
+			T::DaoDemocracyProvider::bake_referendum(dao_id)
 		}
 
 		#[pallet::weight(T::WeightInfo::subscribe())]
@@ -639,6 +648,54 @@ pub mod pallet {
 				&Self::dao_account_id(dao_id),
 				tier,
 			)
+		}
+
+		// TODO: add benchmarking
+		#[pallet::weight(10_000)]
+		#[pallet::call_index(11)]
+		pub fn remove_dao(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
+			ensure_root(origin)?;
+
+			Daos::<T>::get(dao_id)
+				.ok_or(Error::<T>::DaoNotExist.into())
+				.map_err(|e: Error<T>| e)?;
+
+			let policy = Policies::<T>::get(dao_id)
+				.ok_or(Error::<T>::PolicyNotExist.into())
+				.map_err(|e: Error<T>| e)?;
+
+			Daos::<T>::remove(dao_id);
+			Policies::<T>::remove(dao_id);
+
+			T::DaoSubscriptionProvider::unsubscribe(dao_id)?;
+
+			T::CouncilProvider::remove_members(dao_id, true)?;
+
+			T::TechnicalCommitteeProvider::remove_members(dao_id, true)?;
+
+			T::DaoDemocracyProvider::purge_dao(dao_id)?;
+
+			T::DaoEthGovernanceProvider::purge_dao(dao_id)?;
+
+			T::DaoBountiesProvider::purge_dao(dao_id)?;
+
+			let spend_task_id = Self::spend_dao_funds_task_id(dao_id);
+			T::Scheduler::cancel_named(spend_task_id)?;
+
+			let DaoPolicy { governance, .. } = policy;
+			if let Some(governance) = governance {
+				if let DaoGovernance::GovernanceV1(_) = governance {
+					let ref_launch_task_id = Self::launch_dao_referendum_task_id(dao_id);
+					T::Scheduler::cancel_named(ref_launch_task_id)?;
+
+					let ref_bake_task_id = Self::bake_dao_referendum_task_id(dao_id);
+					T::Scheduler::cancel_named(ref_bake_task_id)?;
+				}
+			}
+
+			Self::deposit_event(Event::DaoRemoved { dao_id });
+
+			Ok(())
 		}
 	}
 
