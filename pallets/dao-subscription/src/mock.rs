@@ -3,14 +3,22 @@ use dao_primitives::{DaoOrigin, DaoPolicy, DaoProvider, DaoToken, DispatchResult
 use frame_support::{
 	dispatch::DispatchError,
 	parameter_types,
-	traits::{AsEnsureOriginWithArg, ConstU16, ConstU64, EnsureOriginWithArg},
+	traits::{
+		fungibles::{
+			metadata::{Inspect as MetadataInspect, Mutate as MetadataMutate},
+			Create, Inspect, Mutate, Transfer,
+		},
+		tokens::{DepositConsequence, WithdrawConsequence},
+		AsEnsureOriginWithArg, ConstU16, ConstU64, EnsureOriginWithArg,
+	},
 	PalletId,
 };
 use frame_system as system;
-use sp_core::{ConstU128, H256};
+use sp_core::{ConstU128, ConstU32, H256};
 use sp_runtime::{
 	testing::Header,
 	traits::{AccountIdConversion, BlakeTwo256, IdentityLookup},
+	DispatchResult,
 };
 
 use crate::Error;
@@ -73,12 +81,21 @@ impl pallet_balances::Config for Test {
 
 parameter_types! {
 	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
+
+	pub TokenId: u128 = 0;
+	pub TokenName: String = "dao_token".into();
+	pub TokenSymbol: String = "sctl".into();
+	pub TokenDecimals: u8 = 3;
+	pub TokenMinBalance: String = "1000000000".into();
 }
 
 impl pallet_dao_subscription::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = pallet_balances::Pallet<Test>;
+	type AssetId = u128;
 	type TreasuryPalletId = TreasuryPalletId;
+	type TokenBalancesLimit = ConstU32<10>;
+	type AssetProvider = TestAssetProvider;
 	type WeightInfo = ();
 }
 
@@ -159,6 +176,136 @@ impl DaoProvider<u128, H256> for TestDaoProvider {
 	#[cfg(feature = "runtime-benchmarks")]
 	fn try_successful_origin(dao_origin: &DaoOrigin<u128>) -> Result<Self::Origin, ()> {
 		Self::ApproveOrigin::try_successful_origin(dao_origin)
+	}
+}
+
+pub struct TestAssetProvider;
+impl Create<AccountId> for TestAssetProvider {
+	fn create(
+		_id: u128,
+		_admin: AccountId,
+		_is_sufficient: bool,
+		_min_balance: u128,
+	) -> DispatchResult {
+		Ok(())
+	}
+}
+
+impl Inspect<AccountId> for TestAssetProvider {
+	type AssetId = u128;
+	type Balance = u128;
+
+	fn total_issuance(asset: Self::AssetId) -> Self::Balance {
+		if asset == 2 {
+			return 1
+		}
+
+		0
+	}
+
+	fn minimum_balance(asset: Self::AssetId) -> Self::Balance {
+		if asset == TokenId::get() {
+			return TokenMinBalance::get().parse::<u128>().unwrap()
+		}
+
+		0
+	}
+
+	fn balance(_asset: Self::AssetId, _who: &AccountId) -> Self::Balance {
+		0
+	}
+
+	fn reducible_balance(
+		_asset: Self::AssetId,
+		_who: &AccountId,
+		_keep_alive: bool,
+	) -> Self::Balance {
+		0
+	}
+
+	fn can_deposit(
+		_asset: Self::AssetId,
+		_who: &AccountId,
+		_amount: Self::Balance,
+		_mint: bool,
+	) -> DepositConsequence {
+		DepositConsequence::Success
+	}
+
+	fn can_withdraw(
+		_asset: Self::AssetId,
+		_who: &AccountId,
+		_amount: Self::Balance,
+	) -> WithdrawConsequence<Self::Balance> {
+		WithdrawConsequence::Success
+	}
+
+	fn asset_exists(_asset: Self::AssetId) -> bool {
+		true
+	}
+}
+
+impl Mutate<AccountId> for TestAssetProvider {
+	fn mint_into(_asset: u128, _who: &AccountId, _amount: u128) -> DispatchResult {
+		Ok(())
+	}
+
+	fn burn_from(_asset: u128, _who: &AccountId, _amount: u128) -> Result<u128, DispatchError> {
+		Ok(0)
+	}
+
+	fn slash(_asset: u128, _who: &AccountId, _amount: u128) -> Result<u128, DispatchError> {
+		Ok(0)
+	}
+}
+
+impl MetadataInspect<AccountId> for TestAssetProvider {
+	fn name(asset: u128) -> Vec<u8> {
+		if asset == TokenId::get() {
+			return TokenName::get().as_bytes().to_vec()
+		}
+
+		vec![]
+	}
+
+	fn symbol(asset: u128) -> Vec<u8> {
+		if asset == TokenId::get() {
+			return TokenSymbol::get().as_bytes().to_vec()
+		}
+
+		vec![]
+	}
+
+	fn decimals(asset: u128) -> u8 {
+		if asset == TokenId::get() {
+			return TokenDecimals::get()
+		}
+
+		0
+	}
+}
+
+impl MetadataMutate<AccountId> for TestAssetProvider {
+	fn set(
+		_asset: u128,
+		_from: &AccountId,
+		_name: Vec<u8>,
+		_symbol: Vec<u8>,
+		_decimals: u8,
+	) -> DispatchResult {
+		Ok(())
+	}
+}
+
+impl Transfer<AccountId> for TestAssetProvider {
+	fn transfer(
+		_asset: u128,
+		_source: &AccountId,
+		_dest: &AccountId,
+		amount: u128,
+		_keep_alive: bool,
+	) -> Result<Self::Balance, DispatchError> {
+		Ok(amount)
 	}
 }
 

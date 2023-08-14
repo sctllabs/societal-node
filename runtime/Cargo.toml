@@ -138,6 +138,10 @@ cumulus-primitives-utility = { workspace = true }
 pallet-collator-selection = { workspace = true }
 parachain-info = { workspace = true }
 
+# Astar
+astar-primitives = { workspace = true }
+pallet-xc-asset-config = { workspace = true }
+
 # Local Dependencies
 dao-primitives = { workspace = true }
 eth-primitives = { workspace = true }
@@ -242,6 +246,7 @@ std = [
 	"pallet-utility/std",
 	"pallet-vesting/std",
 	"pallet-xcm/std",
+	"pallet-xc-asset-config/std",
 	"parachain-info/std",
 	"polkadot-parachain/std",
 	"polkadot-runtime-common/std",

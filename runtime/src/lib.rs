@@ -16,6 +16,7 @@ pub fn wasm_binary_unwrap() -> &'static [u8] {
 	)
 }
 
+use astar_primitives::xcm::AssetLocationIdConverter;
 use codec::{Decode, Encode, MaxEncodedLen};
 
 // Frontier
@@ -60,9 +61,9 @@ use sp_runtime::{
 	curve::PiecewiseLinear,
 	generic, impl_opaque_keys,
 	traits::{
-		AccountIdLookup, BlakeTwo256, Block as BlockT, Convert, ConvertInto, DispatchInfoOf,
-		Dispatchable, NumberFor, OpaqueKeys, PostDispatchInfoOf, SaturatedConversion,
-		UniqueSaturatedInto,
+		AccountIdConversion, AccountIdLookup, BlakeTwo256, Block as BlockT, Convert, ConvertInto,
+		DispatchInfoOf, Dispatchable, NumberFor, OpaqueKeys, PostDispatchInfoOf,
+		SaturatedConversion, UniqueSaturatedInto,
 	},
 	transaction_validity::{
 		TransactionPriority, TransactionSource, TransactionValidity, TransactionValidityError,
@@ -150,7 +151,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	//   `spec_version`, and `authoring_version` are the same between Wasm and native.
 	// This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
 	//   the compatible custom types.
-	spec_version: 104,
+	spec_version: 105,
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
@@ -555,6 +556,7 @@ parameter_types! {
 	pub const TipReportDepositBase: Balance = DOLLARS;
 	pub const DataDepositPerByte: Balance = CENTS;
 	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
+	pub TreasuryAccountId: AccountId = TreasuryPalletId::get().into_account_truncating();
 	pub const MaximumReasonLength: u32 = 300;
 	pub const MaxApprovals: u32 = 100;
 }
@@ -943,6 +945,24 @@ impl pallet_dao_assets::Config<LocalAssetInstance> for Runtime {
 	type CallbackHandle = ();
 	type WeightInfo = pallet_dao_assets::weights::SubstrateWeight<Runtime>;
 	type MaxLocks = MaxLocks;
+}
+
+pub type SocietalAssetLocationIdConverter = AssetLocationIdConverter<AssetId, XcAssetRegistry>;
+
+// TODO
+pub struct EvmRevertCodeHandler;
+impl pallet_xc_asset_config::XcAssetChanged<Runtime> for EvmRevertCodeHandler {
+	fn xc_asset_registered(_asset_id: AssetId) {}
+
+	fn xc_asset_unregistered(_asset_id: AssetId) {}
+}
+
+impl pallet_xc_asset_config::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type AssetId = AssetId;
+	type XcAssetChanged = EvmRevertCodeHandler;
+	type ManagerOrigin = EnsureRoot<AccountId>;
+	type WeightInfo = pallet_xc_asset_config::weights::SubstrateWeight<Self>;
 }
 
 impl AddressAssetIdConversion<AccountId, AssetId> for Runtime {
@@ -1486,6 +1506,7 @@ construct_runtime!(
 		PolkadotXcm: pallet_xcm::{Pallet, Call, Event<T>, Origin, Config} = 81,
 		CumulusXcm: cumulus_pallet_xcm::{Pallet, Event<T>, Origin} = 82,
 		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>} = 83,
+		XcAssetRegistry: pallet_xc_asset_config::{Pallet, Call, Storage, Event<T>} = 84,
 
 		// DAO management.
 		Dao: pallet_dao::{Pallet, Call, Storage, Event<T>, Origin<T>, Config<T>, ValidateUnsigned} = 100,

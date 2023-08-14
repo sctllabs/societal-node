@@ -7,7 +7,7 @@ use pallet_balances::Error as BalancesError;
 fn subscribe_not_enough_balance() {
 	new_test_ext().execute_with(|| {
 		assert_noop!(
-			Subscription::subscribe(0, &1, None),
+			Subscription::subscribe(0, &1, None, None),
 			BalancesError::<Test>::InsufficientBalance
 		);
 	})
@@ -20,7 +20,7 @@ fn subscribe_works_default_tier() {
 
 		fast_forward_to(1);
 
-		assert_ok!(Subscription::subscribe(0, &1, None));
+		assert_ok!(Subscription::subscribe(0, &1, None, None));
 
 		assert_eq!(Balances::free_balance(&1), DEFAULT_SUBSCRIPTION_PRICE);
 
@@ -31,6 +31,7 @@ fn subscribe_works_default_tier() {
 			Some(DaoSubscription {
 				tier: tier.clone(),
 				details: details.clone(),
+				token_id: None,
 				subscribed_at: 1_u32.into(),
 				last_renewed_at: None,
 				status: DaoSubscriptionStatus::Active {
@@ -66,9 +67,9 @@ fn fails_already_subscribed() {
 	new_test_ext().execute_with(|| {
 		Balances::make_free_balance_be(&1, DEFAULT_SUBSCRIPTION_PRICE.saturating_mul(2_u32.into()));
 
-		assert_ok!(Subscription::subscribe(0, &1, None));
+		assert_ok!(Subscription::subscribe(0, &1, None, None));
 
-		assert_noop!(Subscription::subscribe(0, &1, None), Error::<Test>::AlreadySubscribed);
+		assert_noop!(Subscription::subscribe(0, &1, None, None), Error::<Test>::AlreadySubscribed);
 	})
 }
 
@@ -77,7 +78,7 @@ fn ensure_active_works() {
 	new_test_ext().execute_with(|| {
 		Balances::make_free_balance_be(&1, DEFAULT_SUBSCRIPTION_PRICE.saturating_mul(2_u32.into()));
 
-		assert_ok!(Subscription::subscribe(0, &1, None));
+		assert_ok!(Subscription::subscribe(0, &1, None, None));
 
 		assert_ok!(Subscription::ensure_active(0, |_| { Ok(()) }));
 	})
@@ -98,7 +99,7 @@ fn ensure_active_expired() {
 	new_test_ext().execute_with(|| {
 		Balances::make_free_balance_be(&1, DEFAULT_SUBSCRIPTION_PRICE.saturating_mul(2_u32.into()));
 
-		assert_ok!(Subscription::subscribe(0, &1, None));
+		assert_ok!(Subscription::subscribe(0, &1, None, None));
 
 		fast_forward_to((MONTH_IN_BLOCKS + 1).into());
 
@@ -114,7 +115,7 @@ fn ensure_active_fn_limit_exceeded() {
 	new_test_ext().execute_with(|| {
 		Balances::make_free_balance_be(&1, DEFAULT_SUBSCRIPTION_PRICE.saturating_mul(2_u32.into()));
 
-		assert_ok!(Subscription::subscribe(0, &1, None));
+		assert_ok!(Subscription::subscribe(0, &1, None, None));
 
 		let mut n = 0;
 		while n < DEFAULT_FUNCTION_CALL_LIMIT {
@@ -136,7 +137,7 @@ fn extend_subscription_balance_low() {
 	new_test_ext().execute_with(|| {
 		Balances::make_free_balance_be(&1, DEFAULT_SUBSCRIPTION_PRICE.saturating_mul(2_u32.into()));
 
-		assert_ok!(Subscription::subscribe(0, &1, None));
+		assert_ok!(Subscription::subscribe(0, &1, None, None));
 
 		fast_forward_to((MONTH_IN_BLOCKS + 1).into());
 
@@ -157,7 +158,7 @@ fn extend_subscription_works() {
 
 		Balances::make_free_balance_be(&1, DEFAULT_SUBSCRIPTION_PRICE.saturating_mul(3_u32.into()));
 
-		assert_ok!(Subscription::subscribe(0, &1, None));
+		assert_ok!(Subscription::subscribe(0, &1, None, None));
 
 		fast_forward_to((MONTH_IN_BLOCKS + 1).into());
 
@@ -170,6 +171,7 @@ fn extend_subscription_works() {
 			Some(DaoSubscription {
 				tier,
 				details,
+				token_id: None,
 				subscribed_at: 0_u32.into(),
 				last_renewed_at: Some(MONTH_IN_BLOCKS.saturating_add(1).into()),
 				status: DaoSubscriptionStatus::Active {
@@ -218,7 +220,7 @@ fn suspend_subscription_works() {
 
 		Balances::make_free_balance_be(&1, DEFAULT_SUBSCRIPTION_PRICE.saturating_mul(3_u32.into()));
 
-		assert_ok!(Subscription::subscribe(0, &1, None));
+		assert_ok!(Subscription::subscribe(0, &1, None, None));
 
 		fast_forward_to(1);
 
@@ -235,6 +237,7 @@ fn suspend_subscription_works() {
 			Some(DaoSubscription {
 				tier,
 				details,
+				token_id: None,
 				subscribed_at: 0_u32.into(),
 				last_renewed_at: None,
 				status: DaoSubscriptionStatus::Suspended {
@@ -266,7 +269,7 @@ fn change_subscription_tier_invalid() {
 
 		Balances::make_free_balance_be(&1, DEFAULT_SUBSCRIPTION_PRICE.saturating_mul(3_u32.into()));
 
-		assert_ok!(Subscription::subscribe(0, &1, None));
+		assert_ok!(Subscription::subscribe(0, &1, None, None));
 
 		assert_noop!(
 			Subscription::change_subscription_tier(
@@ -318,7 +321,7 @@ fn change_subscription_low_balance() {
 			DEFAULT_SUBSCRIPTION_PRICE.saturating_add(100_u32.into()),
 		);
 
-		assert_ok!(Subscription::subscribe(0, &1, None));
+		assert_ok!(Subscription::subscribe(0, &1, None, None));
 
 		assert_noop!(
 			Subscription::change_subscription_tier(
@@ -352,7 +355,7 @@ fn change_subscription_works() {
 
 		Balances::make_free_balance_be(&1, DEFAULT_SUBSCRIPTION_PRICE.saturating_mul(3_u32.into()));
 
-		assert_ok!(Subscription::subscribe(0, &1, None));
+		assert_ok!(Subscription::subscribe(0, &1, None, None));
 
 		fast_forward_to(2);
 
@@ -380,7 +383,7 @@ fn ensure_limited_works() {
 	new_test_ext().execute_with(|| {
 		Balances::make_free_balance_be(&1, DEFAULT_SUBSCRIPTION_PRICE.saturating_mul(2_u32.into()));
 
-		assert_ok!(Subscription::subscribe(0, &1, None));
+		assert_ok!(Subscription::subscribe(0, &1, None, None));
 
 		let mut n = 0;
 		while n < DEFAULT_FUNCTION_CALL_LIMIT {

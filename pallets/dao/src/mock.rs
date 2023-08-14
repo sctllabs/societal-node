@@ -231,6 +231,7 @@ impl pallet_dao::Config for Test {
 	type OffchainEthService = ();
 	type RuntimeCall = RuntimeCall;
 	type DaoMinTreasurySpendPeriod = ConstU32<20>;
+	type TokenBalancesLimit = ConstU32<10>;
 	type ApproveOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
 	type Scheduler = Scheduler;
 	type PalletsOrigin = OriginCaller;
@@ -327,7 +328,10 @@ impl pallet_dao_democracy::Config for Test {
 impl pallet_dao_subscription::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = pallet_balances::Pallet<Test>;
+	type AssetId = u128;
 	type TreasuryPalletId = TreasuryPalletId;
+	type TokenBalancesLimit = ConstU32<10>;
+	type AssetProvider = Assets;
 	type WeightInfo = ();
 }
 

@@ -13,7 +13,7 @@ const SEED: u32 = 0;
 fn setup_subscription<T: Config>() -> Result<(), DispatchError> {
 	let caller: T::AccountId = account("caller", 0, SEED);
 	T::Currency::make_free_balance_be(&caller, BalanceOf::<T>::max_value() / 2u32.into());
-	Subscription::<T>::subscribe(0, &caller, None)
+	Subscription::<T>::subscribe(0, &caller, None, None)
 }
 
 benchmarks! {

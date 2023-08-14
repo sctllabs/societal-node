@@ -12,6 +12,8 @@ use super::{
 #[allow(unused_imports)]
 use super::{CheckInherents, Executive};
 
+use crate::{Assets, SocietalAssetLocationIdConverter, TreasuryAccountId, XcAssetRegistry};
+use astar_primitives::xcm::{FixedRateOfForeignAsset, ReserveAssetFilter, XcmFungibleFeeHandler};
 use core::{marker::PhantomData, ops::ControlFlow};
 use frame_support::{
 	log, match_types, parameter_types,
@@ -28,12 +30,16 @@ use xcm::{
 };
 use xcm_builder::{
 	AccountId32Aliases, AllowKnownQueryResponses, AllowSubscriptionsFrom,
-	AllowTopLevelPaidExecutionFrom, CurrencyAdapter, EnsureXcmOrigin, FixedWeightBounds,
-	IsConcrete, NativeAsset, ParentIsPreset, RelayChainAsNative, SiblingParachainAsNative,
-	SiblingParachainConvertsVia, SignedAccountId32AsNative, SignedToAccountId32,
-	SovereignSignedViaLocation, TakeWeightCredit, UsingComponents,
+	AllowTopLevelPaidExecutionFrom, ConvertedConcreteId, CurrencyAdapter, EnsureXcmOrigin,
+	FixedWeightBounds, FungiblesAdapter, IsConcrete, NoChecking, ParentIsPreset,
+	RelayChainAsNative, SiblingParachainAsNative, SiblingParachainConvertsVia,
+	SignedAccountId32AsNative, SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit,
+	UsingComponents,
 };
-use xcm_executor::{traits::ShouldExecute, XcmExecutor};
+use xcm_executor::{
+	traits::{JustTry, ShouldExecute},
+	XcmExecutor,
+};
 
 parameter_types! {
 	pub const RelayLocation: MultiLocation = MultiLocation::parent();
@@ -41,6 +47,8 @@ parameter_types! {
 	pub RelayChainOrigin: RuntimeOrigin = cumulus_pallet_xcm::Origin::Relay.into();
 	pub Ancestry: MultiLocation = Parachain(ParachainInfo::parachain_id().into()).into();
 	pub UniversalLocation: InteriorMultiLocation = Parachain(ParachainInfo::parachain_id().into()).into();
+	pub SocietalLocation: MultiLocation = Here.into_location();
+	pub DummyCheckingAccount: AccountId = PolkadotXcm::check_account();
 }
 
 /// Type for specifying how a `MultiLocation` can be converted into an `AccountId`. This is used
@@ -55,8 +63,8 @@ pub type LocationToAccountId = (
 	AccountId32Aliases<RelayNetwork, AccountId>,
 );
 
-/// Means for transacting assets on this chain.
-pub type LocalAssetTransactor = CurrencyAdapter<
+/// Means for transacting native currency on this chain.
+pub type CurrencyTransactor = CurrencyAdapter<
 	// Use this currency:
 	Balances,
 	// Use this currency when it is a fungible asset matching the given location or name:
@@ -68,6 +76,23 @@ pub type LocalAssetTransactor = CurrencyAdapter<
 	// We don't track any teleports.
 	(),
 >;
+
+pub type FungiblesTransactor = FungiblesAdapter<
+	// Use this fungibles implementation:
+	Assets,
+	// Use this currency when it is a fungible asset matching the given location or name:
+	ConvertedConcreteId<crate::AssetId, Balance, SocietalAssetLocationIdConverter, JustTry>,
+	// Convert an XCM MultiLocation into a local account id:
+	LocationToAccountId,
+	// Our chain's account ID type (we can't get away without mentioning it explicitly):
+	AccountId,
+	// We dont allow teleports.
+	NoChecking,
+	// We dont track any teleports so it is just a dummy account
+	DummyCheckingAccount,
+>;
+
+pub type AssetTransactors = (CurrencyTransactor, FungiblesTransactor);
 
 /// This is the type we use to convert an (incoming) XCM origin into a local `Origin` instance,
 /// ready for dispatching a transaction with Xcm's `Transact`. There is an `OriginKind` which can
@@ -95,6 +120,7 @@ parameter_types! {
 	pub UnitWeightCost: Weight = Weight::from_parts(1_000_000_000, 64 * 1024);
 	pub const MaxInstructions: u32 = 100;
 	pub const MaxAssetsIntoHolding: u32 = 64;
+
 }
 
 match_types! {
@@ -180,21 +206,31 @@ type Barrier = (
 	AllowSubscriptionsFrom<Everything>,
 );
 
+// Used to handle XCM fee deposit into treasury account
+pub type SocietalXcmFungibleFeeHandler = XcmFungibleFeeHandler<
+	AccountId,
+	ConvertedConcreteId<crate::AssetId, Balance, SocietalAssetLocationIdConverter, JustTry>,
+	Assets,
+	TreasuryAccountId,
+>;
+
 pub struct XcmConfig;
 impl xcm_executor::Config for XcmConfig {
 	type RuntimeCall = RuntimeCall;
 	type XcmSender = XcmRouter;
 	// How to withdraw and deposit an asset.
-	type AssetTransactor = LocalAssetTransactor;
+	type AssetTransactor = AssetTransactors;
 	type OriginConverter = XcmOriginToTransactDispatchOrigin;
-	type IsReserve = NativeAsset;
+	type IsReserve = ReserveAssetFilter;
 	type IsTeleporter = ();
 	type UniversalLocation = UniversalLocation;
 	// Teleporting is disabled.
 	type Barrier = Barrier;
 	type Weigher = FixedWeightBounds<UnitWeightCost, RuntimeCall, MaxInstructions>;
-	type Trader =
-		UsingComponents<WeightToFee, RelayLocation, AccountId, Balances, ToAuthor<Runtime>>;
+	type Trader = (
+		UsingComponents<WeightToFee, RelayLocation, AccountId, Balances, ToAuthor<Runtime>>,
+		FixedRateOfForeignAsset<XcAssetRegistry, SocietalXcmFungibleFeeHandler>,
+	);
 	type ResponseHandler = PolkadotXcm;
 	type AssetTrap = PolkadotXcm;
 	type AssetLocker = ();

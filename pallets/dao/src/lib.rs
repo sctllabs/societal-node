@@ -74,6 +74,7 @@ pub type TokenSupply = u128;
 
 type AssetId<T> = <T as Config>::AssetId;
 type Balance<T> = <T as Config>::Balance;
+type TokenBalancesLimit<T> = <T as Config>::TokenBalancesLimit;
 
 pub type BlockNumber = u32;
 
@@ -219,6 +220,9 @@ pub mod pallet {
 		#[pallet::constant]
 		type DaoMinTreasurySpendPeriod: Get<u32>;
 
+		#[pallet::constant]
+		type TokenBalancesLimit: Get<u32>;
+
 		type CouncilProvider: InitializeDaoMembers<u32, Self::AccountId>
 			+ ContainsDaoMember<u32, Self::AccountId>
 			+ RemoveDaoMembers<u32>;
@@ -273,7 +277,12 @@ pub mod pallet {
 			Self::AccountId,
 			Self::BlockNumber,
 			VersionedDaoSubscriptionTier,
-			VersionedDaoSubscriptionDetails<Self::BlockNumber, Self::Balance>,
+			DaoSubscriptionDetails<
+				Self::BlockNumber,
+				Self::Balance,
+				TokenBalances<AssetId<Self>, Balance<Self>, TokenBalancesLimit<Self>>,
+			>,
+			Self::AssetId,
 		>;
 
 		/// Weight information for extrinsics in this pallet.
@@ -620,10 +629,16 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			dao_id: DaoId,
 			tier: Option<VersionedDaoSubscriptionTier>,
+			token_id: Option<T::AssetId>,
 		) -> DispatchResult {
 			Self::ensure_approved(origin, dao_id)?;
 
-			T::DaoSubscriptionProvider::subscribe(dao_id, &Self::dao_account_id(dao_id), tier)
+			T::DaoSubscriptionProvider::subscribe(
+				dao_id,
+				&Self::dao_account_id(dao_id),
+				tier,
+				token_id,
+			)
 		}
 
 		#[pallet::weight(T::WeightInfo::extend_subscription())]
@@ -732,6 +747,7 @@ pub mod pallet {
 				token_address,
 				policy,
 				tier,
+				subscription_token,
 			} = serde_json::from_slice::<DaoPayload>(&data).map_err(|_| Error::<T>::InvalidInput)?;
 
 			let dao_id = <NextDaoId<T>>::get();
@@ -910,7 +926,12 @@ pub mod pallet {
 			};
 
 			// TODO: approach for pending daos
-			T::DaoSubscriptionProvider::subscribe(dao_id, &founder, tier)?;
+			T::DaoSubscriptionProvider::subscribe(
+				dao_id,
+				&founder,
+				tier,
+				subscription_token.map_or_else(|| None, |id| Some(Self::u128_to_asset_id(id))),
+			)?;
 
 			Self::do_register_dao(dao, policy, council, technical_committee)
 		}
