@@ -3,7 +3,7 @@ version: "3.2"
 services:
   validator-alice:
     container_name: validator-alice
-    image: parity/polkadot:v0.9.37
+    image: parity/polkadot:v0.9.41
     ports:
       - "30333:30333"
       - "9944:9944"
@@ -23,7 +23,7 @@ services:
 
   validator-bob:
     container_name: validator-bob
-    image: parity/polkadot:v0.9.37
+    image: parity/polkadot:v0.9.41
     ports:
       - "30334:30334"
       - "9945:9945"
@@ -43,7 +43,7 @@ services:
 
   validator-charlie:
     container_name: validator-charlie
-    image: parity/polkadot:v0.9.37
+    image: parity/polkadot:v0.9.41
     ports:
       - "30335:30335"
       - "9946:9946"
@@ -63,7 +63,7 @@ services:
 
   parachain-2000:
     container_name: societal-node-parachain-2000
-    image: societal/societal-node:parachain-latest
+    image: societal/societal-node:v0.0.3
     ports:
       - "40333:40333"
       - "9954:9954"
@@ -94,7 +94,7 @@ services:
 
   parachain-2001:
     container_name: societal-node-parachain-2001
-    image: societal/societal-node:parachain-latest
+    image: societal/societal-node:v0.0.3
     ports:
       - "40334:40334"
       - "9955:9955"
@@ -106,7 +106,7 @@ services:
       - parachain-2001:/polkadot
     command: >
       /usr/local/bin/societal-node
-      --bob
+      --alice
       --collator
       --chain /chain/raw-parachain-chainspec.json
       --port 40334
