@@ -148,7 +148,7 @@ by appending your own. A few useful ones are as follow.
 ./scripts/docker_run.sh cargo check
 ```
 
-### Run Rococo Local Testnet with Societal Node Parachains
+### Run Rococo Local Testnet
 ```bash
 # Run Rococo local testnet docker-compose configuration
 ./scripts/rococo_testnet_docker_run.sh
