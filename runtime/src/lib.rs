@@ -31,7 +31,7 @@ use frame_support::{
 	pallet_prelude::Get,
 	parameter_types,
 	traits::{
-		AsEnsureOriginWithArg, ConstU128, ConstU16, ConstU32, ConstU8, EitherOfDiverse,
+		AsEnsureOriginWithArg, ConstU128, ConstU16, ConstU32, ConstU8, Contains, EitherOfDiverse,
 		EqualPrivilegeOnly, FindAuthor, InstanceFilter, KeyOwnerProofSystem, LockIdentifier,
 		TotalIssuanceOf, U128CurrencyToVote, WithdrawReasons,
 	},
@@ -206,11 +206,25 @@ parameter_types! {
 	pub const NoPreimagePostponement: Option<u32> = Some(10);
 }
 
+pub struct BaseFilter;
+impl Contains<RuntimeCall> for BaseFilter {
+	fn contains(call: &RuntimeCall) -> bool {
+		match call {
+			// Filter permission-less assets creation/destroying.
+			// Custom asset's `id` should fit in `u32` as not to mix with service assets.
+			RuntimeCall::Assets(pallet_dao_assets::Call::create { id, .. }) =>
+				*id < (u32::MAX as AssetId).into(),
+			// Other modules should work
+			_ => true,
+		}
+	}
+}
+
 // Configure FRAME pallets to include in runtime.
 
 impl frame_system::Config for Runtime {
 	/// The basic call filter to use in dispatchable.
-	type BaseCallFilter = frame_support::traits::Everything;
+	type BaseCallFilter = BaseFilter;
 	/// Block & extrinsics weights: base values and limits.
 	type BlockWeights = RuntimeBlockWeights;
 	/// The maximum length of a block (in bytes).
