@@ -14,6 +14,7 @@ parameter_types! {
 	pub const DaoMaxTechnicalCommitteeMembers: u32 = 100; // TODO
 	pub const DaoMaxPendingItems: u32 = 100; // TODO
 	pub const DaoMinTreasurySpendPeriod: u32 = 10; // TODO
+	pub const TokenBalancesLimit: u32 = 10;
 }
 
 impl pallet_dao::Config for Runtime {
@@ -28,6 +29,7 @@ impl pallet_dao::Config for Runtime {
 	type DaoMaxTechnicalCommitteeMembers = DaoMaxTechnicalCommitteeMembers;
 	type DaoMaxPendingItems = DaoMaxPendingItems;
 	type DaoMinTreasurySpendPeriod = DaoMinTreasurySpendPeriod;
+	type TokenBalancesLimit = TokenBalancesLimit;
 	type AssetId = AssetId;
 	type Balance = Balance;
 	type CouncilProvider = DaoCouncilMembers;
@@ -265,6 +267,9 @@ impl pallet_dao_bounties::Config for Runtime {
 impl pallet_dao_subscription::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
+	type AssetId = AssetId;
 	type TreasuryPalletId = TreasuryPalletId;
+	type TokenBalancesLimit = TokenBalancesLimit;
+	type AssetProvider = Assets;
 	type WeightInfo = pallet_dao_subscription::weights::SubstrateWeight<Runtime>;
 }

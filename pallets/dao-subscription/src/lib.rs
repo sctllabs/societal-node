@@ -22,13 +22,23 @@ mod tests;
 mod benchmarking;
 pub mod weights;
 
+mod migration;
+
+type AssetIdOf<T> = <T as Config>::AssetId;
 type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+type TokenBalancesLimitOf<T> = <T as Config>::TokenBalancesLimit;
 
+type SubscriptionDetailsOf<T> = DaoSubscriptionDetails<
+	<T as frame_system::Config>::BlockNumber,
+	BalanceOf<T>,
+	TokenBalances<AssetIdOf<T>, BalanceOf<T>, TokenBalancesLimitOf<T>>,
+>;
 type SubscriptionOf<T> = DaoSubscription<
 	<T as frame_system::Config>::BlockNumber,
 	VersionedDaoSubscriptionTier,
-	VersionedDaoSubscriptionDetails<<T as frame_system::Config>::BlockNumber, BalanceOf<T>>,
+	SubscriptionDetailsOf<T>,
+	AssetIdOf<T>,
 >;
 
 type AccountFunctionBalanceOf<T> =
@@ -41,8 +51,15 @@ pub type DaoId = u32;
 pub mod pallet {
 	pub use super::*;
 	use crate::weights::WeightInfo;
-	use frame_support::PalletId;
-	use frame_system::{ensure_root, pallet_prelude::OriginFor};
+	use codec::HasCompact;
+	use frame_support::{
+		traits::fungibles::{Inspect, Transfer},
+		PalletId,
+	};
+	use frame_system::{
+		ensure_root,
+		pallet_prelude::{BlockNumberFor, OriginFor},
+	};
 	use sp_runtime::traits::AccountIdConversion;
 
 	/// The current storage version.
@@ -52,15 +69,41 @@ pub mod pallet {
 	#[pallet::storage_version(STORAGE_VERSION)]
 	pub struct Pallet<T>(_);
 
+	#[pallet::hooks]
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_runtime_upgrade() -> frame_support::weights::Weight {
+			migration::migrate_to_v5::<T>()
+		}
+	}
+
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
 
+		type AssetId: Member
+			+ Parameter
+			+ Copy
+			+ HasCompact
+			+ MaybeSerializeDeserialize
+			+ MaxEncodedLen
+			+ TypeInfo
+			+ From<u128>
+			+ Ord;
+
 		/// Chain Treasury Pallet Id - used for deriving its sovereign account ID.
 		#[pallet::constant]
 		type TreasuryPalletId: Get<PalletId>;
+
+		#[pallet::constant]
+		type TokenBalancesLimit: Get<u32>;
+
+		type AssetProvider: Inspect<
+				Self::AccountId,
+				AssetId = <Self as pallet::Config>::AssetId,
+				Balance = BalanceOf<Self>,
+			> + Transfer<Self::AccountId>;
 
 		/// Weight information for extrinsics in this pallet.
 		type WeightInfo: WeightInfo;
@@ -72,7 +115,7 @@ pub mod pallet {
 		_,
 		Blake2_128Concat,
 		VersionedDaoSubscriptionTier,
-		VersionedDaoSubscriptionDetails<T::BlockNumber, BalanceOf<T>>,
+		SubscriptionDetailsOf<T>,
 		OptionQuery,
 	>;
 
@@ -94,7 +137,7 @@ pub mod pallet {
 			subscribed_at: T::BlockNumber,
 			until: T::BlockNumber,
 			tier: VersionedDaoSubscriptionTier,
-			details: VersionedDaoSubscriptionDetails<T::BlockNumber, BalanceOf<T>>,
+			details: SubscriptionDetailsOf<T>,
 		},
 		DaoSubscriptionExtended {
 			dao_id: DaoId,
@@ -104,13 +147,13 @@ pub mod pallet {
 		DaoSubscriptionChanged {
 			dao_id: DaoId,
 			tier: VersionedDaoSubscriptionTier,
-			details: VersionedDaoSubscriptionDetails<T::BlockNumber, BalanceOf<T>>,
+			details: SubscriptionDetailsOf<T>,
 			status: DaoSubscriptionStatus<T::BlockNumber>,
 			fn_balance: DaoFunctionBalance,
 		},
 		DaoSubscriptionTierUpdated {
 			tier: VersionedDaoSubscriptionTier,
-			details: VersionedDaoSubscriptionDetails<T::BlockNumber, BalanceOf<T>>,
+			details: SubscriptionDetailsOf<T>,
 		},
 		DaoSubscriptionSuspended {
 			dao_id: DaoId,
@@ -136,6 +179,7 @@ pub mod pallet {
 		TooManyCallsPerBlock,
 		TooManyCallsForAccount,
 		TooManyMembers,
+		TokenNotSupported,
 	}
 
 	#[pallet::call]
@@ -145,7 +189,7 @@ pub mod pallet {
 		pub fn set_subscription_tier(
 			origin: OriginFor<T>,
 			tier: VersionedDaoSubscriptionTier,
-			details: VersionedDaoSubscriptionDetails<T::BlockNumber, BalanceOf<T>>,
+			details: SubscriptionDetailsOf<T>,
 		) -> DispatchResult {
 			ensure_root(origin.clone())?;
 
@@ -191,7 +235,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		pub fn do_set_subscription_tier(
 			tier: VersionedDaoSubscriptionTier,
-			details: VersionedDaoSubscriptionDetails<T::BlockNumber, BalanceOf<T>>,
+			details: SubscriptionDetailsOf<T>,
 		) -> Result<(), DispatchError> {
 			SubscriptionTiers::<T>::insert(tier.clone(), details.clone());
 
@@ -200,18 +244,42 @@ pub mod pallet {
 			Ok(())
 		}
 
+		pub fn pay_for_subscription(
+			who: &T::AccountId,
+			details: &SubscriptionDetailsOf<T>,
+			token_id: &Option<T::AssetId>,
+		) -> Result<(), DispatchError> {
+			let DaoSubscriptionDetails { price, token_prices, .. } = details;
+
+			match token_id {
+				None => T::Currency::transfer(who, &Self::treasury_account_id(), *price, KeepAlive),
+				Some(token_id) => {
+					let maybe_token_price = token_prices.iter().find(|(id, _)| id == token_id);
+
+					match maybe_token_price {
+						None => Err(Error::<T>::TokenNotSupported.into()),
+						Some((_, price)) => {
+							T::AssetProvider::transfer(
+								*token_id,
+								who,
+								&Self::treasury_account_id(),
+								*price,
+								true,
+							)?;
+
+							Ok(())
+						},
+					}
+				},
+			}
+		}
+
 		/// Ensures if subscription is active and indexes function call
 		/// - `dao_id`: DAO ID.
 		/// - `extra_check`: Additional check function to call.
 		pub fn ensure_active<F>(dao_id: DaoId, extra_check: F) -> Result<(), Error<T>>
 		where
-			F: FnOnce(
-				&mut DaoSubscription<
-					T::BlockNumber,
-					VersionedDaoSubscriptionTier,
-					VersionedDaoSubscriptionDetails<T::BlockNumber, BalanceOf<T>>,
-				>,
-			) -> Result<(), Error<T>>,
+			F: FnOnce(&mut SubscriptionOf<T>) -> Result<(), Error<T>>,
 		{
 			Subscriptions::<T>::try_mutate(dao_id, |maybe_subscription| -> Result<(), Error<T>> {
 				match maybe_subscription {
@@ -239,16 +307,12 @@ pub mod pallet {
 									(cur_block, 1_u32)
 								};
 
-								match details {
-									VersionedDaoSubscriptionDetails::Default(
-										DaoSubscriptionDetailsV1 { fn_per_block_limit, .. },
-									) => {
-										ensure!(
-											fn_calls <= fn_per_block_limit,
-											Error::<T>::TooManyCallsPerBlock
-										)
-									},
-								}
+								let DaoSubscriptionDetails { fn_per_block_limit, .. } = details;
+
+								ensure!(
+									fn_calls <= fn_per_block_limit,
+									Error::<T>::TooManyCallsPerBlock
+								);
 
 								subscription.fn_per_block = (block_number, fn_calls);
 
@@ -267,66 +331,71 @@ pub mod pallet {
 		}
 
 		// TODO: try to use default for subscription details
-		pub fn get_default_tier_details() -> (
-			VersionedDaoSubscriptionTier,
-			VersionedDaoSubscriptionDetails<T::BlockNumber, BalanceOf<T>>,
-		) {
+		pub fn get_default_tier_details() -> (VersionedDaoSubscriptionTier, SubscriptionDetailsOf<T>)
+		{
 			let tier = VersionedDaoSubscriptionTier::Default(DaoSubscriptionTierV1::Basic);
-			let details = VersionedDaoSubscriptionDetails::Default(DaoSubscriptionDetailsV1 {
+			let details = DaoSubscriptionDetails {
 				duration: MONTH_IN_BLOCKS.into(),
 				price: TryInto::<BalanceOf<T>>::try_into(DEFAULT_SUBSCRIPTION_PRICE).ok().unwrap(),
+				token_prices:
+					BoundedVec::<(AssetIdOf<T>, BalanceOf<T>), T::TokenBalancesLimit>::default(),
 				fn_call_limit: DEFAULT_FUNCTION_CALL_LIMIT,
 				fn_per_block_limit: DEFAULT_FUNCTION_PER_BLOCK_LIMIT,
 				max_members: DEFAULT_MEMBER_COUNT_LIMIT,
-				dao: Some(DaoPalletSubscriptionDetailsV1 {
-					update_dao_metadata: true,
-					update_dao_policy: true,
-					mint_dao_token: true,
-				}),
-				bounties: Some(BountiesSubscriptionDetailsV1 {
-					create_bounty: true,
-					propose_curator: true,
-					unassign_curator: true,
-					accept_curator: true,
-					award_bounty: true,
-					claim_bounty: true,
-					close_bounty: true,
-					extend_bounty_expiry: true,
-				}),
-				council: Some(CollectiveSubscriptionDetailsV1 {
-					propose: true,
-					vote: true,
-					close: true,
-				}),
-				council_membership: Some(MembershipSubscriptionDetailsV1 {
-					add_member: true,
-					remove_member: true,
-					swap_member: true,
-					change_key: true,
-				}),
-				tech_committee: Some(CollectiveSubscriptionDetailsV1 {
-					propose: false,
-					vote: false,
-					close: false,
-				}),
-				tech_committee_membership: Some(MembershipSubscriptionDetailsV1 {
-					add_member: true,
-					remove_member: true,
-					swap_member: true,
-					change_key: false,
-				}),
-				democracy: Some(DemocracySubscriptionDetailsV1 {
-					propose: false,
-					second: false,
-					vote: false,
-					delegate: false,
-					undelegate: false,
-					unlock: false,
-					remove_vote: false,
-					remove_other_vote: false,
-				}),
-				treasury: Some(TreasurySubscriptionDetailsV1 { spend: true, transfer_token: true }),
-			});
+				pallet_details: DaoPalletSubscriptionDetails {
+					dao: Some(DaoPalletSubscriptionDetailsV1 {
+						update_dao_metadata: true,
+						update_dao_policy: true,
+						mint_dao_token: true,
+					}),
+					bounties: Some(BountiesSubscriptionDetailsV1 {
+						create_bounty: true,
+						propose_curator: true,
+						unassign_curator: true,
+						accept_curator: true,
+						award_bounty: true,
+						claim_bounty: true,
+						close_bounty: true,
+						extend_bounty_expiry: true,
+					}),
+					council: Some(CollectiveSubscriptionDetailsV1 {
+						propose: true,
+						vote: true,
+						close: true,
+					}),
+					council_membership: Some(MembershipSubscriptionDetailsV1 {
+						add_member: true,
+						remove_member: true,
+						swap_member: true,
+						change_key: true,
+					}),
+					tech_committee: Some(CollectiveSubscriptionDetailsV1 {
+						propose: false,
+						vote: false,
+						close: false,
+					}),
+					tech_committee_membership: Some(MembershipSubscriptionDetailsV1 {
+						add_member: true,
+						remove_member: true,
+						swap_member: true,
+						change_key: false,
+					}),
+					democracy: Some(DemocracySubscriptionDetailsV1 {
+						propose: false,
+						second: false,
+						vote: false,
+						delegate: false,
+						undelegate: false,
+						unlock: false,
+						remove_vote: false,
+						remove_other_vote: false,
+					}),
+					treasury: Some(TreasurySubscriptionDetailsV1 {
+						spend: true,
+						transfer_token: true,
+					}),
+				},
+			};
 
 			(tier, details)
 		}
@@ -339,13 +408,19 @@ impl<T: Config>
 		T::AccountId,
 		T::BlockNumber,
 		VersionedDaoSubscriptionTier,
-		VersionedDaoSubscriptionDetails<T::BlockNumber, BalanceOf<T>>,
+		DaoSubscriptionDetails<
+			<T as frame_system::Config>::BlockNumber,
+			BalanceOf<T>,
+			TokenBalances<AssetIdOf<T>, BalanceOf<T>, TokenBalancesLimitOf<T>>,
+		>,
+		AssetIdOf<T>,
 	> for Pallet<T>
 {
 	fn subscribe(
 		dao_id: DaoId,
 		account_id: &T::AccountId,
 		tier: Option<VersionedDaoSubscriptionTier>,
+		token_id: Option<T::AssetId>,
 	) -> Result<(), DispatchError> {
 		ensure!(Subscriptions::<T>::get(dao_id).is_none(), Error::<T>::AlreadySubscribed);
 
@@ -366,24 +441,15 @@ impl<T: Config>
 		let (default_tier, default_details) = Self::get_default_tier_details();
 		let tier = tier.unwrap_or(default_tier);
 		let details = SubscriptionTiers::<T>::get(tier.clone()).map_or(default_details, |t| t);
-		let (until, fn_call_limit, price) = match details {
-			VersionedDaoSubscriptionDetails::Default(DaoSubscriptionDetailsV1 {
-				duration,
-				price,
-				fn_call_limit,
-				..
-			}) => (subscribed_at.saturating_add(duration), fn_call_limit, price),
-		};
+		let DaoSubscriptionDetails { duration, fn_call_limit, .. } = details;
+		let until = subscribed_at.saturating_add(duration);
 
-		T::Currency::transfer(account_id, &Self::treasury_account_id(), price, KeepAlive)?;
+		Self::pay_for_subscription(account_id, &details, &token_id)?;
 
-		let subscription: DaoSubscription<
-			T::BlockNumber,
-			VersionedDaoSubscriptionTier,
-			VersionedDaoSubscriptionDetails<T::BlockNumber, BalanceOf<T>>,
-		> = DaoSubscription {
+		let subscription = DaoSubscription {
 			tier: tier.clone(),
 			details: details.clone(),
+			token_id,
 			subscribed_at,
 			last_renewed_at: None,
 			status: DaoSubscriptionStatus::Active { until },
@@ -423,18 +489,12 @@ impl<T: Config>
 						let details = SubscriptionTiers::<T>::get(subscription.tier.clone())
 							.map_or(default_details, |t| t);
 
-						let (duration, fn_call_limit, price) = match subscription.details {
-							VersionedDaoSubscriptionDetails::Default(
-								DaoSubscriptionDetailsV1 { duration, price, fn_call_limit, .. },
-							) => (duration, fn_call_limit, price),
-						};
+						let DaoSubscription { token_id, .. } = subscription;
 
-						T::Currency::transfer(
-							account_id,
-							&Self::treasury_account_id(),
-							price,
-							KeepAlive,
-						)?;
+						let DaoSubscriptionDetails { duration, fn_call_limit, .. } =
+							subscription.details;
+
+						Self::pay_for_subscription(account_id, &subscription.details, token_id)?;
 
 						let cur_block = frame_system::Pallet::<T>::block_number();
 
@@ -484,18 +544,10 @@ impl<T: Config>
 				match maybe_subscription {
 					None => Err(Error::<T>::SubscriptionNotExists.into()),
 					Some(subscription) => {
-						let (duration, fn_call_limit, price) = match details {
-							VersionedDaoSubscriptionDetails::Default(
-								DaoSubscriptionDetailsV1 { duration, fn_call_limit, price, .. },
-							) => (duration, fn_call_limit, price),
-						};
+						let DaoSubscription { token_id, .. } = subscription;
+						let DaoSubscriptionDetails { duration, fn_call_limit, .. } = details;
 
-						T::Currency::transfer(
-							account_id,
-							&Self::treasury_account_id(),
-							price,
-							KeepAlive,
-						)?;
+						Self::pay_for_subscription(account_id, &details, token_id)?;
 
 						subscription.tier = tier.clone();
 						subscription.details = details.clone();

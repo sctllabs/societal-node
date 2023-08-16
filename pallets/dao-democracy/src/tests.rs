@@ -310,6 +310,7 @@ impl pallet_dao::Config for Test {
 	type OffchainEthService = ();
 	type RuntimeCall = RuntimeCall;
 	type DaoMinTreasurySpendPeriod = ConstU32<20>;
+	type TokenBalancesLimit = ConstU32<10>;
 	type ApproveOrigin = AsEnsureOriginWithArg<EnsureRoot<AccountId>>;
 	type Scheduler = Scheduler;
 	type PalletsOrigin = OriginCaller;

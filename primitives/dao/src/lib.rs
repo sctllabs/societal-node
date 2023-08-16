@@ -7,6 +7,7 @@ use frame_support::{
 	codec::{Decode, Encode},
 	dispatch::{DispatchError, DispatchResult},
 	weights::Weight,
+	BoundedVec,
 };
 pub use node_primitives::Balance;
 
@@ -98,6 +99,7 @@ pub struct DaoPayload {
 	pub token_address: Option<Vec<u8>>,
 	pub policy: DaoPolicy,
 	pub tier: Option<VersionedDaoSubscriptionTier>,
+	pub subscription_token: Option<u128>,
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
@@ -610,7 +612,7 @@ pub type FunctionPerBlock<BlockNumber, FunctionBalance> = (BlockNumber, Function
 pub type DaoMembersCount = u32;
 
 #[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
-pub struct DaoSubscription<BlockNumber, Tier, Details> {
+pub struct DaoSubscriptionV1<BlockNumber, Tier, Details> {
 	pub tier: Tier,
 	pub details: Details,
 	pub subscribed_at: BlockNumber,
@@ -620,15 +622,30 @@ pub struct DaoSubscription<BlockNumber, Tier, Details> {
 	pub fn_per_block: FunctionPerBlock<BlockNumber, DaoFunctionBalance>,
 }
 
-pub trait DaoSubscriptionProvider<DaoId, AccountId, BlockNumber, Tier, Details> {
+#[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+pub struct DaoSubscription<BlockNumber, Tier, Details, AssetId> {
+	pub tier: Tier,
+	pub details: Details,
+	pub token_id: Option<AssetId>,
+	pub subscribed_at: BlockNumber,
+	pub last_renewed_at: Option<BlockNumber>,
+	pub status: DaoSubscriptionStatus<BlockNumber>,
+	pub fn_balance: DaoFunctionBalance,
+	pub fn_per_block: FunctionPerBlock<BlockNumber, DaoFunctionBalance>,
+}
+
+pub trait DaoSubscriptionProvider<DaoId, AccountId, BlockNumber, Tier, Details, AssetId> {
 	/// Subscribes DAO
 	/// - `dao_id`: DAO ID.
 	/// - `account_id`: The Account to charge the initial subscription payment from.
 	/// - `tier`: Subscription tier to subscribe to. Optional.
+	/// - `token_id`: The token id to pay with for the subscription if provided, otherwise - the
+	///   native chain token. Optional.
 	fn subscribe(
 		dao_id: DaoId,
 		account_id: &AccountId,
 		tier: Option<Tier>,
+		token_id: Option<AssetId>,
 	) -> Result<(), DispatchError>;
 
 	/// Unsubscribes DAO
@@ -655,20 +672,25 @@ pub trait DaoSubscriptionProvider<DaoId, AccountId, BlockNumber, Tier, Details> 
 	fn assign_subscription_tier(tier: VersionedDaoSubscriptionTier) -> DispatchResult;
 }
 
+pub type TokenBalances<AssetId, Balance, TokenBalancesLimit> =
+	BoundedVec<(AssetId, Balance), TokenBalancesLimit>;
+
 /// Empty implementation.
-impl<DaoId, AccountId, BlockNumber, Balance>
+impl<DaoId, AccountId, BlockNumber, Balance, AssetId, TokenBalances>
 	DaoSubscriptionProvider<
 		DaoId,
 		AccountId,
 		BlockNumber,
 		VersionedDaoSubscriptionTier,
-		VersionedDaoSubscriptionDetails<BlockNumber, Balance>,
+		DaoSubscriptionDetails<BlockNumber, Balance, TokenBalances>,
+		AssetId,
 	> for ()
 {
 	fn subscribe(
 		_dao_id: DaoId,
 		_account_id: &AccountId,
 		_tier: Option<VersionedDaoSubscriptionTier>,
+		_token_id: Option<AssetId>,
 	) -> Result<(), DispatchError> {
 		Ok(())
 	}
@@ -803,6 +825,33 @@ pub enum DaoSubscriptionTierV1 {
 )]
 pub enum VersionedDaoSubscriptionTier {
 	Default(DaoSubscriptionTierV1),
+}
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen, Serialize, Deserialize,
+)]
+pub struct DaoSubscriptionDetails<BlockNumber, Balance, TokenBalances> {
+	pub duration: BlockNumber,
+	pub price: Balance,
+	pub token_prices: TokenBalances,
+	pub fn_call_limit: DaoFunctionBalance,
+	pub fn_per_block_limit: DaoFunctionBalance,
+	pub max_members: DaoMembersCount,
+	pub pallet_details: DaoPalletSubscriptionDetails,
+}
+
+#[derive(
+	Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen, Serialize, Deserialize,
+)]
+pub struct DaoPalletSubscriptionDetails {
+	pub dao: Option<DaoPalletSubscriptionDetailsV1>,
+	pub bounties: Option<BountiesSubscriptionDetailsV1>,
+	pub council: Option<CollectiveSubscriptionDetailsV1>,
+	pub tech_committee: Option<CollectiveSubscriptionDetailsV1>,
+	pub democracy: Option<DemocracySubscriptionDetailsV1>,
+	pub council_membership: Option<MembershipSubscriptionDetailsV1>,
+	pub tech_committee_membership: Option<MembershipSubscriptionDetailsV1>,
+	pub treasury: Option<TreasurySubscriptionDetailsV1>,
 }
 
 #[repr(u8)]
