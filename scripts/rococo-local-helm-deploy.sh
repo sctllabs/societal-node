@@ -71,15 +71,15 @@ helm \
   --set "node.collatorRelayChain.flags[0]=--bootnodes" \
   --set "node.collatorRelayChain.flags[1]='/dns4/rococo-alice-node-0-relay-chain-p2p/tcp/30333/p2p/12D3KooWMeR4iQLRBNq87ViDf9W7f6cc9ydAPJgmq48rAH116WoC'"
 
-echo "*** Deploying Societal Parachain 2001 ***"
+echo "*** Deploying Asset Hub - Para Id 1000 ***"
 
-# Societal Parachain 2001
+# Asset Hub
 helm \
   -n rococo-dev \
   upgrade \
-  societal-parachain-node \
+  asset-hub-node \
   --install \
   ../helm-charts/charts/node \
-  -f ./deployment/parachain-2001-values.yaml \
+  -f ./deployment/asset-hub-values.yaml \
   --set "node.collatorRelayChain.flags[0]=--bootnodes" \
   --set "node.collatorRelayChain.flags[1]='/dns4/rococo-alice-node-0-relay-chain-p2p/tcp/30333/p2p/12D3KooWMeR4iQLRBNq87ViDf9W7f6cc9ydAPJgmq48rAH116WoC'"
