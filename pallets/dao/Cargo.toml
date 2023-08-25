@@ -57,6 +57,7 @@ std = [
 	"frame-support/std",
 	"frame-system/std",
 	"pallet-dao-assets/std",
+	"pallet-dao-democracy/std",
 	"scale-info/std",
 	"sp-core/std",
 	"sp-io/std",

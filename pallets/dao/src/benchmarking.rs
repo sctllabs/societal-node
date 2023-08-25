@@ -272,5 +272,22 @@ benchmarks! {
 	}: _<T::RuntimeOrigin>(RawOrigin::Root.into(), 0)
 	verify { }
 
+	schedule_subscription_payment {
+		setup_dao::<T>(false, None)?;
+		let origin = get_dao_origin::<T>(0)?;
+		let dao_account_id = DaoFactory::<T>::dao_account_id(0);
+		T::Currency::make_free_balance_be(&dao_account_id, BalanceOf::<T>::max_value() / 2u32.into());
+	}: _<T::RuntimeOrigin>(origin, 0)
+	verify { }
+
+	cancel_subscription_payment {
+		setup_dao::<T>(false, None)?;
+		let origin = get_dao_origin::<T>(0)?;
+		let dao_account_id = DaoFactory::<T>::dao_account_id(0);
+		T::Currency::make_free_balance_be(&dao_account_id, BalanceOf::<T>::max_value() / 2u32.into());
+		DaoFactory::<T>::schedule_subscription_payment(origin.clone(), 0)?;
+	}: _<T::RuntimeOrigin>(origin, 0)
+	verify { }
+
 	impl_benchmark_test_suite!(DaoFactory, crate::mock::new_test_ext(), crate::mock::Test);
 }

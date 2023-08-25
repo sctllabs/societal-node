@@ -325,13 +325,10 @@ pub trait DaoProvider<AccountId, Hash> {
 	type ApproveOrigin;
 	type NFTCollectionId;
 
-	fn exists(id: Self::Id) -> Result<(), DispatchError>;
 	fn dao_account_id(id: Self::Id) -> AccountId;
 	fn dao_token(id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError>;
 	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError>;
 	fn dao_nft_collection_id(id: Self::Id) -> Result<Option<Self::NFTCollectionId>, DispatchError>;
-	fn count() -> u32;
-	fn ensure_member(id: Self::Id, who: &AccountId) -> Result<bool, DispatchError>;
 	fn ensure_approved(
 		origin: Self::Origin,
 		dao_id: Self::Id,
@@ -667,6 +664,10 @@ pub trait DaoSubscriptionProvider<DaoId, AccountId, BlockNumber, Tier, Details, 
 		tier: Tier,
 	) -> Result<(), DispatchError>;
 
+	/// Returns DAO subscription if available
+	/// - `dao_id`: DAO ID.
+	fn subscription(dao_id: DaoId) -> Option<DaoSubscription<BlockNumber, Tier, Details, AssetId>>;
+
 	/// Note: Should only be used for benchmarking.
 	#[cfg(feature = "runtime-benchmarks")]
 	fn assign_subscription_tier(tier: VersionedDaoSubscriptionTier) -> DispatchResult;
@@ -709,6 +710,19 @@ impl<DaoId, AccountId, BlockNumber, Balance, AssetId, TokenBalances>
 		_tier: VersionedDaoSubscriptionTier,
 	) -> Result<(), DispatchError> {
 		Ok(())
+	}
+
+	fn subscription(
+		_: DaoId,
+	) -> Option<
+		DaoSubscription<
+			BlockNumber,
+			VersionedDaoSubscriptionTier,
+			DaoSubscriptionDetails<BlockNumber, Balance, TokenBalances>,
+			AssetId,
+		>,
+	> {
+		None
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]

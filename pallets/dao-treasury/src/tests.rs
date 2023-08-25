@@ -133,14 +133,6 @@ impl DaoProvider<u128, H256> for TestDaoProvider {
 	type ApproveOrigin = AsEnsureOriginWithArg<frame_system::EnsureRoot<u128>>;
 	type NFTCollectionId = u32;
 
-	fn exists(_id: Self::Id) -> Result<(), DispatchError> {
-		Ok(())
-	}
-
-	fn count() -> u32 {
-		1
-	}
-
 	fn policy(_id: Self::Id) -> Result<Self::Policy, DispatchError> {
 		Ok(DaoPolicy {
 			proposal_period: 100,
@@ -154,10 +146,6 @@ impl DaoProvider<u128, H256> for TestDaoProvider {
 
 	fn dao_account_id(id: Self::Id) -> u128 {
 		PalletId(*b"py/sctld").into_sub_account_truncating(id)
-	}
-
-	fn ensure_member(_id: Self::Id, _who: &u128) -> Result<bool, DispatchError> {
-		Ok(true)
 	}
 
 	fn dao_token(_id: Self::Id) -> Result<DaoToken<Self::AssetId, Vec<u8>>, DispatchError> {
