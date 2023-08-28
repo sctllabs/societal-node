@@ -552,21 +552,16 @@ where
 	}
 }
 
-pub fn de_string_to_u128<'de, D>(de: D) -> Result<u128, D::Error>
-where
-	D: Deserializer<'de>,
-{
-	let s: &str = Deserialize::deserialize(de)?;
-	Ok(s.parse::<u128>().unwrap())
-}
-
 pub fn de_option_string_to_u128<'de, D>(de: D) -> Result<Option<u128>, D::Error>
 where
 	D: Deserializer<'de>,
 {
 	match Option::<&str>::deserialize(de)? {
 		None => Ok(None),
-		Some(s) => Ok(Some(s.parse::<u128>().unwrap())),
+		Some(s) => match s.parse::<u128>() {
+			Ok(number) => Ok(Some(number)),
+			Err(_) => Ok(None),
+		},
 	}
 }
 
