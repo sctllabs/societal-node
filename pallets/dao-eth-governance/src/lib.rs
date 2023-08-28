@@ -586,6 +586,10 @@ pub mod pallet {
 		Expired,
 		TooManyPendingProposals,
 		TooManyPendingVotes,
+		/// Pending proposal must exist
+		PendingProposalMissing,
+		/// Pending vote must exist
+		PendingVoteMissing,
 	}
 
 	#[pallet::call]
@@ -1162,6 +1166,13 @@ impl<T: Config> Pallet<T> {
 
 		let PendingProposal { who, length_bound, meta, .. } = pending_proposal;
 
+		<PendingProposals<T>>::try_mutate_exists(dao_id, |maybe_hashes| -> DispatchResult {
+			let hashes = maybe_hashes.as_mut().ok_or(Error::<T>::PendingProposalMissing)?;
+			hashes.retain(|h| h != &hash);
+
+			Ok(())
+		})?;
+
 		PendingProposals::<T>::mutate(dao_id, |hashes| {
 			hashes.retain(|h| h != &hash);
 			hashes.len() + 1
@@ -1186,10 +1197,15 @@ impl<T: Config> Pallet<T> {
 		let PendingVote { who, proposal_hash, proposal_index, aye, balance, .. } =
 			<PendingVoting<T>>::take(dao_id, hash).expect("Pending Vote not found");
 
-		PendingVotes::<T>::mutate((dao_id, proposal_index), |hashes| {
-			hashes.retain(|h| h != &hash);
-			hashes.len() + 1
-		});
+		PendingVotes::<T>::try_mutate_exists(
+			(dao_id, proposal_index),
+			|maybe_hashes| -> DispatchResult {
+				let hashes = maybe_hashes.as_mut().ok_or(Error::<T>::PendingProposalMissing)?;
+				hashes.retain(|h| h != &hash);
+
+				Ok(())
+			},
+		)?;
 
 		if approve {
 			Self::do_vote(who, dao_id, proposal_hash, proposal_index, Vote { aye, balance })?;
