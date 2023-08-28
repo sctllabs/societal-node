@@ -83,6 +83,8 @@ const ONCHAIN_TX_KEY: &[u8] = b"societal-dao-eth-gov::storage::tx";
 
 const DAO_ETH_GOVERNANCE_ID: LockIdentifier = *b"daoethgv";
 
+const H160_ACCOUNT_ID_LENGTH: u32 = 42;
+
 #[derive(Debug, Encode, Decode, Clone, Default, Deserialize, PartialEq, Eq)]
 pub enum OffchainData<Hash, BlockNumber> {
 	#[default]
@@ -590,6 +592,8 @@ pub mod pallet {
 		PendingProposalMissing,
 		/// Pending vote must exist
 		PendingVoteMissing,
+		/// Account Id provided is not H160 address compliant
+		InvalidAccount,
 	}
 
 	#[pallet::call]
@@ -1131,6 +1135,9 @@ impl<T: Config> Pallet<T> {
 		_signer: T::AccountId,
 		account_id: Vec<u8>,
 	) -> Result<Vec<u8>, DispatchError> {
+		let account_id = BoundedVec::<u8, ConstU32<H160_ACCOUNT_ID_LENGTH>>::try_from(account_id)
+			.map_err(|_| Error::<T>::InvalidAccount)?;
+
 		let account_id = Result::unwrap_or(str::from_utf8(&account_id), "");
 		if account_id.is_empty() {
 			return Err(Error::<T>::InvalidInput.into())
