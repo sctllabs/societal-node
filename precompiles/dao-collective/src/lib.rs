@@ -5,18 +5,20 @@ extern crate core;
 use fp_evm::{Log, PrecompileHandle};
 use frame_support::{
 	dispatch::{Dispatchable, GetDispatchInfo, Pays, PostDispatchInfo},
+	traits::{ConstU32, Get},
 	weights::Weight,
 };
 use pallet_evm::AddressMapping;
-use parity_scale_codec::Decode;
+use parity_scale_codec::{Decode, DecodeLimit as _};
 use precompile_utils::prelude::*;
-use sp_core::{ConstU32, H160, H256};
+use sp_core::{H160, H256};
 use sp_runtime::traits::Hash;
 use sp_std::{boxed::Box, marker::PhantomData, vec::Vec};
 
 /// Dao ID. Just a `u32`.
 pub type DaoId = u32;
 
+type DecodeLimit = ConstU32<8>;
 type GetProposalLimit = ConstU32<100>;
 type GetProposalMetaLimit = ConstU32<100>;
 
@@ -134,9 +136,12 @@ where
 		let proposal_index =
 			pallet_dao_collective::Pallet::<Runtime, Instance>::proposal_count(dao_id);
 		let proposal_hash: H256 = hash::<Runtime>(&proposal);
-		let proposal = <Runtime as frame_system::Config>::RuntimeCall::decode(&mut &*proposal)
-			.map_err(|_| RevertReason::custom("Failed to decode proposal").in_field("proposal"))?
-			.into();
+		let proposal = <Runtime as frame_system::Config>::RuntimeCall::decode_with_depth_limit(
+			DecodeLimit::get(),
+			&mut &*proposal,
+		)
+		.map_err(|_| RevertReason::custom("Failed to decode proposal").in_field("proposal"))?
+		.into();
 		let proposal = Box::new(proposal);
 
 		{
