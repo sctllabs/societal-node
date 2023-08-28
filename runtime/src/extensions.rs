@@ -34,7 +34,7 @@ pub struct PrevalidateAttests<T: Config + Send + Sync>(sp_std::marker::PhantomDa
 impl<T: Config + Send + Sync> sp_std::fmt::Debug for PrevalidateAttests<T> {
 	#[cfg(feature = "std")]
 	fn fmt(&self, f: &mut sp_std::fmt::Formatter) -> sp_std::fmt::Result {
-		write!(f, "DaoDemocracyPrevalidateAttests")
+		write!(f, "SocietalNodePrevalidateAttests")
 	}
 
 	#[cfg(not(feature = "std"))]
