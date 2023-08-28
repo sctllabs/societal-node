@@ -228,6 +228,7 @@ pallet-dao-eth-governance = { version = "4.0.0-dev", default-features = false, p
 pallet-dao-eth-governance-precompile = { version = "1.0.0-dev", default-features = false, path = "./precompiles/dao-eth-governance" }
 pallet-dao-membership = { version = "4.0.0-dev", default-features = false, path = "./pallets/dao-membership" }
 pallet-dao-membership-precompile = { version = "1.0.0-dev", default-features = false, path = "./precompiles/dao-membership" }
+pallet-dao-nft-governance = { version = "4.0.0-dev", default-features = false, path = "./pallets/dao-nft-governance" }
 pallet-dao-precompile = { version = "1.0.0-dev", default-features = false, path = "./precompiles/dao" }
 pallet-dao-subscription = { version = "1.0.0-dev", default-features = false, path = "./pallets/dao-subscription" }
 pallet-dao-treasury = { version = "4.0.0-dev", default-features = false, path = "./pallets/dao-treasury" }
