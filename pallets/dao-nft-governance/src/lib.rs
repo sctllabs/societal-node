@@ -32,6 +32,16 @@ use frame_system::pallet_prelude::*;
 use crate::vote::{AccountVote, Vote};
 pub use pallet::*;
 
+#[cfg(test)]
+pub mod mock;
+
+#[cfg(test)]
+mod tests;
+
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+pub mod weights;
+
 pub mod vote;
 
 type ItemOf<T> = <T as Config>::ItemId;
@@ -67,7 +77,7 @@ pub struct Votes<BlockNumber, VotingSet> {
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use crate::vote::Vote;
+	use crate::{vote::Vote, weights::WeightInfo};
 	use frame_support::traits::tokens::nonfungibles_v2::{Inspect, InspectEnumerable};
 
 	/// The current storage version.
@@ -119,7 +129,7 @@ pub mod pallet {
 
 		type NFTCollectionId: Member + Parameter + MaxEncodedLen + Copy;
 
-		type ItemId: Member + Parameter + MaxEncodedLen + Copy;
+		type ItemId: Member + Parameter + MaxEncodedLen + Copy + From<u32>;
 
 		type NFTProvider: Inspect<Self::AccountId, CollectionId = Self::NFTCollectionId, ItemId = Self::ItemId>
 			+ InspectEnumerable<
@@ -127,6 +137,9 @@ pub mod pallet {
 				CollectionId = Self::NFTCollectionId,
 				ItemId = Self::ItemId,
 			>;
+
+		/// Weight information for extrinsics in this pallet.
+		type WeightInfo: WeightInfo;
 	}
 
 	/// The hashes of the active proposals by Dao.
@@ -250,7 +263,7 @@ pub mod pallet {
 		/// Add a new proposal to either be voted on or executed directly.
 		///
 		/// Requires the sender to be member.
-		#[pallet::weight(10_1000)]
+		#[pallet::weight(T::WeightInfo::propose_with_meta())]
 		#[pallet::call_index(0)]
 		pub fn propose(
 			origin: OriginFor<T>,
@@ -261,7 +274,7 @@ pub mod pallet {
 		}
 
 		/// Adds a new proposal with temporary meta field for arbitrary data indexed by node indexer
-		#[pallet::weight(10_1000)]
+		#[pallet::weight(T::WeightInfo::propose_with_meta())]
 		#[pallet::call_index(1)]
 		pub fn propose_with_meta(
 			origin: OriginFor<T>,
@@ -304,7 +317,7 @@ pub mod pallet {
 		}
 
 		/// Add an aye or nay vote for the sender to the given proposal.
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::vote())]
 		#[pallet::call_index(2)]
 		pub fn vote(
 			origin: OriginFor<T>,
@@ -351,7 +364,7 @@ pub mod pallet {
 		///
 		/// + `proposal_weight_bound`: The maximum amount of weight consumed by executing the closed
 		/// proposal.
-		#[pallet::weight(10_000)]
+		#[pallet::weight(T::WeightInfo::close())]
 		#[pallet::call_index(3)]
 		pub fn close(
 			origin: OriginFor<T>,
