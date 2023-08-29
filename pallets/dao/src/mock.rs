@@ -22,6 +22,7 @@ use frame_system::{EnsureRoot, EnsureSigned, EnsureSignedBy};
 use serde_json::{json, Value};
 use sp_core::{
 	crypto::Ss58Codec,
+	offchain::{testing::TestOffchainExt, OffchainDbExt, OffchainWorkerExt},
 	sr25519::{Public, Signature},
 };
 use sp_runtime::{
@@ -340,13 +341,32 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
 }
 
+// Register offchain externalities
+pub fn register_offchain_ext(ext: &mut sp_io::TestExternalities) {
+	let (offchain, _offchain_state) = TestOffchainExt::with_offchain_db(ext.offchain_db());
+	ext.register_extension(OffchainDbExt::new(offchain.clone()));
+	ext.register_extension(OffchainWorkerExt::new(offchain));
+}
+
 pub fn get_dao_json() -> Value {
 	json!({
 		"name": DaoName::get(),
 		"purpose": DaoPurpose::get(),
 		"metadata": DaoMetadata::get(),
 		"policy": {
-			"proposal_period": 100
+			"proposal_period": 100,
+			"spend_period": 7200,
+			"governance": {
+				"GovernanceV1": {
+					"enactment_period": 20,
+					"launch_period": 200,
+					"voting_period": 200,
+					"vote_locking_period": 20,
+					"fast_track_voting_period": 300000,
+					"cooloff_period": 30,
+					"minimum_deposit": 1
+				}
+			}
 		},
 		"token": {
 			"token_id": TokenId::get(),

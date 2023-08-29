@@ -175,7 +175,7 @@ fn extend_subscription_works() {
 				subscribed_at: 0_u32.into(),
 				last_renewed_at: Some(MONTH_IN_BLOCKS.saturating_add(1).into()),
 				status: DaoSubscriptionStatus::Active {
-					until: MONTH_IN_BLOCKS.saturating_mul(2).into()
+					until: MONTH_IN_BLOCKS.saturating_mul(2).saturating_add(1).into()
 				},
 				fn_balance: DEFAULT_FUNCTION_CALL_LIMIT.saturating_mul(2),
 				fn_per_block: (0_u32.into(), 0),
@@ -186,7 +186,7 @@ fn extend_subscription_works() {
 			crate::Event::DaoSubscriptionExtended {
 				dao_id: 0,
 				status: DaoSubscriptionStatus::Active {
-					until: MONTH_IN_BLOCKS.saturating_mul(2).into(),
+					until: MONTH_IN_BLOCKS.saturating_mul(2).saturating_add(1).into(),
 				},
 				fn_balance: DEFAULT_FUNCTION_CALL_LIMIT.saturating_mul(2),
 			}

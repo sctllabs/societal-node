@@ -500,7 +500,8 @@ impl<T: Config>
 
 						let until = match subscription.status {
 							// overriding `until` based on the current active value
-							DaoSubscriptionStatus::Active { until } => until + duration,
+							DaoSubscriptionStatus::Active { until } =>
+								until.max(cur_block) + duration,
 							DaoSubscriptionStatus::Suspended { .. } => cur_block + duration,
 						};
 
@@ -582,6 +583,10 @@ impl<T: Config>
 		});
 
 		Ok(())
+	}
+
+	fn subscription(dao_id: DaoId) -> Option<SubscriptionOf<T>> {
+		Subscriptions::<T>::get(dao_id)
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]

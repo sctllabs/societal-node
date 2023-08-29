@@ -17,7 +17,7 @@ use serde::{self, Deserialize};
 use sp_core::crypto::KeyTypeId;
 use sp_io::offchain_index;
 use sp_runtime::{
-	traits::{AccountIdConversion, AtLeast32BitUnsigned, BlockNumberProvider, Saturating},
+	traits::{AccountIdConversion, AtLeast32BitUnsigned, BlockNumberProvider, One, Saturating},
 	transaction_validity::{
 		InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
 	},
@@ -90,6 +90,7 @@ const DAO_FACTORY_ID: LockIdentifier = *b"daofctry";
 const DAO_SPEND_ID: [u8; 4] = *b"spnd";
 const DAO_REFERENDUM_LAUNCH_ID: [u8; 4] = *b"refl";
 const DAO_REFERENDUM_BAKE_ID: [u8; 4] = *b"refb";
+const DAO_SUBSCRIPTION_PAYMENT_ID: [u8; 4] = *b"subp";
 
 pub mod crypto {
 	use crate::KEY_TYPE;
@@ -705,6 +706,48 @@ pub mod pallet {
 
 			Ok(())
 		}
+
+		#[pallet::weight(T::WeightInfo::schedule_subscription_payment())]
+		#[pallet::call_index(12)]
+		pub fn schedule_subscription_payment(
+			origin: OriginFor<T>,
+			dao_id: DaoId,
+		) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			let DaoSubscription { details, last_renewed_at, subscribed_at, .. } =
+				T::DaoSubscriptionProvider::subscription(dao_id).ok_or(Error::<T>::DaoNotExist)?;
+			let DaoSubscriptionDetails { duration, .. } = details;
+
+			let when = last_renewed_at
+				.unwrap_or(subscribed_at)
+				.saturating_add(duration)
+				.max(Self::current_block_number().saturating_add(One::one()));
+
+			let task_id = Self::subscription_payment_task_id(dao_id);
+			let call = CallOf::<T>::from(Call::extend_subscription { dao_id });
+
+			T::Scheduler::schedule_named(
+				task_id,
+				DispatchTime::At(when),
+				Some((duration, u32::MAX)),
+				50,
+				RawOrigin::Dao(Self::account_id(dao_id)).into(),
+				T::Preimages::bound(call)?.transmute(),
+			)?;
+
+			Ok(())
+		}
+
+		#[pallet::weight(T::WeightInfo::cancel_subscription_payment())]
+		#[pallet::call_index(13)]
+		pub fn cancel_subscription_payment(origin: OriginFor<T>, dao_id: DaoId) -> DispatchResult {
+			Self::ensure_approved(origin, dao_id)?;
+
+			T::Scheduler::cancel_named(Self::subscription_payment_task_id(dao_id))?;
+
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -730,6 +773,10 @@ pub mod pallet {
 
 		fn bake_dao_referendum_task_id(dao_id: DaoId) -> TaskName {
 			(DAO_FACTORY_ID, DAO_REFERENDUM_BAKE_ID, dao_id).encode_into()
+		}
+
+		fn subscription_payment_task_id(dao_id: DaoId) -> TaskName {
+			(DAO_FACTORY_ID, DAO_SUBSCRIPTION_PAYMENT_ID, dao_id).encode_into()
 		}
 
 		pub fn do_create_dao(
@@ -883,6 +930,8 @@ pub mod pallet {
 						Ok(hashes.len())
 					})?;
 
+					let block_number = Self::current_block_number();
+
 					PendingDaos::<T>::insert(
 						dao_hash,
 						PendingDao {
@@ -890,11 +939,11 @@ pub mod pallet {
 							policy: policy.clone(),
 							council,
 							technical_committee,
-							block_number: frame_system::Pallet::<T>::block_number(),
+							block_number,
 						},
 					);
 
-					let key = Self::derived_key(frame_system::Pallet::<T>::block_number());
+					let key = Self::derived_key(block_number);
 					let data: IndexingData<T::Hash> = IndexingData(
 						b"approve_dao".to_vec(),
 						OffchainData::ApproveDao { dao_hash, token_address },
@@ -1000,7 +1049,7 @@ pub mod pallet {
 			policy: DaoPolicy,
 			reschedule: bool,
 		) -> DispatchResult {
-			let now = frame_system::Pallet::<T>::block_number();
+			let now = Self::current_block_number();
 			let DaoPolicy { spend_period, governance, .. } = policy;
 			let account_id = Self::account_id(dao_id);
 
@@ -1104,29 +1153,11 @@ impl<T: Config> DaoProvider<T::AccountId, T::Hash> for Pallet<T> {
 	type ApproveOrigin = T::ApproveOrigin;
 	type NFTCollectionId = u32;
 
-	fn exists(id: Self::Id) -> Result<(), DispatchError> {
-		if !Daos::<T>::contains_key(id) {
-			return Err(Error::<T>::DaoNotExist.into())
-		}
-
-		Ok(())
-	}
-
-	fn count() -> u32 {
-		NextDaoId::<T>::get()
-	}
-
 	fn policy(id: Self::Id) -> Result<Self::Policy, DispatchError> {
 		match Policies::<T>::get(id) {
 			Some(policy) => Ok(policy),
 			None => Err(Error::<T>::PolicyNotExist.into()),
 		}
-	}
-
-	fn ensure_member(id: Self::Id, who: &T::AccountId) -> Result<bool, DispatchError> {
-		let (is_member, _) = Self::do_ensure_member(id, who)?;
-
-		Ok(is_member)
 	}
 
 	fn dao_account_id(id: Self::Id) -> T::AccountId {
