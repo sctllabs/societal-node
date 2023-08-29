@@ -20,6 +20,15 @@ benchmarks! {
 
 	set_subscription_tier {
 		let (tier, details) = Subscription::<T>::get_default_tier_details();
+		/// <SBP MR2
+		///
+		/// Is it possible that taking into account that SubscriptionDetailsOf<T> is composed by TokenBalances:
+		/// pub type TokenBalances<AssetId, Balance, TokenBalancesLimit> = BoundedVec<(AssetId, Balance), TokenBalancesLimit>;
+		///
+		/// the call can be called with a different token_prices len size and make a discrepancy with the the default len comming from get_default_tier_details()?
+		///
+		///
+		/// ?
 	}: _(RawOrigin::Root, tier.clone(), details.clone())
 	verify {
 		let subscription_tier = Subscription::<T>::subscription_tiers(tier).unwrap();

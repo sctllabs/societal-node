@@ -149,6 +149,12 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// The range of component `b` is `[1, 1024]`.
 	/// The range of component `m` is `[4, 100]`.
 	/// The range of component `p` is `[1, 50]`.
+	/// <HB SBP M2 Review
+	/// 
+	/// I don't know the internals, but for some reason the benchmarking macro is really using the bytes parameter for the benchmarking function.
+	/// There is nothingto do here, but in case you want to optimize this result, this can be a starting point.
+	/// 
+	/// >
 	fn close_early_approved(_b: u32, m: u32, p: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `871 + b * (1 ±0) + m * (64 ±0) + p * (185 ±0)`

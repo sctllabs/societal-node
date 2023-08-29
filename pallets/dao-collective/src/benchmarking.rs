@@ -118,6 +118,13 @@ benchmarks_instance_pallet! {
 		let bounded = T::Preimages::bound(proposal.clone())?.transmute();
 		let proposal_hash = T::Hashing::hash_of(&bounded);
 
+		/// <SBP MR2
+		///
+		/// Why don't generate a vector lenght based oin the ProposalMetadataLimit?
+		/// Or even sending this as a complexity parameter as you are doing with the other storage items?
+		///
+		/// Even if "meta" will not be stored in the DB, the data included in the events will allocate storage from the PoV anyway.
+		/// >
 		let meta: Option<Vec<u8>> = Some("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor \
 			incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud \
 			exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure \
@@ -416,6 +423,11 @@ benchmarks_instance_pallet! {
 		let m in 4 .. T::MaxMembers::get();
 		let p in 1 .. T::MaxProposals::get();
 
+		/// <SBP MR2
+		///
+		/// Is there any reason why this function is not using the b linear parameter as the others?
+		///
+		///  >
 		let bytes = 100;
 		let bytes_in_storage = bytes + size_of::<u32>() as u32;
 

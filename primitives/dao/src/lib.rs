@@ -601,8 +601,19 @@ pub enum SuspensionReason {
 
 #[derive(Encode, Decode, Clone, PartialEq, TypeInfo, RuntimeDebug, MaxEncodedLen)]
 pub enum DaoSubscriptionStatus<BlockNumber> {
-	Active { until: BlockNumber },
-	Suspended { at: BlockNumber, reason: SuspensionReason },
+	/// <SBP MR2
+	///
+	/// Please take into account that in release 1.0 the api for block number changes to  
+	/// frame_system::pallet_prelude::BlockNumberFor;
+	///
+	/// >
+	Active {
+		until: BlockNumber,
+	},
+	Suspended {
+		at: BlockNumber,
+		reason: SuspensionReason,
+	},
 }
 
 pub type DaoFunctionBalance = u32;
@@ -630,6 +641,17 @@ pub struct DaoSubscription<BlockNumber, Tier, Details, AssetId> {
 	pub subscribed_at: BlockNumber,
 	pub last_renewed_at: Option<BlockNumber>,
 	pub status: DaoSubscriptionStatus<BlockNumber>,
+	/// <SBP M2
+	///
+	/// I struggle to understand the purpose of this field since it saw in the tests the folliwing:
+	///
+	/// fn_balance: DEFAULT_FUNCTION_CALL_LIMIT,
+	///
+	/// i would suggest to rename these fn fields with something more descriptive.
+	/// Personally, in the code i was expecting kind of a closure assigment in my first read (then
+	/// i realized it was not the case)
+	///
+	/// >
 	pub fn_balance: DaoFunctionBalance,
 	pub fn_per_block: FunctionPerBlock<BlockNumber, DaoFunctionBalance>,
 }
