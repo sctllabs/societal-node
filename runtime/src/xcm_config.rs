@@ -208,7 +208,7 @@ type Barrier = (
 	TakeWeightCredit,
 	/// < SBP MR2
 	/// 
-	/// AllowTopLevelPaidExecutionFrom<Everything> duplicated.
+	/// Remove AllowTopLevelPaidExecutionFrom<Everything> duplicated.
 	/// 
 	/// >
 	AllowTopLevelPaidExecutionFrom<Everything>,
