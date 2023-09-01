@@ -8,11 +8,13 @@ use frame_support::{
 	assert_noop, assert_ok,
 	traits::tokens::fungibles::{metadata::Inspect as MetadataInspect, Inspect},
 };
+use log::info;
 use pallet_balances::Error as BalancesError;
 use pallet_dao_democracy::Error as DemocracyError;
 use pallet_dao_subscription::Error as SubscriptionError;
 use serde_json::{json, Value};
-use sp_core::{crypto::Ss58Codec, sr25519::Public};
+use sp_core::{crypto::Ss58Codec, sr25519::Public, TypedGet};
+use sp_runtime::traits::One;
 
 use super::*;
 
@@ -54,8 +56,12 @@ fn create_dao_fails_on_string_limits() {
 		);
 
 		dao_json = get_dao_json();
-		let new_purpose = "very long purpose above the limits very long purpose above the \
-			limits very long purpose above the limits";
+		let new_purpose = String::from_utf8(vec![
+			97_u8;
+			<<Test as Config>::DaoStringLimit as TypedGet>::get().saturating_add(One::one())
+				as usize
+		])
+		.expect("invalid utf8");
 		dao_json["purpose"] = Value::String(new_purpose.to_string());
 		assert_noop!(
 			DaoFactory::create_dao(
@@ -68,16 +74,15 @@ fn create_dao_fails_on_string_limits() {
 		);
 
 		dao_json = get_dao_json();
-		let new_metadata = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor \
-			incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud \
-			exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure \
-			dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. \
-			Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt \
-			mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit, \
-			sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim \
-			veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo \
-			consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.";
-		dao_json["metadata"] = Value::String(new_metadata.to_string());
+		let new_metadata = vec![
+			98_u8;
+			<<Test as Config>::DaoMetadataLimit as TypedGet>::get().saturating_add(One::one())
+				as usize
+		];
+		info!("{:?}", new_metadata.clone());
+		dao_json["metadata"] =
+			Value::String(String::from_utf8(new_metadata.clone()).expect("invalid utf8"));
+		info!("{:?}", Value::String(String::from_utf8(new_metadata).expect("invalid utf8")));
 		assert_noop!(
 			DaoFactory::create_dao(
 				RuntimeOrigin::signed(account.clone()),
@@ -325,25 +330,14 @@ fn update_dao_metadata_too_long() {
 	new_test_ext().execute_with(|| {
 		create_dao();
 
-		let new_metadata =
-			"Lorem Lorem dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor \
-			incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud \
-			exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure \
-			dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. \
-			Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt \
-			mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit, \
-			sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim \
-			veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo \
-			consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum \
-			do voluptate velit esse cillum do voluptate velit esse cillum do voluptate velit \
-			esse cillum dovoluptate velit esse cillum do";
+		let new_metadata = vec![
+			0;
+			<<Test as Config>::DaoMetadataLimit as TypedGet>::get().saturating_add(One::one())
+				as usize
+		];
 
 		assert_noop!(
-			DaoFactory::update_dao_metadata(
-				RuntimeOrigin::root(),
-				0,
-				new_metadata.as_bytes().to_vec()
-			),
+			DaoFactory::update_dao_metadata(RuntimeOrigin::root(), 0, new_metadata),
 			Error::<Test>::MetadataTooLong
 		);
 	})
@@ -355,24 +349,12 @@ fn update_dao_metadata_works() {
 		create_dao();
 
 		let new_metadata =
-			"Lorem Lorem dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor \
-			incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud \
-			exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure \
-			dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. \
-			Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt \
-			mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit, \
-			sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim \
-			veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo \
-			consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum do";
+			vec![1; <<Test as Config>::DaoMetadataLimit as TypedGet>::get() as usize];
 
-		assert_ok!(DaoFactory::update_dao_metadata(
-			RuntimeOrigin::root(),
-			0,
-			new_metadata.as_bytes().to_vec()
-		));
+		assert_ok!(DaoFactory::update_dao_metadata(RuntimeOrigin::root(), 0, new_metadata.clone()));
 
 		let DaoConfig { metadata, .. } = DaoFactory::daos(0).unwrap().config;
-		assert_eq!(metadata.to_vec(), new_metadata.as_bytes().to_vec());
+		assert_eq!(metadata.to_vec(), new_metadata);
 	})
 }
 

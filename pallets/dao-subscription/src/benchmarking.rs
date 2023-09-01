@@ -18,6 +18,7 @@ fn setup_subscription<T: Config>() -> Result<(), DispatchError> {
 
 benchmarks! {
 
+	// TODO: use max length for the tier
 	set_subscription_tier {
 		let (tier, details) = Subscription::<T>::get_default_tier_details();
 	}: _(RawOrigin::Root, tier.clone(), details.clone())
