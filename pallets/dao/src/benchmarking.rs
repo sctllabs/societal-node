@@ -11,6 +11,7 @@ use sp_runtime::traits::Bounded;
 use crate::Pallet as DaoFactory;
 use serde_json::{json, Value};
 
+use crate::string::String;
 use codec::alloc::string::ToString;
 
 const SEED: u32 = 0;
@@ -21,16 +22,10 @@ const TECH_COMMITTEE_SEED: u32 = 2;
 fn setup_dao_payload<T: Config>(is_eth: bool, tier: Option<Value>) -> Vec<u8> {
 	let mut dao_json = json!({
 		"name": "name",
-		"purpose": "purpose",
-		"metadata": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor \
-			incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud \
-			exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure \
-			dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. \
-			Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt \
-			mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit, \
-			sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim \
-			veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo \
-			consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum do",
+		"purpose": Value::String(
+			String::from_utf8(vec![97_u8; T::DaoStringLimit::get() as usize]).expect("invalid utf8")),
+		"metadata": Value::String(
+			String::from_utf8(vec![97_u8; T::DaoMetadataLimit::get() as usize]).expect("invalid utf8")),
 		"policy": {
 			"proposal_period": 300000,
 			"governance": {
@@ -145,20 +140,12 @@ benchmarks! {
 
 	update_dao_metadata {
 		setup_dao::<T>(false, None)?;
-		let new_metadata = "Lorem Lorem dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor \
-			incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud \
-			exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure \
-			dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. \
-			Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt \
-			mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit, \
-			sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim \
-			veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo \
-			consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum do";
+		let new_metadata = vec![1; T::DaoMetadataLimit::get() as usize];
 		let origin = get_dao_origin::<T>(0)?;
-	}: _<T::RuntimeOrigin>(origin, 0, new_metadata.as_bytes().to_vec())
+	}: _<T::RuntimeOrigin>(origin, 0, new_metadata.clone())
 	verify {
 		let DaoConfig { metadata, .. } = Daos::<T>::get(0).unwrap().config;
-		assert_eq!(metadata.to_vec(), new_metadata.as_bytes().to_vec());
+		assert_eq!(metadata.to_vec(), new_metadata);
 	}
 
 	update_dao_policy {
@@ -212,7 +199,23 @@ benchmarks! {
 		setup_dao::<T>(false, None)?;
 		let origin = get_dao_origin::<T>(0)?;
 	}: _<T::RuntimeOrigin>(origin, 0)
-	verify { }
+	verify {
+		// assert_last_event::<T, I>(
+			// Event::DaoRegistered {
+			// 	dao_id: DaoId,
+			// 	founder: T::AccountId,
+			// 	account_id: T::AccountId,
+			// 	council: BoundedVec<T::AccountId, T::DaoMaxCouncilMembers>,
+			// 	technical_committee: BoundedVec<T::AccountId, T::DaoMaxTechnicalCommitteeMembers>,
+			// 	token: DaoToken<T::AssetId, BoundedVec<u8, T::DaoStringLimit>>,
+			// 	config: DaoConfig<
+			// 		BoundedVec<u8, T::DaoNameLimit>,
+			// 		BoundedVec<u8, T::DaoStringLimit>,
+			// 		BoundedVec<u8, T::DaoMetadataLimit>,
+			// 	>,
+			// 	policy: DaoPolicy,
+			// }.into());
+	}
 
 	launch_dao_referendum {
 		setup_dao::<T>(false, None)?;
