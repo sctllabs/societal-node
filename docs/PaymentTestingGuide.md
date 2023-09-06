@@ -2,7 +2,7 @@
 
 ## Launch Rococo Local Testnet
 
-- Please refer to the [Run Local Rococo Testnet ](../README.md#run-rococo-local-testnet-with-societal-node-parachains) section of the README
+- Please refer to the [Run Local Rococo Testnet ](../README.md#run-rococo-local-testnet) section of the README
 
 ## Register Societal Parachain - Para ID 2000
 
