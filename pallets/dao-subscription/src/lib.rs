@@ -184,7 +184,7 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		#[pallet::weight(T::WeightInfo::set_subscription_tiers())]
+		#[pallet::weight(T::WeightInfo::set_subscription_tier())]
 		#[pallet::call_index(0)]
 		pub fn set_subscription_tier(
 			origin: OriginFor<T>,
