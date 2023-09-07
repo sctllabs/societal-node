@@ -2,7 +2,7 @@
 
 ## Launch Rococo Local Testnet
 
-- Please refer to the [Run Local Rococo Testnet ](../README.md#run-rococo-local-testnet) section of the README
+- Please refer to the [Run in Docker](../README.md#run-in-docker) section of the README
 
 ## Register Asset Hub Parachain - Para ID 1000
 
