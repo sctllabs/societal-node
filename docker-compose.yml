@@ -1,18 +1,159 @@
 version: "3.2"
 
 services:
-  dev:
-    container_name: societal-node
-    image: societal/societal-node:solo-latest
-    working_dir: /societal-node
+  validator-alice:
+    container_name: validator-alice
+    image: parity/polkadot:v0.9.41
     ports:
+      - "30333:30333"
       - "9944:9944"
-      - "9933:9933"
-    environment:
-      - CARGO_HOME=/var/www/societal-node/.cargo
     volumes:
-      - .:/var/www/societal-node
-      - type: bind
-        source: ./.local
-        target: /root/.local
-    command: /usr/local/bin/societal-node --dev --enable-offchain-indexing true --rpc-external --ws-external --rpc-cors=all --unsafe-ws-external --unsafe-rpc-external
+      - ./examples/raw-local-chainspec.json:/chain/raw-local-chainspec.json
+      - validator-alice:/polkadot
+    command: >
+      --name "AliceRelayDocker"
+      --alice
+      --chain /chain/raw-local-chainspec.json
+      --port 30333
+      --ws-port 9944
+      --ws-external
+      --rpc-external
+      --rpc-cors all
+      --rpc-methods unsafe
+
+  validator-bob:
+    container_name: validator-bob
+    image: parity/polkadot:v0.9.41
+    ports:
+      - "30334:30334"
+      - "9945:9945"
+    volumes:
+      - ./examples/raw-local-chainspec.json:/chain/raw-local-chainspec.json
+      - validator-bob:/polkadot
+    command: >
+      --name "BobRelayDocker"
+      --bob
+      --chain /chain/raw-local-chainspec.json
+      --port 30334
+      --ws-port 9945
+      --ws-external
+      --rpc-external
+      --rpc-cors all
+      --rpc-methods unsafe
+
+  validator-charlie:
+    container_name: validator-charlie
+    image: parity/polkadot:v0.9.41
+    ports:
+      - "30335:30335"
+      - "9946:9946"
+    volumes:
+      - ./examples/raw-local-chainspec.json:/chain/raw-local-chainspec.json
+      - validator-bob:/polkadot
+    command: >
+      --name "CharlieRelayDocker"
+      --bob
+      --chain /chain/raw-local-chainspec.json
+      --port 30335
+      --ws-port 9946
+      --ws-external
+      --rpc-external
+      --rpc-cors all
+      --rpc-methods unsafe
+
+  parachain-2000:
+    container_name: societal-node-parachain-2000
+    image: societal/societal-node:v0.0.3
+    ports:
+      - "40333:40333"
+      - "9954:9954"
+      - "30343:30343"
+      - "9977:9977"
+    volumes:
+      - ./examples/raw-local-chainspec.json:/chain/raw-local-chainspec.json
+      - ./examples/raw-parachain-chainspec.json:/chain/raw-parachain-chainspec.json
+      - parachain-2000:/polkadot
+    command: >
+      /usr/local/bin/societal-node
+      --name "SocietalParachain2000"
+      --alice
+      --collator
+      --chain /chain/raw-parachain-chainspec.json
+      --port 40333
+      --ws-port 9954
+      --enable-offchain-indexing true
+      --ws-external
+      --rpc-external
+      --rpc-cors all
+      --rpc-methods unsafe
+      --
+      --execution wasm
+      --chain /chain/raw-local-chainspec.json
+      --port 30343
+      --ws-port 9977
+
+  parachain-2001:
+    container_name: societal-node-parachain-2001
+    image: societal/societal-node:v0.0.3
+    ports:
+      - "40334:40334"
+      - "9955:9955"
+      - "30344:30344"
+      - "9978:9978"
+    volumes:
+      - ./examples/raw-local-chainspec.json:/chain/raw-local-chainspec.json
+      - ./examples/raw-parachain-chainspec-2001.json:/chain/raw-parachain-chainspec.json
+      - parachain-2001:/polkadot
+    command: >
+      /usr/local/bin/societal-node
+      --alice
+      --collator
+      --chain /chain/raw-parachain-chainspec.json
+      --port 40334
+      --ws-port 9955
+      --enable-offchain-indexing true
+      --ws-external
+      --rpc-external
+      --rpc-cors all
+      --rpc-methods unsafe
+      --
+      --execution wasm
+      --chain /chain/raw-local-chainspec.json
+      --port 30344
+      --ws-port 9978
+
+  asset-hub:
+    container_name: asset-hub
+    image: parity/polkadot-parachain:0.9.400
+    user: root
+    ports:
+      - "40335:40335"
+      - "9956:9956"
+      - "30345:30345"
+      - "9979:9979"
+    volumes:
+      - ./examples/raw-local-chainspec.json:/chain/raw-local-chainspec.json
+      - ./examples/raw-parachain-chainspec-1000.json:/chain/raw-parachain-chainspec.json
+      - asset-hub:/polkadot
+    command: >
+      --alice
+      --collator
+      --chain /chain/raw-parachain-chainspec.json
+      --port 40335
+      --ws-port 9956
+      --ws-external
+      --rpc-external
+      --rpc-cors all
+      --rpc-methods unsafe
+      --
+      --execution wasm
+      --chain /chain/raw-local-chainspec.json
+      --port 30345
+      --ws-port 9979
+
+volumes:
+  validator-alice:
+  validator-bob:
+  parachain-2000:
+  parachain-2001:
+  asset-hub:
