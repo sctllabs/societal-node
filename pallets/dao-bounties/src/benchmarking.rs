@@ -17,6 +17,21 @@ const SEED: u32 = 0;
 
 // Create the pre-requisite information needed to create a dao.
 fn setup_dao_payload<T: Config<I>, I: 'static>() -> Vec<u8> {
+	/// <SBP MR2
+	///
+	/// I have a concern about this setup_dao_payload fn that seems to be common for all the
+	/// benchmarks:
+	///
+	/// I understand this function is to initilize the payload for the dao during the benchmarking
+	/// executions. As per i was able to understand, these values are mostly used by the methods
+	/// exposed by T:DaoProvider which as far as i have reviewed, it does not execute any o(n)
+	/// operations, but as the code extense and i don't have it 100% on top of my head i wonder if
+	/// there is any part of the code where the function being benchmarked is influenced by the size
+	/// of any of the fields in the json, which are currently hardcoded.
+	///
+	/// In case they are not, this comment can be dismissed.
+	///
+	/// >
 	let dao_json = json!({
 		"name": "name",
 		"purpose": "purpose",
@@ -41,7 +56,6 @@ fn setup_dao_payload<T: Config<I>, I: 'static>() -> Vec<u8> {
 fn create_dao<T: Config<I>, I: 'static>() -> Result<(), DispatchError> {
 	let caller = account("caller", 0, SEED);
 	let data = setup_dao_payload::<T, I>();
-
 	T::DaoProvider::create_dao(caller, vec![], vec![], data)?;
 
 	let dao_account_id = T::DaoProvider::dao_account_id(0);
@@ -122,6 +136,12 @@ fn assert_last_event<T: Config<I>, I: 'static>(generic_event: <T as Config<I>>::
 	frame_system::Pallet::<T>::assert_last_event(generic_event.into());
 }
 
+/// <SBP MR2
+///
+/// Is there any reason why most of the benchmarks do not attach "verify"s functions?
+/// I think its healty that every benchmark function verify that its execution was successful.
+///
+/// >
 benchmarks_instance_pallet! {
 	create_bounty {
 		create_dao::<T, I>()?;

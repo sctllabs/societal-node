@@ -191,7 +191,10 @@ pub mod pallet {
 			tier: VersionedDaoSubscriptionTier,
 			details: SubscriptionDetailsOf<T>,
 		) -> DispatchResult {
-			ensure_root(origin.clone())?;
+			/// <SBP MR2
+			/// You can remove this .clone()
+			/// >
+			ensure_root(origin)?;
 
 			Self::do_set_subscription_tier(tier, details)
 		}
@@ -203,6 +206,9 @@ pub mod pallet {
 			dao_id: DaoId,
 			reason: SuspensionReason,
 		) -> DispatchResult {
+			/// <SBP MR2
+			/// You can remove this .clone()
+			/// >
 			ensure_root(origin.clone())?;
 
 			Subscriptions::<T>::try_mutate(
@@ -295,9 +301,13 @@ pub mod pallet {
 
 								extra_check(subscription)?;
 
-								subscription.fn_balance = fn_balance
-									.checked_sub(1)
-									.ok_or(Error::<T>::FunctionBalanceLow)?;
+								/// <SBP MR2
+								///
+								/// Is this kind of used to assure that at least the account has
+								/// balance 1 for existencial deposit? It's not wrong but i
+								/// wonder if there could be an impl fn for this where yoiu don't
+								/// hardcode the 1 value >
+								subscription.fn_balance = fn_balance.checked_sub(1).ok_or(Error::<T>::FunctionBalanceLow)?;
 
 								let (block_number, fn_calls) = subscription.fn_per_block;
 
@@ -330,6 +340,11 @@ pub mod pallet {
 			T::TreasuryPalletId::get().into_account_truncating()
 		}
 
+		/// <SBP MR2
+		///
+		/// As the TODO says, this is a good candidate to be configured in the chain_spec + Defaults
+		///
+		/// >
 		// TODO: try to use default for subscription details
 		pub fn get_default_tier_details() -> (VersionedDaoSubscriptionTier, SubscriptionDetailsOf<T>)
 		{
@@ -467,6 +482,13 @@ impl<T: Config>
 	fn unsubscribe(dao_id: DaoId) -> Result<(), DispatchError> {
 		let subscription = Subscriptions::<T>::get(dao_id);
 		if subscription.is_some() {
+			///< SBP MR2
+			///
+			/// Is this the only required action for subscribing ?
+			/// What about the opther storage items ? I wonder if it worths to do some cleanup for
+			/// storage optimization once they unsubscribe happens
+			///
+			/// >
 			Subscriptions::<T>::remove(dao_id);
 
 			Self::deposit_event(Event::DaoUnsubscribed { dao_id });
@@ -550,6 +572,11 @@ impl<T: Config>
 
 						Self::pay_for_subscription(account_id, &details, token_id)?;
 
+						/// <SBP MR2
+						///
+						/// Unnecesary clones ?
+						///
+						/// >
 						subscription.tier = tier.clone();
 						subscription.details = details.clone();
 

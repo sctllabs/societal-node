@@ -154,6 +154,12 @@ where
 	}
 }
 
+
+	/// < SBP MR2
+	/// 
+	/// This struct can be removed since is not being used anywhere. 
+	/// 
+	/// >
 // See issue #5233
 pub struct DenyReserveTransferToRelayChain;
 impl ShouldExecute for DenyReserveTransferToRelayChain {
@@ -200,6 +206,11 @@ impl ShouldExecute for DenyReserveTransferToRelayChain {
 
 type Barrier = (
 	TakeWeightCredit,
+	/// < SBP MR2
+	/// 
+	/// Remove AllowTopLevelPaidExecutionFrom<Everything> duplicated.
+	/// 
+	/// >
 	AllowTopLevelPaidExecutionFrom<Everything>,
 	AllowTopLevelPaidExecutionFrom<Everything>,
 	AllowKnownQueryResponses<PolkadotXcm>,
