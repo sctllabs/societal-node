@@ -269,6 +269,10 @@ try-runtime-cli = { version = "0.10.0-dev", git = "https://github.com/paritytech
 # Build dependencies
 substrate-build-script-utils = { version = "3.0.0", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.41" }
 
+# tanssi dependencies
+pallet-cc-authorities-noting = { git = "https://github.com/moondance-labs/tanssi", branch = "master", default-features = false }
+pallet_authorities_noting = { git = "https://github.com/moondance-labs/moonkit", branch = "tanssi-polkadot-v0.9.43", default-features = false}
+
 #runtime = { path = "runtime" }
 
 [profile.release]

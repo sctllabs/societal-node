@@ -1447,6 +1447,30 @@ impl pallet_collator_selection::Config for Runtime {
 	type WeightInfo = ();
 }
 
+// tanssi addition
+
+impl pallet_author_inherent::Config for Runtime {
+    type AuthorId = NimbusId;
+    type AccountLookup = tp_consensus::NimbusLookUp;
+    type CanAuthor = pallet_cc_authorities_noting::CanAuthor<Runtime>;
+    type SlotBeacon = tp_consensus::AuraDigestSlotBeacon<Runtime>;
+    type WeightInfo = 
+        pallet_author_inherent::weights::SubstrateWeight<Runtime>;
+}
+
+
+// tanssi addition
+impl pallet_cc_authorities_noting::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type SelfParaId = parachain_info::Pallet<Runtime>;
+    type RelayChainStateProvider = 
+        cumulus_pallet_parachain_system::RelaychainDataProvider<Self>;
+    type AuthorityId = NimbusId;
+    type WeightInfo = 
+        pallet_cc_authorities_noting::weights::SubstrateWeight<Runtime>;
+}
+
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub struct Runtime
@@ -1533,6 +1557,11 @@ construct_runtime!(
 		DaoEthGovernance: pallet_dao_eth_governance::{Pallet, Call, Storage, Event<T>, Config<T>, ValidateUnsigned} = 107,
 		DaoBounties: pallet_dao_bounties::{Pallet, Call, Storage, Event<T>} = 108,
 		DaoSubscription: pallet_dao_subscription::{Pallet, Call, Storage, Event<T>} = 109,
+
+		// tanssi addition
+		// ContainerChain
+		AuthoritiesNoting: pallet_cc_authorities_noting = 50,
+    	AuthorInherent: pallet_author_inherent = 51,
 	}
 );
 
@@ -1540,6 +1569,11 @@ construct_runtime!(
 pub type Address = sp_runtime::MultiAddress<AccountId, ()>;
 /// Block header type as expected by this runtime.
 pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
+
+// tanssi addition
+/// An index to a block.
+pub type BlockNumber = u32; 
+
 /// Block type as expected by this runtime.
 pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 /// The SignedExtension to the basic transaction logic.
@@ -2018,3 +2052,10 @@ impl cumulus_pallet_parachain_system::CheckInherents<Block> for CheckInherents {
 		inherent_data.check_extrinsics(block)
 	}
 }
+
+cumulus_pallet_parachain_system::register_validate_block! {
+    Runtime = Runtime,
+    BlockExecutor = pallet_author_inherent::BlockExecutor::<Runtime, Executive>
+    CheckInherents = CheckInherents,
+}
+
