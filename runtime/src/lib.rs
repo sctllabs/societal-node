@@ -1560,8 +1560,8 @@ construct_runtime!(
 
 		// tanssi addition
 		// ContainerChain
-		AuthoritiesNoting: pallet_cc_authorities_noting = 50,
-    	AuthorInherent: pallet_author_inherent = 51,
+		AuthoritiesNoting: pallet_cc_authorities_noting,
+    	AuthorInherent: pallet_author_inherent,
 	}
 );
 
@@ -2053,6 +2053,7 @@ impl cumulus_pallet_parachain_system::CheckInherents<Block> for CheckInherents {
 	}
 }
 
+// tanssi addition
 cumulus_pallet_parachain_system::register_validate_block! {
     Runtime = Runtime,
     BlockExecutor = pallet_author_inherent::BlockExecutor::<Runtime, Executive>
