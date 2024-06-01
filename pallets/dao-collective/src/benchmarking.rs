@@ -103,7 +103,8 @@ benchmarks_instance_pallet! {
 		// Add previous proposals.
 		for i in 0 .. p - 1 {
 			// Proposals should be different so that different proposal hashes are generated
-			let proposal: T::Proposal = SystemCall::<T>::remark { remark: vec![i as u8; b as usize] }.into();
+			let proposal: T::Proposal =
+				SystemCall::<T>::remark { remark: vec![i as u8; b as usize] }.into();
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(caller.clone()).into(),
 				0,
@@ -114,19 +115,11 @@ benchmarks_instance_pallet! {
 
 		assert_eq!(Collective::<T, I>::proposals(0).len(), (p - 1) as usize);
 
-		let proposal: T::Proposal = SystemCall::<T>::remark { remark: vec![p as u8; b as usize] }.into();
+		let proposal: T::Proposal =
+			SystemCall::<T>::remark { remark: vec![p as u8; b as usize] }.into();
 		let bounded = T::Preimages::bound(proposal.clone())?.transmute();
 		let proposal_hash = T::Hashing::hash_of(&bounded);
-
-		let meta: Option<Vec<u8>> = Some("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor \
-			incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud \
-			exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure \
-			dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. \
-			Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt \
-			mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit, \
-			sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim \
-			veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo \
-			consequat. Duis aute irure dolor in reprehenderit".into());
+		let meta = Some(vec![97_u8; T::ProposalMetadataLimit::get() as usize]);
 	}: _(
 		SystemOrigin::Signed(caller.clone()),
 		0,
@@ -152,11 +145,10 @@ benchmarks_instance_pallet! {
 	}
 
 	vote {
+		let b in 1 .. MAX_BYTES;
 		// We choose 5 as a minimum so we always trigger a vote in the voting loop (`for j in ...`)
 		let m in 5 .. T::MaxMembers::get();
-
 		let p = T::MaxProposals::get();
-		let b = MAX_BYTES;
 		let bytes_in_storage = b + size_of::<u32>() as u32;
 
 		create_dao::<T, I>()?;
@@ -230,24 +222,23 @@ benchmarks_instance_pallet! {
 	}
 
 	close_early_disapproved {
+		let b in 1 .. MAX_BYTES;
 		// We choose 4 as a minimum so we always trigger a vote in the voting loop (`for j in ...`)
 		let m in 4 .. T::MaxMembers::get();
 		let p in 1 .. T::MaxProposals::get();
-
-		let bytes = 100;
-		let bytes_in_storage = bytes + size_of::<u32>() as u32;
+		let bytes_in_storage = b + size_of::<u32>() as u32;
 
 		create_dao::<T, I>()?;
 
 		// Construct `members`.
 		let mut members = vec![];
-		let proposer = account::<T::AccountId>("proposer", 0, SEED);
+		let proposer: T::AccountId = account::<T::AccountId>("proposer", 0, SEED);
 		members.push(proposer.clone());
 		for i in 1 .. m - 1 {
 			let member = account::<T::AccountId>("member", i, SEED);
 			members.push(member);
 		}
-		let voter = account::<T::AccountId>("voter", 0, SEED);
+		let voter: T::AccountId = account::<T::AccountId>("voter", 0, SEED);
 		members.push(voter.clone());
 		Collective::<T, I>::initialize_members(0, members.clone())?;
 
@@ -255,10 +246,8 @@ benchmarks_instance_pallet! {
 		let mut last_hash = T::Hash::default();
 		for i in 0 .. p {
 			// Proposals should be different so that different proposal hashes are generated
-			let proposal: T::Proposal = SystemCall::<T>::remark {
-
-				remark: vec![i as u8; bytes as usize]
-			}.into();
+			let proposal: T::Proposal =
+				SystemCall::<T>::remark { remark: vec![i as u8; b as usize] }.into();
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(proposer.clone()).into(),
 				0,
@@ -315,7 +304,6 @@ benchmarks_instance_pallet! {
 		// We choose 4 as a minimum so we always trigger a vote in the voting loop (`for j in ...`)
 		let m in 4 .. T::MaxMembers::get();
 		let p in 1 .. T::MaxProposals::get();
-
 		let bytes_in_storage = b + size_of::<u32>() as u32;
 
 		create_dao::<T, I>()?;
@@ -412,12 +400,11 @@ benchmarks_instance_pallet! {
 
 	// TODO: get back to it in case if prime member returned back
 	close_disapproved {
+		let b in 1 .. MAX_BYTES;
 		// We choose 4 as a minimum so we always trigger a vote in the voting loop (`for j in ...`)
 		let m in 4 .. T::MaxMembers::get();
 		let p in 1 .. T::MaxProposals::get();
-
-		let bytes = 100;
-		let bytes_in_storage = bytes + size_of::<u32>() as u32;
+		let bytes_in_storage = b + size_of::<u32>() as u32;
 
 		create_dao::<T, I>()?;
 
@@ -438,10 +425,8 @@ benchmarks_instance_pallet! {
 		let mut last_hash = T::Hash::default();
 		for i in 0 .. p {
 			// Proposals should be different so that different proposal hashes are generated
-			let proposal: T::Proposal = SystemCall::<T>::remark {
-
-				remark: vec![i as u8; bytes as usize]
-			}.into();
+			let proposal: T::Proposal =
+				SystemCall::<T>::remark { remark: vec![i as u8; b as usize] }.into();
 			Collective::<T, I>::propose(
 				SystemOrigin::Signed(caller.clone()).into(),
 				0,
@@ -500,7 +485,6 @@ benchmarks_instance_pallet! {
 		// We choose 4 as a minimum so we always trigger a vote in the voting loop (`for j in ...`)
 		let m in 4 .. T::MaxMembers::get();
 		let p in 1 .. T::MaxProposals::get();
-
 		let bytes_in_storage = b + size_of::<u32>() as u32;
 
 		create_dao::<T, I>()?;

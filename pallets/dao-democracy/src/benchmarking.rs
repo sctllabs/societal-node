@@ -153,17 +153,7 @@ benchmarks! {
 		let value = 10_u32.into();
 		whitelist_account!(caller);
 
-		let meta: Option<Vec<u8>> = Some(
-			"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor \
-			incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud \
-			exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure \
-			dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. \
-			Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt \
-			mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit, \
-			sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim \
-			veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo \
-			consequat. Duis aute irure dolor in reprehenderit".into()
-		);
+		let meta = Some(vec![97_u8; T::ProposalMetadataLimit::get() as usize]);
 	}: _(RawOrigin::Signed(caller), 0, proposal, value, meta)
 	verify {
 		assert_eq!(Democracy::<T>::public_props(0).len(), p as usize, "Proposals not created.");

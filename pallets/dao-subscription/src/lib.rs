@@ -7,7 +7,7 @@ use frame_support::{
 };
 pub use pallet::*;
 use scale_info::prelude::*;
-use sp_runtime::Saturating;
+use sp_runtime::{traits::One, Saturating};
 use sp_std::str;
 
 use dao_primitives::*;
@@ -184,14 +184,14 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		#[pallet::weight(T::WeightInfo::set_subscription_tiers())]
+		#[pallet::weight(T::WeightInfo::set_subscription_tier())]
 		#[pallet::call_index(0)]
 		pub fn set_subscription_tier(
 			origin: OriginFor<T>,
 			tier: VersionedDaoSubscriptionTier,
 			details: SubscriptionDetailsOf<T>,
 		) -> DispatchResult {
-			ensure_root(origin.clone())?;
+			ensure_root(origin)?;
 
 			Self::do_set_subscription_tier(tier, details)
 		}
@@ -203,7 +203,7 @@ pub mod pallet {
 			dao_id: DaoId,
 			reason: SuspensionReason,
 		) -> DispatchResult {
-			ensure_root(origin.clone())?;
+			ensure_root(origin)?;
 
 			Subscriptions::<T>::try_mutate(
 				dao_id,
@@ -296,7 +296,7 @@ pub mod pallet {
 								extra_check(subscription)?;
 
 								subscription.fn_balance = fn_balance
-									.checked_sub(1)
+									.checked_sub(One::one())
 									.ok_or(Error::<T>::FunctionBalanceLow)?;
 
 								let (block_number, fn_calls) = subscription.fn_per_block;

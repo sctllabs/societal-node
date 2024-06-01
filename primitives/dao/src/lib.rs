@@ -9,7 +9,7 @@ use frame_support::{
 	weights::Weight,
 	BoundedVec,
 };
-pub use node_primitives::Balance;
+pub use node_primitives::{Balance, BlockNumber};
 
 use scale_info::TypeInfo;
 use serde::{self, Deserialize, Deserializer, Serialize};
@@ -17,6 +17,9 @@ use sp_runtime::RuntimeDebug;
 use sp_std::prelude::*;
 
 pub type DispatchResultWithDaoOrigin<T> = Result<DaoOrigin<T>, DispatchError>;
+
+pub type AssetId = u128;
+pub type TokenBalancesLimit = u32;
 
 // TODO: retrieve from runtime
 pub const EXPECTED_BLOCK_TIME: u32 = 12; // in seconds
@@ -847,6 +850,75 @@ pub struct DaoSubscriptionDetails<BlockNumber, Balance, TokenBalances> {
 	pub fn_per_block_limit: DaoFunctionBalance,
 	pub max_members: DaoMembersCount,
 	pub pallet_details: DaoPalletSubscriptionDetails,
+}
+
+impl Default
+	for DaoSubscriptionDetails<
+		BlockNumber,
+		Balance,
+		TokenBalances<AssetId, Balance, TokenBalancesLimit>,
+	>
+{
+	fn default() -> Self {
+		DaoSubscriptionDetails {
+			duration: MONTH_IN_BLOCKS.into(),
+			price: DEFAULT_SUBSCRIPTION_PRICE,
+			token_prices: BoundedVec::<(AssetId, Balance), TokenBalancesLimit>::default(),
+			fn_call_limit: DEFAULT_FUNCTION_CALL_LIMIT,
+			fn_per_block_limit: DEFAULT_FUNCTION_PER_BLOCK_LIMIT,
+			max_members: DEFAULT_MEMBER_COUNT_LIMIT,
+			pallet_details: DaoPalletSubscriptionDetails {
+				dao: Some(DaoPalletSubscriptionDetailsV1 {
+					update_dao_metadata: true,
+					update_dao_policy: true,
+					mint_dao_token: true,
+				}),
+				bounties: Some(BountiesSubscriptionDetailsV1 {
+					create_bounty: true,
+					propose_curator: true,
+					unassign_curator: true,
+					accept_curator: true,
+					award_bounty: true,
+					claim_bounty: true,
+					close_bounty: true,
+					extend_bounty_expiry: true,
+				}),
+				council: Some(CollectiveSubscriptionDetailsV1 {
+					propose: true,
+					vote: true,
+					close: true,
+				}),
+				council_membership: Some(MembershipSubscriptionDetailsV1 {
+					add_member: true,
+					remove_member: true,
+					swap_member: true,
+					change_key: true,
+				}),
+				tech_committee: Some(CollectiveSubscriptionDetailsV1 {
+					propose: false,
+					vote: false,
+					close: false,
+				}),
+				tech_committee_membership: Some(MembershipSubscriptionDetailsV1 {
+					add_member: true,
+					remove_member: true,
+					swap_member: true,
+					change_key: false,
+				}),
+				democracy: Some(DemocracySubscriptionDetailsV1 {
+					propose: false,
+					second: false,
+					vote: false,
+					delegate: false,
+					undelegate: false,
+					unlock: false,
+					remove_vote: false,
+					remove_other_vote: false,
+				}),
+				treasury: Some(TreasurySubscriptionDetailsV1 { spend: true, transfer_token: true }),
+			},
+		}
+	}
 }
 
 #[derive(

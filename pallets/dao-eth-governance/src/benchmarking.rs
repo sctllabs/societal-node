@@ -29,19 +29,6 @@ fn setup_dao_payload<T: Config>() -> Vec<u8> {
 	serde_json::to_vec(&dao_json).ok().unwrap()
 }
 
-fn get_proposal_metadata() -> Vec<u8> {
-	"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor \
-	incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud \
-	exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure \
-	dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. \
-	Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt \
-	mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit, \
-	sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim \
-	veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo \
-	consequat. Duis aute irure dolor in reprehenderit"
-		.into()
-}
-
 fn create_dao<T: Config>() -> Result<T::AccountId, DispatchError> {
 	let caller: T::AccountId = account("caller", 0, SEED);
 
@@ -93,7 +80,7 @@ fn add_proposal<T: Config>(
 		Box::new(proposal.clone()),
 		proposal_len,
 		other_eth.into(),
-		Some(get_proposal_metadata()),
+		Some(vec![97_u8; T::ProposalMetadataLimit::get() as usize]),
 	)?;
 	Ok((
 		proposal.clone(),
@@ -136,7 +123,7 @@ benchmarks! {
 
 		let proposal = make_proposal::<T>(0);
 		let proposal_len: u32 = proposal.using_encoded(|p| p.len() as u32);
-		let meta: Option<Vec<u8>> = Some(get_proposal_metadata());
+		let meta = Some(vec![97_u8; T::ProposalMetadataLimit::get() as usize]);
 	}: _(RawOrigin::Signed(caller), 0, Box::new(proposal), proposal_len, caller_eth.into(), meta)
 	verify {
 		assert_eq!(PendingProposals::<T>::get(0).len(), usize::try_from(T::MaxProposals::get()).unwrap());
